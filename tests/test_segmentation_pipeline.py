@@ -70,7 +70,22 @@ def test_pipeline_resumes(demo, tmp_path):
     assert first["validate"]["oa"] > 0.5
     logs = []
     pipeline.run(path, stages, log=logs.append)
-    assert all(line.startswith("[skip]") for line in logs)
+    assert all(line.startswith("[skip]") for line in logs if line.startswith("["))
+    # touching a file (new mtime, same content) must not invalidate anything
+    import os
+    import time
+    os.utime(demo["training"], (time.time() + 5, time.time() + 5))
+    logs = []
+    pipeline.run(path, stages, log=logs.append)
+    assert all(line.startswith("[skip]") for line in logs if line.startswith("["))
+    # a content change in the model configuration re-runs train and everything downstream of it
+    cfg["model"]["n_estimators"] = 25
+    path.write_text(yaml.safe_dump(cfg))
+    logs = []
+    pipeline.run(path, stages, log=logs.append)
+    ran = {line.split()[-1] for line in logs if line.startswith("[run ]")}
+    assert {"train", "predict", "parcels", "validate", "experiments"} <= ran and "features" not in ran
+    assert (tmp_path / "run" / "run.log").exists()
     manifest = json.loads((tmp_path / "run" / "run_manifest.json").read_text())
     assert manifest["config_fingerprint"] and manifest["packages"]["numpy"]
 
@@ -136,3 +151,25 @@ def test_ablation_with_holdout(samples, stack, tmp_path):
                         {"A": {"groups": ["s2_band"]}, "B": {"groups": ["s1"]}},
                         {"n_estimators": 15, "n_jobs": 1}, 2, 500, holdout_fraction=0.25)
     assert {"holdout_overall_accuracy", "holdout_macro_f1", "holdout_mcnemar_p"} <= set(t.columns)
+
+
+def test_run_lock(tmp_path):
+    from geocrop.cache import RunLock
+    with RunLock(tmp_path):
+        (tmp_path / ".geocrop.lock").write_text(str(1))          # pid 1 is always alive
+        with pytest.raises(RuntimeError), RunLock(tmp_path):
+            pass
+
+
+def test_hash_cache_content_not_mtime(tmp_path):
+    import os
+
+    from geocrop.cache import HashCache
+    f = tmp_path / "a.tif"
+    f.write_bytes(b"abc")
+    hc = HashCache(tmp_path / "h.json")
+    d1 = hc.file(f)
+    os.utime(f, (1, 1))
+    assert hc.file(f) == d1
+    f.write_bytes(b"abd")
+    assert hc.file(f) != d1

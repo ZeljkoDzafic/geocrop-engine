@@ -2,59 +2,98 @@
 
     composite -> features (+ time series) -> samples -> train -> predict -> cbm -> parcels -> validate -> experiments
 
-Each stage records a fingerprint of its configuration section and input files in
-`<output>/stages.json`; a stage whose fingerprint is unchanged and whose outputs exist is
-skipped, so long regional runs can be resumed after interruption. `force=True` reruns everything.
+Each stage records in `<output>/stages.json` a fingerprint made of its configuration section, the
+SHA-256 content digests of its input files (cached, see `geocrop.cache`), the engine version and the
+fingerprints of the stages it depends on. A stage whose fingerprint is unchanged and whose outputs
+exist is skipped, so long regional runs resume after interruption, and any upstream change
+invalidates every dependent stage. `force=True` reruns everything. A lock file prevents concurrent
+runs on one output directory, and `run.log` records timing and peak memory per stage.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+from . import __version__, scenes
 from . import config as cfgmod
-from . import scenes
+from .cache import HashCache, RunLock, fingerprint
 
 STAGES = ("composite", "features", "samples", "train", "predict", "cbm", "parcels", "validate", "experiments")
+DEPENDS = {"composite": (), "features": ("composite",), "samples": ("features",), "train": ("samples",),
+           "predict": ("train", "features"), "cbm": (), "parcels": ("predict", "train", "cbm"),
+           "validate": ("predict",), "experiments": ("samples", "features")}
 
 
-def _fp(*parts) -> str:
-    h = hashlib.sha256()
-    for p in parts:
-        if isinstance(p, (str, Path)) and Path(p).is_file():
-            st = Path(p).stat()
-            h.update(f"{p}:{st.st_size}:{st.st_mtime_ns}".encode())
-        else:
-            h.update(json.dumps(p, sort_keys=True, default=str).encode())
-    return h.hexdigest()[:16]
+def _peak_rss_mb() -> float | None:
+    try:
+        import resource
+        import sys
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return round(peak / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)
+    except (ImportError, AttributeError):
+        return None
 
 
 class Runner:
     def __init__(self, cfg: dict, force: bool = False, log=print):
-        self.cfg, self.force, self.log = cfg, force, log
+        self.cfg, self.force = cfg, force
         self.paths = {k: Path(v) for k, v in cfg["paths"].items()}
         self.out = self.paths["output"]
         self.out.mkdir(parents=True, exist_ok=True)
         self.state_path = self.out / "stages.json"
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
+        self.hashes = HashCache(self.out / ".hashcache.json", cfg["cache"]["hash"])
+        self._echo = log
+        self._current = None
+
+    def log(self, message: str):
+        self._echo(message)
+        with (self.out / "run.log").open("a", encoding="utf8") as fh:
+            fh.write(f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} {message}\n")
+
+    def _fp(self, *parts) -> str:
+        """Fingerprint of config parts, input contents (files or directories), engine version and upstream stages."""
+        resolved = []
+        for p in parts:
+            if isinstance(p, (str, Path)) and len(str(p)) < 4096 and Path(p).exists():
+                resolved.append(self.hashes.tree(p))
+            elif isinstance(p, (list, tuple)) and p and all(isinstance(x, (str, Path)) for x in p):
+                resolved.append([self.hashes.tree(x) if Path(x).exists() else str(x) for x in p])
+            else:
+                resolved.append(p)
+        upstream = {d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(self._current, ())}
+        self.hashes.save()
+        return fingerprint(__version__, upstream, resolved)
 
     def _done(self, stage, fp, outputs) -> bool:
         return (not self.force and self.state.get(stage, {}).get("fingerprint") == fp
                 and all(Path(o).exists() for o in outputs))
 
     def _record(self, stage, fp, started, info=None):
-        self.state[stage] = {"fingerprint": fp, "seconds": round(time.time() - started, 1), "info": info or {}}
-        self.state_path.write_text(json.dumps(self.state, indent=2, default=str), encoding="utf8")
+        self.state[stage] = {"fingerprint": fp, "seconds": round(time.time() - started, 1),
+                             "peak_rss_mb": _peak_rss_mb(), "engine": __version__,
+                             "finished_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                             "info": info or {}}
+        tmp = self.state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.state, indent=2, default=str), encoding="utf8")
+        tmp.replace(self.state_path)                  # atomic: a crash never leaves a half-written state
 
     def stage(self, name, fp, outputs, fn):
         if self._done(name, fp, outputs):
             self.log(f"[skip] {name} (unchanged)")
             return self.state[name].get("info")
         self.log(f"[run ] {name}")
+        self.state.pop(name, None)                    # invalidate before running: a failure forces a rerun
         started = time.time()
-        info = fn()
+        try:
+            info = fn()
+        except Exception as exc:
+            self.log(f"[fail] {name}: {type(exc).__name__}: {exc}")
+            raise
         self._record(name, fp, started, info)
+        self.log(f"[done] {name} in {self.state[name]['seconds']} s, peak RSS {self.state[name]['peak_rss_mb']} MB")
         return info
 
     # ------------------------------------------------------------------ stages
@@ -69,8 +108,8 @@ class Runner:
         s1_scenes = scenes.assign(scenes.discover(self.paths["s1_scenes"]), windows) if self.paths["s1_scenes"].exists() else {}
         grid = self.cfg["grid"].get("reference")
         outputs = [comp / w / "B02.tif" for w in windows if s2_scenes.get(w)]
-        fp = _fp(c, self.cfg["s1"], self.cfg["windows"], grid,
-                 [str(s["path"]) for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v])
+        fp = self._fp(c, self.cfg["s1"], self.cfg["windows"], grid,
+                      [str(s["path"]) for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v])
 
         def run():
             info = {"s2": scenes.inventory(s2_scenes) if s2_scenes else [],
@@ -98,9 +137,9 @@ class Runner:
         f = self.cfg["features"]
         periods = list(cfgmod.parse_windows(self.cfg["windows"])) or None
         comp = self.paths["composites"]
-        inputs = sorted(str(p) for p in comp.rglob("*.tif")) if comp.exists() else []
         t = self.cfg["timeseries"]
-        fp = _fp(f, t, periods, *inputs)
+        scene_roots = [self.paths["s2_scenes"], self.paths["s1_scenes"]] if t["enabled"] else []
+        fp = self._fp(f, t, periods, comp, *scene_roots)
 
         def run():
             target = self.paths["features"]
@@ -137,7 +176,7 @@ class Runner:
         from .samples import extract
         target = self.out / "samples.npz"
         m, cl = self.cfg["model"], self.cfg["classes"]
-        fp = _fp(m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"], self.paths["training"])
+        fp = self._fp(m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"], self.paths["training"])
 
         def run():
             s = extract(self.paths["features"], self.paths["training"], label_field=cl["label_field"],
@@ -151,7 +190,7 @@ class Runner:
         from .samples import Samples
         m = self.cfg["model"]
         target = self.out / "model" / "model.joblib"
-        fp = _fp(m, self.cfg["seed"], self.out / "samples.npz")
+        fp = self._fp(m, self.cfg["seed"], self.out / "samples.npz")
 
         def run():
             params = {k: m[k] for k in model.RF_KEYS if k in m}
@@ -166,7 +205,7 @@ class Runner:
     def predict(self):
         from . import model
         target = self.out / "prediction" / "classes.tif"
-        fp = _fp(self.paths["features"], self.out / "model" / "model.joblib")
+        fp = self._fp(self.paths["features"], self.out / "model" / "model.joblib")
         return self.stage("predict", fp, [target], lambda: model.predict(
             self.paths["features"], self.out / "model" / "model.joblib", self.out / "prediction"))
 
@@ -185,7 +224,7 @@ class Runner:
         start, end = date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"]))
         target = self.out / "cbm" / "markers.csv"
         ref = self.cfg["grid"].get("reference") or next(self.paths["composites"].glob("*/B02.tif"))
-        fp = _fp(c, t, self.paths["parcels"], str(self.paths["s2_scenes"]))
+        fp = self._fp(c, t, self.paths["parcels"], self.paths["s2_scenes"], self.cfg["parcels"]["interior_buffer_px"])
 
         def run():
             idx = [c["index"], "BSI"] if c["index"] != "BSI" else ["BSI"]
@@ -205,7 +244,7 @@ class Runner:
             self.log("[skip] parcels (no parcel layer)")
             return None
         target = self.out / "parcels" / "parcels.gpkg"
-        fp = _fp(p, self.paths["parcels"], self.out / "prediction" / "probabilities.tif")
+        fp = self._fp(p, self.paths["parcels"], self.out / "prediction" / "probabilities.tif")
         mapping = None
         if p.get("crop_mapping"):
             from .adapters import read_mapping
@@ -230,7 +269,7 @@ class Runner:
                 aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
                 markers=pd.read_csv(markers_csv) if self.cfg["cbm"]["enabled"] and markers_csv.exists() else None,
                 calendar=calendar)
-        fp = _fp(fp, conformal, aoa, markers_csv, calendar)
+        fp = self._fp(fp, conformal, aoa, markers_csv, calendar)
         return self.stage("parcels", fp, [target], run)
 
     def validate(self):
@@ -240,7 +279,7 @@ class Runner:
             self.log("[skip] validate (no independent observations)")
             return None
         target = self.out / "validation" / "validation_report.json"
-        fp = _fp(v, self.paths["observations"], self.paths["training"], self.out / "prediction" / "classes.tif")
+        fp = self._fp(v, self.paths["observations"], self.paths["training"], self.out / "prediction" / "classes.tif")
 
         def run():
             r = validation.evaluate_points(
@@ -259,7 +298,7 @@ class Runner:
         m = self.cfg["model"]
         exps = self.cfg["experiments"] or experiments.DEFAULT_EXPERIMENTS
         target = self.out / "experiments" / "ablation.csv"
-        fp = _fp(exps, m, self.out / "samples.npz")
+        fp = self._fp(exps, m, self.out / "samples.npz")
 
         def run():
             from .model import RF_KEYS
@@ -279,9 +318,13 @@ def run(config_path: str | Path, stages=None, force: bool = False, log=print) ->
     if unknown:
         raise ValueError(f"Unknown stages {sorted(unknown)}; choose from {STAGES}")
     results = {}
-    for name in STAGES:
-        if name in chosen:
-            results[name] = getattr(runner, name)()
-    from .provenance import run_manifest
-    run_manifest(runner.out, config=cfg, inputs=[runner.paths[k] for k in ("training", "parcels", "observations")])
+    with RunLock(runner.out):
+        runner.log(f"geocrop {__version__}: run {chosen} with config {config_path}")
+        for name in STAGES:
+            if name in chosen:
+                runner._current = name
+                results[name] = getattr(runner, name)()
+        runner.hashes.save()
+        from .provenance import run_manifest
+        run_manifest(runner.out, config=cfg, inputs=[runner.paths[k] for k in ("training", "parcels", "observations")])
     return results

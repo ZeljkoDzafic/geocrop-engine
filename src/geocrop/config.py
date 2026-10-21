@@ -19,6 +19,7 @@ DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
     "seed": 42,
     "grid": {"crs": None, "resolution_m": 10, "reference": None},
+    "cache": {"hash": "content"},
     "windows": {},
     "paths": {
         "s2_scenes": "data/interim/s2",
