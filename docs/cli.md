@@ -230,6 +230,8 @@ Spatial CV + final Random Forest
 | `--tune` |  |  | JSON grid, e.g. {"max_features": ["sqrt", 0.3]} |
 | `--groups` |  |  | restrict to feature groups |
 | `--manifest` |  |  | feature stack (for --groups) |
+| `--algorithm` |  |  |  |
+| `--no-calibrate` |  |  | skip temperature scaling |
 
 ## `geocrop predict`
 
@@ -284,6 +286,11 @@ Parcel aggregation, decision and declaration comparison
 | `--min-majority-share` |  |  |  |
 | `--min-margin` |  |  |  |
 | `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--conformal` |  |  | conformal.json from training |
+| `--alpha` |  | `0.1` |  |
+| `--aoa` |  |  | aoa.tif from prediction |
+| `--markers` |  |  | markers.csv from geocrop markers |
+| `--calendar` |  |  | crop calendar YAML |
 
 ## `geocrop parcel-model`
 
@@ -405,6 +412,104 @@ Boundary raster precision/recall/F1 with tolerance
 | `--out` | yes |  |  |
 | `--threshold` |  | `0.5` |  |
 | `--tolerance-px` |  | `2` |  |
+
+## `geocrop ts-features`
+
+Time-series features (Whittaker, phenology, harmonics) from scene folders
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  | scene root folder(s) |
+| `--reference` | yes |  | reference grid GeoTIFF |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--s2-indices` |  | `['NDVI', 'NDRE', 'NDMI']` |  |
+| `--s1-indices` |  | `['VHVV_dB']` |  |
+| `--step-days` |  | `5` |  |
+| `--output-step-days` |  | `15` |  |
+| `--lam` |  | `50.0` |  |
+| `--envelope` |  |  | upper-envelope iterations |
+
+## `geocrop merge-stacks`
+
+Concatenate feature stacks on one grid
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--stacks` | yes |  |  |
+| `--out` | yes |  |  |
+
+## `geocrop signatures`
+
+Parcel-mean time series (CbM signatures) from S2 scene folders
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  |  |
+| `--parcels` | yes |  |  |
+| `--reference` | yes |  |  |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | .csv or .parquet |
+| `--indices` |  | `['NDVI', 'BSI']` |  |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop markers`
+
+Phenology, harvest and bare-soil markers from parcel signatures
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` | yes |  |  |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--index` |  | `NDVI` |  |
+
+## `geocrop variogram`
+
+Spatial autocorrelation range of reference objects (for spatial_block_m)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-distance` |  |  |  |
+
+## `geocrop fieldwork`
+
+Rank parcels for the next field campaign (uncertainty + AOA, spatially spread)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | output of geocrop parcels |
+| `--out` | yes |  |  |
+| `--n` |  | `50` |  |
+| `--min-spacing-m` |  | `1000` |  |
+| `--per-class` |  |  |  |
+
+## `geocrop cloudmask`
+
+Write CLOUDMASK.tif for S2 scene folders with OmniCloudMask (optional dependency)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  |  |
+
+## `geocrop export`
+
+Publish a prediction directory: COGs, STAC item, optional GeoParquet parcels
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--prediction` | yes |  |  |
+| `--out` | yes |  |  |
+| `--id` | yes |  |  |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--parcels` |  |  | parcels.gpkg to convert to GeoParquet |
+| `--hcat` |  |  | CSV class_name,hcat_code,hcat_name |
 
 ## `geocrop manifest`
 

@@ -1,6 +1,6 @@
 """Config-driven, resumable pipeline.
 
-    composite -> features -> samples -> train -> predict -> parcels -> validate -> experiments
+    composite -> features (+ time series) -> samples -> train -> predict -> cbm -> parcels -> validate -> experiments
 
 Each stage records a fingerprint of its configuration section and input files in
 `<output>/stages.json`; a stage whose fingerprint is unchanged and whose outputs exist is
@@ -16,7 +16,7 @@ from pathlib import Path
 from . import config as cfgmod
 from . import scenes
 
-STAGES = ("composite", "features", "samples", "train", "predict", "parcels", "validate", "experiments")
+STAGES = ("composite", "features", "samples", "train", "predict", "cbm", "parcels", "validate", "experiments")
 
 
 def _fp(*parts) -> str:
@@ -81,7 +81,8 @@ class Runner:
                                  statistic=c["statistic"], scl_invalid=c["scl_invalid"],
                                  cloud_probability_max=c["cloud_probability_max"],
                                  mask_dilation_px=c["mask_dilation_px"],
-                                 min_valid_observations=c["min_valid_observations"])
+                                 min_valid_observations=c["min_valid_observations"],
+                                 temporal_screening=c["temporal_screening"])
                 if s1_scenes.get(w):
                     ref = grid or (comp / w / "B02.tif")
                     s1.composite([s["path"] for s in s1_scenes[w]], comp / w, reference=ref,
@@ -98,10 +99,39 @@ class Runner:
         periods = list(cfgmod.parse_windows(self.cfg["windows"])) or None
         comp = self.paths["composites"]
         inputs = sorted(str(p) for p in comp.rglob("*.tif")) if comp.exists() else []
-        fp = _fp(f, periods, *inputs)
-        return self.stage("features", fp, [self.paths["features"]], lambda: {"stack": str(features.build_stack(
-            comp, self.paths["features"], periods=periods, s2_bands=f["s2_bands"], s2_indices=f["s2_indices"],
-            s1=f["s1"], deltas=f["deltas"], seasonal=f["seasonal"]))})
+        t = self.cfg["timeseries"]
+        fp = _fp(f, t, periods, *inputs)
+
+        def run():
+            target = self.paths["features"]
+            parts = []
+            if periods and comp.exists():
+                win = target.with_name(target.stem + "_windows.tif") if t["enabled"] else target
+                parts.append(features.build_stack(comp, win, periods=periods, s2_bands=f["s2_bands"],
+                                                  s2_indices=f["s2_indices"], s1=f["s1"], deltas=f["deltas"],
+                                                  seasonal=f["seasonal"]))
+            if t["enabled"]:
+                from datetime import date
+
+                from .tsfeatures import build_timeseries_stack, merge_stacks
+                if not (t["start"] and t["end"]):
+                    raise cfgmod.ConfigError("timeseries.start and timeseries.end are required")
+                ref = self.cfg["grid"].get("reference") or (comp / periods[0] / "B02.tif")
+                tsp = build_timeseries_stack(
+                    [self.paths["s2_scenes"], self.paths["s1_scenes"]], ref, target.with_name(target.stem + "_ts.tif"),
+                    date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"])), t["s2_indices"],
+                    t["s1_indices"], t["step_days"], t["output_step_days"], t["lambda"], t["envelope_iterations"],
+                    t["harmonic_order"], self.cfg["compositing"]["scl_invalid"],
+                    self.cfg["compositing"]["cloud_probability_max"])
+                parts.append(tsp)
+                if len(parts) > 1:
+                    merge_stacks(parts, target)
+                else:
+                    import shutil
+                    shutil.copy(tsp, target)
+                    shutil.copy(features.manifest_path(tsp), features.manifest_path(target))
+            return {"stack": str(target), "parts": [str(p) for p in parts]}
+        return self.stage("features", fp, [self.paths["features"]], run)
 
     def samples(self):
         from .samples import extract
@@ -127,7 +157,8 @@ class Runner:
             params = {k: m[k] for k in model.RF_KEYS if k in m}
             r = model.train(Samples.load(self.out / "samples.npz"), self.out / "model", params=params,
                             n_splits=m["cv_folds"], spatial_block_m=m["spatial_block_m"], seed=self.cfg["seed"],
-                            tune_grid=m.get("tune_grid"), provenance={"config_fingerprint": cfgmod.fingerprint(self.cfg)})
+                            tune_grid=m.get("tune_grid"), provenance={"config_fingerprint": cfgmod.fingerprint(self.cfg)},
+                            calibrate=m["calibrate"])
             return {"cv_macro_f1": r["cross_validation"]["macro_f1"], "cv_oa": r["cross_validation"]["overall_accuracy"]}
         return self.stage("train", fp, [target], run)
 
@@ -137,6 +168,34 @@ class Runner:
         fp = _fp(self.paths["features"], self.out / "model" / "model.joblib")
         return self.stage("predict", fp, [target], lambda: model.predict(
             self.paths["features"], self.out / "model" / "model.joblib", self.out / "prediction"))
+
+    def cbm(self):
+        from datetime import date
+
+        from . import cbm
+        c, t = self.cfg["cbm"], self.cfg["timeseries"]
+        if not c["enabled"]:
+            return None
+        if not self.paths["parcels"].exists():
+            self.log("[skip] cbm (no parcel layer)")
+            return None
+        if not (t["start"] and t["end"]):
+            raise cfgmod.ConfigError("cbm needs timeseries.start/end for the season grid")
+        start, end = date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"]))
+        target = self.out / "cbm" / "markers.csv"
+        ref = self.cfg["grid"].get("reference") or next(self.paths["composites"].glob("*/B02.tif"))
+        fp = _fp(c, t, self.paths["parcels"], str(self.paths["s2_scenes"]))
+
+        def run():
+            idx = [c["index"], "BSI"] if c["index"] != "BSI" else ["BSI"]
+            sig = cbm.parcel_signatures(self.paths["s2_scenes"], self.paths["parcels"], ref,
+                                        self.out / "cbm" / "signatures.csv", start, end, idx,
+                                        id_field=self.cfg["parcels"]["id_field"],
+                                        interior_buffer_px=self.cfg["parcels"]["interior_buffer_px"])
+            m = cbm.markers(sig, start, end, index=c["index"], min_coverage=c["min_coverage"])
+            m.to_csv(target, index=False)
+            return {"parcels": int(len(m))}
+        return self.stage("cbm", fp, [target], run)
 
     def parcels(self):
         from . import parcels
@@ -150,12 +209,28 @@ class Runner:
         if p.get("crop_mapping"):
             from .adapters import read_mapping
             mapping = read_mapping(p["crop_mapping"])
-        return self.stage("parcels", fp, [target], lambda: parcels.aggregate(
-            self.out / "prediction" / "probabilities.tif", self.paths["parcels"], target,
-            id_field=p["id_field"], declared_field=p["declared_field"], strategy=p["strategy"],
-            interior_buffer_px=p["interior_buffer_px"], min_valid_pixels=p["min_valid_pixels"],
-            min_confidence=p["min_confidence"], min_majority_share=p["min_majority_share"],
-            min_margin=p["min_margin"], crop_mapping=mapping))
+        conformal = self.out / "model" / "conformal.json"
+        aoa = self.out / "prediction" / "aoa.tif"
+        markers_csv = self.out / "cbm" / "markers.csv"
+        calendar = None
+        if self.cfg["cbm"]["calendar"]:
+            import yaml
+            calendar = yaml.safe_load(Path(self.cfg["cbm"]["calendar"]).read_text(encoding="utf8"))
+
+        def run():
+            import pandas as pd
+            return parcels.aggregate(
+                self.out / "prediction" / "probabilities.tif", self.paths["parcels"], target,
+                id_field=p["id_field"], declared_field=p["declared_field"], strategy=p["strategy"],
+                interior_buffer_px=p["interior_buffer_px"], min_valid_pixels=p["min_valid_pixels"],
+                min_confidence=p["min_confidence"], min_majority_share=p["min_majority_share"],
+                min_margin=p["min_margin"], crop_mapping=mapping,
+                conformal=conformal if conformal.exists() else None, alpha=p["conformal_alpha"],
+                aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
+                markers=pd.read_csv(markers_csv) if self.cfg["cbm"]["enabled"] and markers_csv.exists() else None,
+                calendar=calendar)
+        fp = _fp(fp, conformal, aoa, markers_csv, calendar)
+        return self.stage("parcels", fp, [target], run)
 
     def validate(self):
         from . import validation
@@ -186,7 +261,8 @@ class Runner:
         fp = _fp(exps, m, self.out / "samples.npz")
 
         def run():
-            params = {k: m[k] for k in ("n_estimators", "max_features", "min_samples_leaf", "class_weight", "n_jobs") if k in m}
+            from .model import RF_KEYS
+            params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
             t = experiments.run(Samples.load(self.out / "samples.npz"), features.load_manifest(self.paths["features"]),
                                 self.out / "experiments", exps, params, m["cv_folds"], m["spatial_block_m"],
                                 self.cfg["seed"], self.cfg["classes"]["targets"])

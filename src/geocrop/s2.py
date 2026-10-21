@@ -18,6 +18,7 @@ import rasterio
 from rasterio.warp import Resampling
 from scipy.ndimage import binary_dilation
 
+from . import clouds
 from . import scenes as scene_meta
 from .indices import S2_BANDS
 from .raster import NODATA, blocks, expand, float_profile, gtiff_profile, read_aligned
@@ -66,7 +67,7 @@ def _locate(safe: Path, band: str) -> Path:
     return hits[0]
 
 
-def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024) -> Path:
+def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shadow_projection: bool = True) -> Path:
     """Convert one L2A SAFE to the scene-folder contract on the native 10 m grid of B02.
 
     20 m bands are bilinearly resampled to 10 m (no information gain; recorded in provenance);
@@ -97,10 +98,36 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024) -> Pa
                     a = read_aligned(src, ref.window_transform(w), ref.crs, (int(w.height), int(w.width)),
                                      Resampling.nearest, dtype="uint8", fill=0)
                     dst.write(a, 1, window=w)
+    extra = {}
+    if shadow_projection:
+        try:
+            extra = _write_shadow(safe, out, quant, offsets["B8A"])
+        except ValueError as exc:            # e.g. MTD_TL.xml missing: keep SCL shadows only
+            extra = {"shadow_projection": f"skipped: {exc}"}
     meta = scene_meta.parse_product_name(safe.name)
-    scene_meta.write(out, **meta, source=safe.name, quantification=quant, boa_offsets=offsets,
+    scene_meta.write(out, **meta, **extra, source=safe.name, quantification=quant, boa_offsets=offsets,
                      note="20 m bands bilinearly resampled to 10 m; no spatial information gain")
     return out
+
+
+def _write_shadow(safe: Path, out: Path, quant: float, nir_offset: float) -> dict:
+    """Projected cloud shadows on the native 20 m SCL grid (whole scene: shadows travel kilometres)."""
+    zenith, azimuth = clouds.sun_angles(safe)
+    with rasterio.open(_locate(safe, "SCL")) as s, rasterio.open(_locate(safe, "B8A")) as n:
+        scl = s.read(1)
+        dn = n.read(1, out_shape=scl.shape).astype("float32")
+        nir = np.where(dn > 0, (dn + nir_offset) / quant, np.nan)
+        prob = None
+        cp = _locate(safe, "CLDPRB")
+        if cp is not None:
+            with rasterio.open(cp) as c:
+                prob = c.read(1, out_shape=scl.shape)
+        mask = clouds.shadow_mask(scl, nir, zenith, azimuth, abs(s.transform.a), prob)
+        profile = gtiff_profile(s, count=1, dtype="uint8", nodata=None)
+    with rasterio.open(out / "SHADOW.tif", "w", **profile) as dst:
+        dst.write(mask.astype("uint8"), 1)
+    return {"sun_zenith": zenith, "sun_azimuth": azimuth, "shadow_projection": "SHADOW.tif",
+            "shadow_fraction": float(mask.mean())}
 
 
 # --------------------------------------------------------------------------- compositing
@@ -118,11 +145,18 @@ def _reduce(stack: np.ndarray, statistic: str) -> np.ndarray:
 
 
 def clear_mask(scl: np.ndarray, cloud_prob: np.ndarray | None, scl_invalid=DEFAULT_SCL_INVALID,
-               cloud_probability_max: float | None = None, dilation_px: int = 0) -> np.ndarray:
-    """True where an observation is usable. Invalid areas are optionally dilated to suppress cloud halos."""
+               cloud_probability_max: float | None = None, dilation_px: int = 0,
+               external: np.ndarray | None = None, shadow: np.ndarray | None = None) -> np.ndarray:
+    """True where an observation is usable. Combines SCL, cloud probability, an external cloud mask
+    (CLOUDMASK.tif, >0 = invalid) and projected shadows (SHADOW.tif); invalid areas are optionally
+    dilated to suppress cloud halos."""
     bad = np.isin(scl, list(scl_invalid))
     if cloud_prob is not None and cloud_probability_max is not None:
         bad |= cloud_prob > cloud_probability_max
+    if external is not None:
+        bad |= external > 0
+    if shadow is not None:
+        bad |= shadow > 0
     if dilation_px > 0:
         # Only clouds/shadows are dilated, not no-data borders.
         dilated = binary_dilation(bad & (scl != 0), structure=np.ones((3, 3), bool), iterations=dilation_px)
@@ -132,8 +166,12 @@ def clear_mask(scl: np.ndarray, cloud_prob: np.ndarray | None, scl_invalid=DEFAU
 
 def composite(scene_dirs, out_dir, reference: str | Path | None = None, statistic: str = "median",
               scl_invalid=DEFAULT_SCL_INVALID, cloud_probability_max: float | None = None,
-              mask_dilation_px: int = 0, min_valid_observations: int = 1, block_size: int = 512) -> Path:
+              mask_dilation_px: int = 0, min_valid_observations: int = 1, block_size: int = 512,
+              temporal_screening: bool = False, blue_delta: float = 0.04, dark_delta: float = 0.04) -> Path:
     """Per-pixel temporal composite of clear observations from several scene folders.
+
+    Optional per-scene CLOUDMASK.tif / SHADOW.tif are honoured; `temporal_screening` additionally drops
+    observations that are outliers against the pixel's clear-sky median (residual clouds/shadows).
 
     Writes one GeoTIFF per band, `valid_count.tif` (clear observations per pixel) and
     `composite.json` (scene list and parameters). Pixels with fewer than
@@ -159,8 +197,9 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
         for key, members in dates.items():
             for d in members:
                 scene = {b: rasterio.open(d / f"{b}.tif") for b in (*S2_BANDS, "SCL")}
-                if (d / "CLDPRB.tif").exists():
-                    scene["CLDPRB"] = rasterio.open(d / "CLDPRB.tif")
+                for extra in ("CLDPRB", "CLOUDMASK", "SHADOW"):
+                    if (d / f"{extra}.tif").exists():
+                        scene[extra] = rasterio.open(d / f"{extra}.tif")
                 handles.setdefault(key, []).append(scene)
         with rasterio.open(ref_path) as ref:
             if ref.crs is None:
@@ -182,9 +221,12 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
                         day = {b: np.full(day_ok.shape, np.nan, dtype="float32") for b in S2_BANDS}
                         for scene in tiles:
                             scl = read_aligned(scene["SCL"], transform, ref.crs, shape, Resampling.nearest, dtype="uint8", fill=0)
-                            prob = (read_aligned(scene["CLDPRB"], transform, ref.crs, shape, Resampling.nearest,
-                                                 dtype="uint8", fill=0) if "CLDPRB" in scene else None)
-                            ok = clear_mask(scl, prob, scl_invalid, cloud_probability_max, mask_dilation_px)[inner]
+                            # fill 255 (not 0): GDAL would rewrite valid zeros when 0 is the nodata value
+                            opt = {k: read_aligned(scene[k], transform, ref.crs, shape, Resampling.nearest,
+                                                   dtype="uint8", fill=255)
+                                   for k in ("CLDPRB", "CLOUDMASK", "SHADOW") if k in scene}
+                            ok = clear_mask(scl, opt.get("CLDPRB"), scl_invalid, cloud_probability_max,
+                                            mask_dilation_px, opt.get("CLOUDMASK"), opt.get("SHADOW"))[inner]
                             values = {}
                             for b in S2_BANDS:
                                 v = read_aligned(scene[b], transform, ref.crs, shape)[inner]
@@ -197,6 +239,14 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
                         masks.append(day_ok)
                         for b in S2_BANDS:
                             layers[b].append(day[b])
+                    if temporal_screening and len(masks) >= 3:
+                        drop = clouds.temporal_outliers(np.stack(layers["B02"]), np.stack(layers["B08"]),
+                                                        np.stack(layers["B11"]), np.stack(masks),
+                                                        blue_delta, dark_delta)
+                        for i in range(len(masks)):
+                            masks[i] = masks[i] & ~drop[i]
+                            for b in S2_BANDS:
+                                layers[b][i] = np.where(drop[i], np.nan, layers[b][i])
                     count = np.sum(masks, axis=0).astype("uint16")
                     counter.write(count, 1, window=w)
                     enough = count >= min_valid_observations
@@ -217,5 +267,6 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
         "sensor": "S2", "acquisitions": {k: [str(d) for d in v] for k, v in dates.items()}, "statistic": statistic,
         "scl_invalid": list(scl_invalid), "cloud_probability_max": cloud_probability_max,
         "mask_dilation_px": mask_dilation_px, "min_valid_observations": min_valid_observations,
+        "temporal_screening": temporal_screening,
         "reference_grid": str(ref_path)}, indent=2), encoding="utf8")
     return out_dir

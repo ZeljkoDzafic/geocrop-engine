@@ -32,6 +32,26 @@ compositing:
   mask_dilation_px: 2        # grow cloud/shadow masks to suppress halos
   min_valid_observations: 1
 
+  temporal_screening: true  # drop residual clouds/shadows that are outliers in time
+
+# Optional: features from the full time series of individual scenes (merged into the feature stack)
+timeseries:
+  enabled: false
+  start: "2023-03-15"
+  end: "2023-10-31"
+  s2_indices: [NDVI, NDRE, NDMI]
+  s1_indices: [VHVV_dB]
+  step_days: 5
+  output_step_days: 15
+  lambda: 50
+  envelope_iterations: 2
+
+# Optional: Checks-by-Monitoring markers and traffic light
+cbm:
+  enabled: false
+  index: NDVI
+  calendar: configs/crop_calendar.example.yaml
+
 s1:
   separate_orbits: true      # keep ASC and DESC apart until their comparability is assessed
   statistic: mean            # computed in linear power, converted to dB at feature time
@@ -49,6 +69,8 @@ classes:
   targets: [soybean, sunflower]
 
 model:
+  algorithm: rf              # rf | extra_trees | hist_gb | lightgbm | catboost | tempcnn
+  calibrate: true            # temperature scaling of probabilities
   n_estimators: 500
   max_features: sqrt
   min_samples_leaf: 1
@@ -75,6 +97,8 @@ parcels:
   min_confidence: null       # choose from the validation reject curve, never a priori
   min_majority_share: null
   min_margin: null
+  conformal_alpha: 0.1       # prediction sets at 90 % coverage
+  min_aoa_fraction: 0.5      # parcels mostly outside the Area of Applicability go to review
 
 validation:
   label_field: class_name

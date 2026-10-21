@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use GeoCrop Engine in your research, please cite it as below."
 title: "GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and parcel-level declaration verification"
 type: software
-version: 0.7.0
+version: 0.8.0
 date-released: 2026-10-21
 license: Apache-2.0
 repository-code: "https://github.com/ZeljkoDzafic/geocrop-engine"

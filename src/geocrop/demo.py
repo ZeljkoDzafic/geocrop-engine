@@ -102,6 +102,85 @@ def generate(root: str | Path, parcels_per_side: int = 12, parcel_px: int = 16, 
             "classes": names}
 
 
+WINDOW_CENTRES = (121, 174, 220, 266)   # day of year of P1..P4 centres
+
+
+def class_curve(name: str, doy) -> np.ndarray:
+    """Smooth NDVI trajectory of a class, through the window values (bare soil outside the season)."""
+    knots = (60, *WINDOW_CENTRES, 330)
+    prof = PROFILES[name]
+    edge = 0.75 if name == "forest" else (0.6 if name == "winter_crops" else 0.15)
+    return np.interp(doy, knots, (edge, *prof, max(0.15, prof[-1] - 0.25) if name != "forest" else 0.7))
+
+
+def generate_scenes(root: str | Path, year: int = 2023, s2_every: int = 5, s1_every: int = 12,
+                    cloud_fraction: float = 0.35, seed: int = 7, **grid) -> dict:
+    """Per-acquisition scene folders (S2 with SCL clouds, S1 linear VV/VH) following the scene contract."""
+    from datetime import date, timedelta
+
+    from . import scenes as scene_meta
+
+    root = Path(root)
+    base = generate(root, **grid)
+    rng = np.random.default_rng(seed)
+    with rasterio.open(Path(base["composites"]) / "P1" / "B02.tif") as ref:
+        profile, shape = ref.profile, ref.shape
+    lab = _labels(base["parcels"], shape)
+    names = list(PROFILES)
+    swir = np.array([SWIR_OFFSET[c] for c in names], dtype="float32")[lab]
+    vh_off = np.array([VH_OFFSET[c] for c in names], dtype="float32")[lab]
+    start = date(year, 3, 15)
+    s2_dirs, s1_dirs = [], []
+    for k in range(0, 230, s2_every):
+        d = start + timedelta(days=k)
+        doy = d.timetuple().tm_yday
+        ndvi = np.array([class_curve(c, doy) for c in names], dtype="float32")[lab]
+        ndvi = np.clip(ndvi + rng.normal(0, 0.03, shape), 0.02, 0.95)
+        folder = root / "scenes" / "s2" / d.isoformat()
+        folder.mkdir(parents=True, exist_ok=True)
+        for band, arr in _bands(ndvi, swir, rng).items():
+            with rasterio.open(folder / f"{band}.tif", "w", **profile) as dst:
+                dst.write(arr, 1)
+        scl = np.full(shape, 4, dtype="uint8")
+        if rng.random() < cloud_fraction * 2:
+            cy, cx, r = rng.integers(0, shape[0]), rng.integers(0, shape[1]), rng.integers(10, shape[0] // 2)
+            yy, xx = np.ogrid[: shape[0], : shape[1]]
+            scl[(yy - cy) ** 2 + (xx - cx) ** 2 < r**2] = 9
+        prof8 = {**profile, "dtype": "uint8", "nodata": None}
+        with rasterio.open(folder / "SCL.tif", "w", **prof8) as dst:
+            dst.write(scl, 1)
+        scene_meta.write(folder, sensor="S2", datetime=f"{d.isoformat()}T09:40:00", synthetic=True)
+        s2_dirs.append(folder)
+    for k in range(0, 230, s1_every):
+        d = start + timedelta(days=k)
+        doy = d.timetuple().tm_yday
+        ndvi = np.array([class_curve(c, doy) for c in names], dtype="float32")[lab]
+        folder = root / "scenes" / "s1" / d.isoformat()
+        folder.mkdir(parents=True, exist_ok=True)
+        vh = -23 + 9 * ndvi + vh_off + rng.normal(0, 1.5, shape)
+        vv = -13 + 3 * ndvi + 0.4 * vh_off + rng.normal(0, 1.5, shape)
+        for pol, db in (("VV", vv), ("VH", vh)):
+            with rasterio.open(folder / f"{pol}.tif", "w", **profile) as dst:
+                dst.write((10 ** (db / 10)).astype("float32"), 1)
+        scene_meta.write(folder, sensor="S1", datetime=f"{d.isoformat()}T16:50:00", orbit_direction="ASCENDING",
+                         synthetic=True)
+        s1_dirs.append(folder)
+    return {**base, "s2_scenes": [str(p) for p in s2_dirs], "s1_scenes": [str(p) for p in s1_dirs],
+            "scene_root": str(root / "scenes"), "reference": str(Path(base["composites"]) / "P1" / "B02.tif")}
+
+
+def _labels(parcels_path, shape) -> np.ndarray:
+    gdf = gpd.read_file(parcels_path)
+    names = list(PROFILES)
+    lab = np.zeros(shape, dtype=int)
+    for row in gdf.itertuples():
+        x0, y0, x1, y1 = row.geometry.bounds
+        c0, c1 = int((x0 - ORIGIN[0]) / 10), int((x1 - ORIGIN[0]) / 10)
+        r0, r1 = int((ORIGIN[1] - y1) / 10), int((ORIGIN[1] - y0) / 10)
+        lab[r0:r1, c0:c1] = names.index(row.true_class)
+    return lab
+
+
 def run(root: str | Path, quick: bool = False) -> dict:
     """Generate synthetic data and run every stage of the pipeline on it."""
     from . import experiments, features, model, parcels, validation
@@ -119,7 +198,8 @@ def run(root: str | Path, quick: bool = False) -> dict:
     model.predict(stack, root / "model" / "model.joblib", root / "prediction")
     parcel_summary = parcels.aggregate(root / "prediction" / "probabilities.tif", data["parcels"],
                                        root / "parcels" / "parcels.gpkg", strategy="combined",
-                                       min_confidence=0.5)
+                                       conformal=root / "model" / "conformal.json", alpha=0.1,
+                                       aoa=root / "prediction" / "aoa.tif")
     val = validation.evaluate_points(root / "prediction", data["observations"], root / "validation",
                                      year=2023, training=data["training"], training_exclusion_m=20, window_px=1,
                                      bootstrap=100 if quick else 500)
@@ -130,6 +210,7 @@ def run(root: str | Path, quick: bool = False) -> dict:
         "cv_macro_f1": round(report["cross_validation"]["macro_f1"], 3),
         "field_points_oa": round(val["accuracy"]["overall_accuracy"], 3),
         "declaration_status": parcel_summary["declaration_status_counts"],
+        "traffic_light": parcel_summary["traffic_light_counts"],
         "ablation": table[["experiment", "macro_f1"]].round(3).to_dict(orient="records"),
         "outputs": str(root),
     }

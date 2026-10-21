@@ -48,6 +48,7 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
             continue
         cv = cross_validate(samples.subset(names), samples.y, samples.polygon, groups, params, n_splits, seed)
         oof = cv.pop("_oof")
+        cv.pop("_oof_proba"), cv.pop("_classes")
         if reference_oof is None:
             reference_name, reference_oof = name, oof
         test = metrics.mcnemar(samples.y, oof, reference_oof)
@@ -105,6 +106,7 @@ def feature_reduction(samples: Samples, features: list[str], params: dict, outpu
     The resulting curve supports choosing a reduced model with comparable macro-F1. Because the
     ranking uses all samples, report the curve as model-selection evidence, not as test accuracy.
     """
+    from .estimators import importances
     from .model import make_rf
 
     out = Path(output_dir)
@@ -120,7 +122,7 @@ def feature_reduction(samples: Samples, features: list[str], params: dict, outpu
         if len(current) <= min_features:
             break
         rf = make_rf(params, seed).fit(X, samples.y)
-        order = np.argsort(rf.feature_importances_)
+        order = np.argsort(importances(rf, len(current)))
         drop = min(max(1, int(len(current) * step)), len(current) - min_features)
         current = [current[i] for i in sorted(order[drop:])]
     table = pd.DataFrame(rows)

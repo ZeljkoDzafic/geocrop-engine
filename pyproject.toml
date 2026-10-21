@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geocrop-engine"
-version = "0.7.0"
+version = "0.8.0"
 description = "Open, reproducible Sentinel-1/Sentinel-2 crop-type classification, parcel aggregation and declaration verification engine"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -41,7 +41,10 @@ segmentation = ["scikit-image>=0.21"]
 stac = ["pystac-client>=0.8"]
 deep = ["torch>=2.1"]
 dev = ["pytest>=7", "ruff>=0.5", "scikit-image>=0.21"]
-all = ["scikit-image>=0.21", "pystac-client>=0.8"]
+boost = ["lightgbm>=4", "catboost>=1.2"]
+cloud = ["omnicloudmask>=1.0"]
+parquet = ["pyarrow>=14"]
+all = ["scikit-image>=0.21", "pystac-client>=0.8", "pyarrow>=14"]
 
 [project.urls]
 Homepage = "https://github.com/ZeljkoDzafic/geocrop-engine"

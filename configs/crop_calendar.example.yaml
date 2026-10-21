@@ -1,0 +1,6 @@
+# Expected day-of-year ranges of NDVI peak and harvest / rapid senescence per class.
+# ILLUSTRATIVE values for lowland northern Bosnia and Herzegovina; agronomists must set them per study and year.
+winter_crops: {peak: [100, 150], harvest: [170, 205]}
+maize:        {peak: [195, 240]}
+soybean:      {peak: [195, 240]}
+sunflower:    {peak: [165, 210], harvest: [200, 250]}

@@ -23,8 +23,15 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `s1` | VV_dB, VH_dB, VHVV_dB | radar features |
 | | `deltas` | NDVI, NDRE, NDMI | consecutive-window differences (S2 or S1 feature names) |
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
+| `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
+| `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
+| | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
+| | `step_days`, `output_step_days`, `lambda`, `envelope_iterations`, `harmonic_order` | 5, 15, 50, 0, 2 | grid, output sampling, smoothness, upper envelope, harmonics |
+| `cbm` | `enabled`, `index`, `calendar`, `min_coverage` | false, NDVI, –, 0.5 | parcel signatures + markers; crop-calendar YAML |
 | `classes` | `label_field`, `id_field`, `targets` | `class_name`, `polygon_id`, [] | reference schema; target classes get extra columns in ablation tables |
-| `model` | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs` | 500, sqrt, 1, null, balanced_subsample, −1 | Random Forest |
+| `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn` |
+| | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs`, `learning_rate` | 500, sqrt, 1, null, balanced_subsample, −1, null | estimator settings (keys unknown to an algorithm are ignored) |
+| | `calibrate` | true | temperature scaling of probabilities |
 | | `max_samples_per_polygon` | 250 | sampling cap |
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
@@ -33,5 +40,6 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `strategy` | `mean_probability` | `majority`, `mean_probability`, `combined` |
 | | `interior_buffer_px`, `min_valid_pixels` | 1, 4 | edge exclusion, resolution limit |
 | | `min_confidence`, `min_majority_share`, `min_margin` | null | review thresholds (choose on validation data) |
+| | `conformal_alpha`, `min_aoa_fraction` | 0.1, 0.5 | conformal level for parcel sets; AOA share required for acceptance |
 | `validation` | `label_field`, `date_field`, `year` | `class_name`, `observed_at`, null | observation schema and season |
 | | `training_exclusion_m`, `window_px`, `bootstrap` | 0, 1, 1000 | leakage buffer, GNSS window, bootstrap replicates |

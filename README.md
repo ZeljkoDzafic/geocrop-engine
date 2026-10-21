@@ -43,6 +43,12 @@ custom platforms) can consume the results.
 | Fragmented landscapes | Pixel counts per parcel, `insufficient_resolution` status, shape index, within-parcel variability |
 | Publishable experiments | One-line ablations (S2 / S1 / fusion / window subsets) on identical folds with McNemar tests, feature-reduction curves, group importance, index table with formulas and references |
 | Missing parcel boundaries | OBIA (SLIC) and an optional U-Net boundary model with watershed post-processing, scored with boundary F1 and object-level OS/US/IoU |
+| Clouds and shadows | SCL + cloud probability, geometric shadow projection from sun angles, external masks (OmniCloudMask, s2cloudless, Fmask), halo dilation, multi-temporal outlier screening, Whittaker gap filling |
+| Crop timing | Regular-grid time series (weighted Whittaker, upper envelope), phenology metrics (SOS, peak, EOS, LOS, slopes, integral), harmonic coefficients |
+| Trustworthy decisions | Temperature-scaled probabilities, class-conditional conformal prediction sets, Area of Applicability (extrapolation flag), label-noise screening |
+| Checks-by-Monitoring | Parcel signatures (Sen4CAP/JRC style), harvest / bare-soil / peak markers, crop-calendar consistency, green-yellow-red traffic light, field-campaign planning |
+| Choice of model | Random Forest, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN — all behind the same spatial CV, ablation and prediction |
+| Interoperability | COG rasters, GeoParquet parcels, STAC items with classification extension, EuroCrops HCAT mapping |
 
 ## Install
 
@@ -50,7 +56,8 @@ custom platforms) can consume the results.
 conda env create -f environment.yml      # Python 3.11, GDAL stack from conda-forge
 conda activate geocrop
 # or: pip install -e '.[all]'   (Python >= 3.10)
-pip install -e '.[deep]'                 # optional: U-Net segmentation (PyTorch)
+pip install -e '.[deep]'                 # optional: U-Net / TempCNN (PyTorch)
+pip install -e '.[boost,cloud,parquet]'  # optional: LightGBM/CatBoost, OmniCloudMask, GeoParquet
 ```
 ESA SNAP (for Sentinel-1 preprocessing) is installed separately: <https://step.esa.int/main/download/snap-download/>.
 
@@ -88,7 +95,11 @@ See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
 | [Features](docs/features.md) | feature groups, naming, index formulas and references |
 | [Classification & validation](docs/classification-validation.md) | spatial CV, tuning, ablation, independent validation, area estimation |
 | [Parcels & declarations](docs/parcels.md) | aggregation, decision strategies, declaration status, parcel model |
+| [Clouds & time series](docs/timeseries.md) | cloud/shadow screening, Whittaker smoothing, phenology, harmonics |
+| [Uncertainty & applicability](docs/uncertainty.md) | calibration, conformal prediction, AOA, label noise, variogram |
+| [Checks-by-Monitoring](docs/cbm.md) | parcel signatures, markers, traffic light, field-campaign planning |
 | [Segmentation](docs/segmentation.md) | OBIA, U-Net, boundary/object metrics |
+| [Interoperability](docs/interoperability.md) | COG, GeoParquet, STAC, HCAT, comparison with other systems |
 | [Configuration](docs/configuration.md) | all YAML keys |
 | [CLI reference](docs/cli.md) | all commands |
 | [Reproducibility & privacy](docs/reproducibility.md) | manifests, caching, data protection |
@@ -97,7 +108,7 @@ See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
 
 ## Status
 
-Version 0.7 — research software. The complete pipeline is unit-tested and runs end-to-end on synthetic
+Version 0.8 — research software. The complete pipeline is unit-tested and runs end-to-end on synthetic
 data; CDSE access, SNAP graphs and SAFE import follow the official product specifications but must be
 verified on real scenes for each study (see [limitations](docs/limitations.md)). The engine was developed
 for a 2023 soybean / sunflower declaration-verification study in northern Bosnia and Herzegovina; nothing
@@ -113,7 +124,7 @@ about that study is hard-coded — area, season, classes, windows and rules are 
 If you use GeoCrop Engine, please cite it via [CITATION.cff](CITATION.cff):
 
 > Džafić, Ž.; Adžić, D. *GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and
-> parcel-level declaration verification* (version 0.7.0) [Software]. 2026.
+> parcel-level declaration verification* (version 0.8.0) [Software]. 2026.
 > https://github.com/ZeljkoDzafic/geocrop-engine
 
 ## License

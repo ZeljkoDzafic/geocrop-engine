@@ -106,3 +106,38 @@ def test_import_safe_scaling(tmp_path):
         assert ds.shape == (4, 4) and np.allclose(ds.read(1), 0.2)   # (3000 - 1000) / 10000
     meta = scenes.read(out)
     assert meta["tile"] == "34TCQ" and str(meta["date"]) == "2023-07-05"
+
+
+def test_shadow_projection_direction():
+    from geocrop import clouds
+    cloud = np.zeros((60, 60), bool)
+    cloud[30, 30] = True
+    # sun in the south-east (azimuth 135): shadow falls to the north-west (smaller row and col)
+    sh = clouds.project_shadows(cloud, sun_zenith=45, sun_azimuth=135, pixel_m=20, heights=[400])
+    r, c = np.argwhere(sh)[0]
+    assert r < 30 and c < 30
+
+
+def test_temporal_outliers():
+    from geocrop import clouds
+    blue = np.full((5, 2, 2), 0.04)
+    nir = np.full((5, 2, 2), 0.35)
+    swir = np.full((5, 2, 2), 0.2)
+    blue[1] = 0.2          # residual cloud
+    nir[3], swir[3] = 0.1, 0.05   # residual shadow
+    drop = clouds.temporal_outliers(blue, nir, swir, np.ones((5, 2, 2), bool))
+    assert drop[1].all() and drop[3].all() and not drop[[0, 2, 4]].any()
+
+
+def test_external_mask_respected(tmp_path):
+    clear = np.full((6, 6), 4)
+    _scene(tmp_path / "a", 0.1, clear, "2023-06-01T10:00:00")
+    _scene(tmp_path / "b", 0.3, clear, "2023-06-11T10:00:00")
+    m = np.zeros((6, 6), "uint8")
+    m[:2] = 1
+    with rasterio.open(tmp_path / "b" / "CLOUDMASK.tif", "w", dtype="uint8", **PROFILE) as ds:
+        ds.write(m, 1)
+    out = s2.composite([tmp_path / "a", tmp_path / "b"], tmp_path / "P", statistic="mean")
+    with rasterio.open(out / "B04.tif") as ds:
+        v = ds.read(1)
+    assert np.allclose(v[:2], 0.1) and np.allclose(v[2:], 0.2)

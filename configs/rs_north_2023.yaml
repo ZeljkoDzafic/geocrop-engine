@@ -29,6 +29,19 @@ compositing:
   statistic: median
   mask_dilation_px: 2
   min_valid_observations: 1
+  temporal_screening: true
+
+timeseries:
+  enabled: true
+  start: "2023-03-15"
+  end: "2023-10-31"
+  s2_indices: [NDVI, NDRE, NDMI]
+  s1_indices: [VHVV_dB]
+  envelope_iterations: 2
+
+cbm:
+  enabled: true
+  calendar: configs/crop_calendar.example.yaml
 
 s1:
   separate_orbits: true
@@ -56,6 +69,8 @@ experiments:
   E4_S1_S2_fusion: {groups: [s2_band, s2_index, s1, delta, seasonal]}
   E5_fusion_P1_P2: {groups: [s2_band, s2_index, s1, delta], periods: [P1, P2]}
   E6_fusion_P1_P3: {groups: [s2_band, s2_index, s1, delta], periods: [P1, P2, P3]}
+  E7_timeseries: {groups: [ts, phenology, harmonic]}
+  E8_windows_plus_timeseries: {groups: [s2_band, s2_index, s1, delta, seasonal, ts, phenology, harmonic]}
 
 parcels:
   declared_field: declared_crop

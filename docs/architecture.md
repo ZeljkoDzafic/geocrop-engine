@@ -28,6 +28,12 @@
 | `metrics` | OA, κ, F1, UA/PA, bootstrap CIs, Olofsson area estimation, calibration, reject curves, McNemar |
 | `parcels` | interior-buffered aggregation, decision strategies, declaration status, second-stage parcel model |
 | `validation` | independent point validation with year filter, leakage exclusion and window vote; mapped area |
+| `clouds` | sun-angle shadow projection, external cloud masks (OmniCloudMask), multi-temporal outlier screening |
+| `timeseries`, `tsfeatures` | regular-grid binning, weighted Whittaker smoothing, phenology, harmonics; time-series feature stack, stack merging |
+| `estimators` | RF, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN behind one factory |
+| `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
+| `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
+| `export` | COG, GeoParquet, STAC items, HCAT mapping |
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
 | `pipeline`, `config`, `provenance`, `cli` | orchestration, configuration, manifests and checks, command line |
@@ -39,6 +45,8 @@ inventory ─► download ─► s2-import ─┐
                          snap ─► s1-import ─┤
                                             ▼
 grid ─────────────────────────────► composite (per window) ─► features ─► samples ─► train ─► predict
+                         scenes ─► ts-features (Whittaker, phenology) ─┘          (calibration, conformal, AOA)
+                         scenes ─► signatures ─► markers ─────────────────────────────────► parcels (traffic light)
                                                                                  │                │
                                                                            experiments      parcels ─► parcel-model
                                                                                                   │

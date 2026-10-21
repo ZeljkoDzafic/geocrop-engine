@@ -157,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--tune", type=_json_arg, help='JSON grid, e.g. {"max_features": ["sqrt", 0.3]}')
     x.add_argument("--groups", nargs="*", help="restrict to feature groups")
     x.add_argument("--manifest", help="feature stack (for --groups)")
+    x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"])
+    x.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling")
 
     x = cmd("predict", "Blockwise prediction: classes, probabilities, uncertainty")
     x.add_argument("--features", required=True)
@@ -191,6 +193,11 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--min-majority-share", type=float)
     x.add_argument("--min-margin", type=float)
     x.add_argument("--crop-mapping", help="CSV source_code,class_name")
+    x.add_argument("--conformal", help="conformal.json from training")
+    x.add_argument("--alpha", type=float, default=0.1)
+    x.add_argument("--aoa", help="aoa.tif from prediction")
+    x.add_argument("--markers", help="markers.csv from geocrop markers")
+    x.add_argument("--calendar", help="crop calendar YAML")
 
     x = cmd("parcel-model", "Second-stage parcel classifier on aggregated descriptors")
     x.add_argument("--parcels", required=True, help="output of geocrop parcels with a reference label column")
@@ -263,6 +270,64 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--out", required=True)
     x.add_argument("--threshold", type=float, default=0.5)
     x.add_argument("--tolerance-px", type=int, default=2)
+
+    x = cmd("ts-features", "Time-series features (Whittaker, phenology, harmonics) from scene folders")
+    x.add_argument("--scenes", nargs="+", required=True, help="scene root folder(s)")
+    x.add_argument("--reference", required=True, help="reference grid GeoTIFF")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--s2-indices", nargs="*", default=["NDVI", "NDRE", "NDMI"])
+    x.add_argument("--s1-indices", nargs="*", default=["VHVV_dB"])
+    x.add_argument("--step-days", type=int, default=5)
+    x.add_argument("--output-step-days", type=int, default=15)
+    x.add_argument("--lam", type=float, default=50.0)
+    x.add_argument("--envelope", type=int, default=0, help="upper-envelope iterations")
+
+    x = cmd("merge-stacks", "Concatenate feature stacks on one grid")
+    x.add_argument("--stacks", nargs="+", required=True)
+    x.add_argument("--out", required=True)
+
+    x = cmd("signatures", "Parcel-mean time series (CbM signatures) from S2 scene folders")
+    x.add_argument("--scenes", required=True)
+    x.add_argument("--parcels", required=True)
+    x.add_argument("--reference", required=True)
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help=".csv or .parquet")
+    x.add_argument("--indices", nargs="*", default=["NDVI", "BSI"])
+    x.add_argument("--id-field", default="parcel_id")
+
+    x = cmd("markers", "Phenology, harvest and bare-soil markers from parcel signatures")
+    x.add_argument("--signatures", required=True)
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--index", default="NDVI")
+
+    x = cmd("variogram", "Spatial autocorrelation range of reference objects (for spatial_block_m)")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--max-distance", type=float)
+
+    x = cmd("fieldwork", "Rank parcels for the next field campaign (uncertainty + AOA, spatially spread)")
+    x.add_argument("--parcels", required=True, help="output of geocrop parcels")
+    x.add_argument("--out", required=True)
+    x.add_argument("--n", type=int, default=50)
+    x.add_argument("--min-spacing-m", type=float, default=1000)
+    x.add_argument("--per-class", type=int)
+
+    x = cmd("cloudmask", "Write CLOUDMASK.tif for S2 scene folders with OmniCloudMask (optional dependency)")
+    x.add_argument("--scenes", nargs="+", required=True)
+
+    x = cmd("export", "Publish a prediction directory: COGs, STAC item, optional GeoParquet parcels")
+    x.add_argument("--prediction", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--id", required=True)
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--parcels", help="parcels.gpkg to convert to GeoParquet")
+    x.add_argument("--hcat", help="CSV class_name,hcat_code,hcat_name")
 
     x = cmd("manifest", "Write a reproducibility manifest (versions, git, hashes)")
     x.add_argument("--out", required=True)
@@ -362,7 +427,11 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .samples import Samples
         s = Samples.load(a.samples)
         feats = select([f for f in load_manifest(a.manifest) if f.name in s.features], groups=a.groups) if a.groups else None
-        r = train(s, a.out, feats, a.params, a.folds, a.block_m, tune_grid=a.tune)
+        params = dict(a.params or {"n_estimators": 500, "max_features": "sqrt",
+                                   "class_weight": "balanced_subsample", "n_jobs": -1})
+        if a.algorithm:
+            params["algorithm"] = a.algorithm
+        r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate)
         _print({k: r["cross_validation"][k] for k in ("overall_accuracy", "kappa", "macro_f1", "fold_macro_f1_std")})
     elif c == "predict":
         from .model import predict
@@ -389,11 +458,16 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                               a.out, a.block_m, step=a.step)
         print(t[["n_features", "macro_f1", "overall_accuracy"]].to_string(index=False))
     elif c == "parcels":
+        import pandas as pd
+        import yaml
+
         from .adapters import read_mapping
         from .parcels import aggregate
         _print(aggregate(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.strategy, a.buffer_px,
                          a.min_pixels, a.min_confidence, a.min_majority_share, a.min_margin,
-                         read_mapping(a.crop_mapping) or None))
+                         read_mapping(a.crop_mapping) or None, a.conformal, a.alpha, a.aoa,
+                         markers=pd.read_csv(a.markers) if a.markers else None,
+                         calendar=yaml.safe_load(Path(a.calendar).read_text()) if a.calendar else None))
     elif c == "parcel-model":
         from .parcels import train_parcel_model
         r = train_parcel_model(a.parcels, a.label_field, a.out, spatial_block_m=a.block_m)
@@ -443,6 +517,64 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "evaluate-boundaries":
         from .segmentation_metrics import evaluate_boundary_rasters
         _print(evaluate_boundary_rasters(a.prediction, a.reference, a.out, a.threshold, a.tolerance_px))
+    elif c == "ts-features":
+        from datetime import date
+
+        from .tsfeatures import build_timeseries_stack
+        print(build_timeseries_stack(a.scenes, a.reference, a.out, date.fromisoformat(a.start), date.fromisoformat(a.end),
+                                     a.s2_indices, a.s1_indices, a.step_days, a.output_step_days, a.lam, a.envelope))
+    elif c == "merge-stacks":
+        from .tsfeatures import merge_stacks
+        print(merge_stacks(a.stacks, a.out))
+    elif c == "signatures":
+        from datetime import date
+
+        from .cbm import parcel_signatures
+        t = parcel_signatures(a.scenes, a.parcels, a.reference, a.out, date.fromisoformat(a.start),
+                              date.fromisoformat(a.end), a.indices, a.id_field)
+        _print({"rows": len(t), "parcels": int(t.parcel_id.nunique()), "out": a.out})
+    elif c == "markers":
+        from datetime import date
+
+        import pandas as pd
+
+        from .cbm import markers
+        sig = pd.read_parquet(a.signatures) if a.signatures.endswith(".parquet") else pd.read_csv(a.signatures)
+        m = markers(sig, date.fromisoformat(a.start), date.fromisoformat(a.end), a.index)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        m.to_csv(a.out, index=False)
+        _print({"parcels": len(m), "with_peak": int(m.peak_doy.notna().sum()), "out": a.out})
+    elif c == "variogram":
+        from .samples import Samples
+        from .spatial import object_table, variogram
+        t = object_table(Samples.load(a.samples))
+        r = variogram(t.x, t.y, t.pc1, a.max_distance)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(json.dumps(r, indent=2))
+        _print({k: r[k] for k in ("model", "range_m", "max_distance_m")})
+    elif c == "fieldwork":
+        from .fieldwork import rank
+        r = rank(a.parcels, a.out, a.n, a.min_spacing_m, a.per_class)
+        _print({"selected": len(r), "out": a.out})
+    elif c == "cloudmask":
+        from .clouds import omnicloudmask_scene
+        for sdir in a.scenes:
+            print(omnicloudmask_scene(sdir))
+    elif c == "export":
+        from .export import read_hcat, stac_item, to_cog, to_geoparquet
+        out = Path(a.out)
+        assets = {}
+        for name, resampling in (("classes", "nearest"), ("probabilities", "average"), ("uncertainty", "average"),
+                                 ("aoa", "nearest")):
+            src = Path(a.prediction) / f"{name}.tif"
+            if src.exists():
+                to_cog(src, out / f"{name}.tif", resampling)
+        (out / "class_legend.json").write_text((Path(a.prediction) / "class_legend.json").read_text())
+        if a.parcels:
+            to_geoparquet(a.parcels, out / "parcels.parquet")
+            assets["parcels"] = {"href": "parcels.parquet", "type": "application/vnd.apache.parquet", "roles": ["data"]}
+        item = stac_item(out, a.id, a.start, a.end, out / "item.json", read_hcat(a.hcat) if a.hcat else None, assets)
+        _print({"stac_item": str(out / "item.json"), "assets": list(item["assets"])})
     elif c == "manifest":
         from .provenance import run_manifest
         cfg = None

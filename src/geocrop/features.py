@@ -28,7 +28,8 @@ import rasterio
 from . import indices
 from .raster import NODATA, blocks, ensure_parent, float_profile
 
-GROUPS = ("s2_band", "s2_index", "s1", "delta", "seasonal")
+GROUPS = ("s2_band", "s2_index", "s1", "delta", "seasonal", "ts", "phenology", "harmonic")
+SEASON_GROUPS = ("seasonal", "ts", "phenology", "harmonic")   # span the whole season
 SEASONAL_STATS = ("max", "min", "range", "argmax")
 
 
@@ -67,7 +68,7 @@ def select(features: list[Feature], groups=None, periods=None, names=None, exclu
         if groups and f.group not in groups:
             continue
         if periods:
-            if f.group == "seasonal":
+            if f.group in SEASON_GROUPS:
                 continue
             span = f.periods or ((f.period,) if f.period else ())
             if not set(span) <= set(periods):

@@ -56,6 +56,9 @@ Sentinel-1B stopped operating in December 2021 (mission end declared August 2022
 Sentinel-1A alone (12-day repeat per orbit) until Sentinel-1C data are available; expect fewer radar
 observations per window.
 
+See [timeseries.md](timeseries.md) for the full cloud/shadow screening chain (projected shadows, external
+masks such as OmniCloudMask, multi-temporal outlier screening) and for time-series features from individual scenes.
+
 ## Quality control checklist
 * Inventory per window: number of S2 acquisitions, S1 acquisitions per orbit direction.
 * `valid_count` maps per window; gaps over target fields.

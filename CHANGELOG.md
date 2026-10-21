@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.0 — 2026-10-21
+Second development wave, informed by a review of WorldCereal, Sen4CAP, sits, eo-learn, JRC CbM, FORCE and
+Fields of The World.
+
+### Added
+- Cloud/shadow screening: sun-angle shadow projection at import, external `CLOUDMASK.tif` (OmniCloudMask runner),
+  multi-temporal outlier screening in compositing.
+- Regular-grid time series: weighted Whittaker smoother with upper envelope, phenology metrics, harmonic
+  regression; `ts-features` stack builder and `merge-stacks`; time-series features in the pipeline.
+- Estimator factory: ExtraTrees, HistGradientBoosting, LightGBM, CatBoost and a TempCNN in addition to RF.
+- Temperature scaling of probabilities; class-conditional conformal prediction sets with pooled fallback for
+  small classes; label-noise screening; Area of Applicability raster; variogram tool for block size.
+- Checks-by-Monitoring: parcel signatures, markers (peak, harvest, bare soil), crop-calendar consistency,
+  traffic light; field-campaign ranking.
+- Export: COG, GeoParquet, STAC items with classification extension, HCAT mapping template.
+- Synthetic per-scene generator (clouds, S1) and an end-to-end scene-to-traffic-light test.
+
+### Fixed
+- uint8 masks are reprojected with fill 255 so GDAL never rewrites valid zeros.
+
 ## 0.7.0 — 2026-10-21
 First public release of GeoCrop Engine (formerly the internal "Open GeoCrop Engine" prototype, package `etfarm_ml`).
 
