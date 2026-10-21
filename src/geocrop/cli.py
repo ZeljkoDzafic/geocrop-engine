@@ -159,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--manifest", help="feature stack (for --groups)")
     x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"])
     x.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling")
+    x.add_argument("--holdout", type=float, default=0.0, help="fraction of spatial blocks locked as final test")
 
     x = cmd("predict", "Blockwise prediction: classes, probabilities, uncertainty")
     x.add_argument("--features", required=True)
@@ -245,6 +246,16 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--model", required=True)
     x.add_argument("--epochs", type=int, default=30)
     x.add_argument("--batch-size", type=int, default=8)
+    x.add_argument("--groups", help=".npy/.txt with one spatial group id per patch (required for a fair split)")
+    x.add_argument("--allow-random-split", action="store_true", help="accept an optimistic random patch split")
+
+    x = cmd("segment-patches", "Cut image/boundary patches with spatial group ids for U-Net training")
+    x.add_argument("--raster", required=True)
+    x.add_argument("--mask", required=True, help="rasterised reference boundaries (1 = boundary)")
+    x.add_argument("--out", required=True, help="output prefix; writes _X.npy, _Y.npy, _groups.npy")
+    x.add_argument("--size", type=int, default=128)
+    x.add_argument("--block-m", type=float, default=2000)
+    x.add_argument("--bands", nargs="*")
 
     x = cmd("segment-unet-infer", "Boundary probability with overlapping tiles")
     x.add_argument("--raster", required=True)
@@ -431,7 +442,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                    "class_weight": "balanced_subsample", "n_jobs": -1})
         if a.algorithm:
             params["algorithm"] = a.algorithm
-        r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate)
+        r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate,
+                  holdout_fraction=a.holdout)
         _print({k: r["cross_validation"][k] for k in ("overall_accuracy", "kappa", "macro_f1", "fold_macro_f1_std")})
     elif c == "predict":
         from .model import predict
@@ -503,8 +515,17 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
-        r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size)
-        _print({"best_val_loss": r["best_val_loss"], "epochs": r["epochs"]})
+        r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,
+                       allow_random_split=a.allow_random_split)
+        _print({"best_val_loss": r["best_val_loss"], "epochs": r["epochs"], "split": r["split"]})
+    elif c == "segment-patches":
+        import numpy as np
+
+        from .segmentation import extract_patches
+        X, Y, G = extract_patches(a.raster, a.mask, a.size, block_m=a.block_m, bands=a.bands)
+        for suffix, arr in (("_X", X), ("_Y", Y), ("_groups", G)):
+            np.save(f"{a.out}{suffix}.npy", arr)
+        _print({"patches": int(len(X)), "groups": int(len(set(G)))})
     elif c == "segment-unet-infer":
         from .segmentation import unet_infer
         print(unet_infer(a.raster, a.model, a.out, overlap=a.overlap, bands=a.bands))

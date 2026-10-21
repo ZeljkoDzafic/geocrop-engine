@@ -79,6 +79,8 @@ DEFAULTS: dict[str, Any] = {
         "learning_rate": None,
         "tune_grid": None,
         "calibrate": True,
+        "holdout_fraction": 0.0,
+        "inner_splits": 3,
     },
     "experiments": {},
     "parcels": {

@@ -158,7 +158,8 @@ class Runner:
             r = model.train(Samples.load(self.out / "samples.npz"), self.out / "model", params=params,
                             n_splits=m["cv_folds"], spatial_block_m=m["spatial_block_m"], seed=self.cfg["seed"],
                             tune_grid=m.get("tune_grid"), provenance={"config_fingerprint": cfgmod.fingerprint(self.cfg)},
-                            calibrate=m["calibrate"])
+                            calibrate=m["calibrate"], holdout_fraction=m["holdout_fraction"],
+                            inner_splits=m["inner_splits"])
             return {"cv_macro_f1": r["cross_validation"]["macro_f1"], "cv_oa": r["cross_validation"]["overall_accuracy"]}
         return self.stage("train", fp, [target], run)
 
@@ -265,7 +266,7 @@ class Runner:
             params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
             t = experiments.run(Samples.load(self.out / "samples.npz"), features.load_manifest(self.paths["features"]),
                                 self.out / "experiments", exps, params, m["cv_folds"], m["spatial_block_m"],
-                                self.cfg["seed"], self.cfg["classes"]["targets"])
+                                self.cfg["seed"], self.cfg["classes"]["targets"], m["holdout_fraction"])
             return {"rows": int(len(t))}
         return self.stage("experiments", fp, [target], run)
 

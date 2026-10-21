@@ -83,3 +83,22 @@ def test_predict_rejects_missing_features(samples, stack, tmp_path):
     dump(payload, tmp_path / "m2" / "bad.joblib")
     with pytest.raises(ValueError, match="lacks"):
         model.predict(stack, tmp_path / "m2" / "bad.joblib", tmp_path / "p2")
+
+
+def test_holdout_is_locked_and_reported(samples, tmp_path):
+    groups = model.spatial_blocks(samples, 500)
+    mask = model.holdout_mask(samples.y, groups, 0.25, seed=3)
+    assert mask.any() and (~mask).any()
+    assert not set(groups[mask]) & set(groups[~mask])
+    rep = model.train(samples, tmp_path / "h", params={"n_estimators": 20, "n_jobs": 1}, n_splits=3,
+                      spatial_block_m=500, bootstrap=20, holdout_fraction=0.25)
+    assert 0 <= rep["holdout"]["overall_accuracy"] <= 1
+    assert rep["final_model_samples"] == len(samples.y)          # refit on all after the locked evaluation
+    assert rep["cross_validation"]["n"] < len(samples.y)          # CV saw only development blocks
+
+
+def test_nested_cv_reports_selection_per_fold(samples, tmp_path):
+    rep = model.train(samples, tmp_path / "n", params={"n_estimators": 10, "n_jobs": 1}, n_splits=2,
+                      spatial_block_m=500, tune_grid={"max_features": ["sqrt", 0.5]}, bootstrap=0, inner_splits=2)
+    assert len(rep["nested_cv"]["selected_params_per_fold"]) == 2
+    assert "nested_cv" in rep["cross_validation"]["note"]

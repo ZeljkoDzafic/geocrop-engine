@@ -30,12 +30,22 @@ DEFAULT_EXPERIMENTS = {
 
 def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, experiments: dict | None = None,
         params: dict | None = None, n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42,
-        targets: list[str] | None = None) -> pd.DataFrame:
+        targets: list[str] | None = None, holdout_fraction: float = 0.0) -> pd.DataFrame:
+    """With holdout_fraction > 0, whole spatial blocks are locked away first: cross-validation runs on the
+    remaining blocks and every experiment is additionally trained on them and scored once on the holdout
+    (columns `holdout_*`, McNemar on the holdout), so the comparison is not decided on the folds it was tuned on."""
+    from .model import holdout_mask, make_estimator
+
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     experiments = experiments or DEFAULT_EXPERIMENTS
     params = params or {"n_estimators": 300, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1}
-    groups = spatial_blocks(samples, spatial_block_m)
+    groups_all = spatial_blocks(samples, spatial_block_m)
+    hold = holdout_mask(samples.y, groups_all, holdout_fraction, seed) if holdout_fraction else \
+        np.zeros(len(samples.y), bool)
+    dev = ~hold
+    groups = groups_all[dev]
+    ref_hold = None
     available = [f for f in manifest if f.name in samples.features]
     rows, full = [], {}
     reference_name, reference_oof = None, None   # first successful experiment is the paired-test baseline
@@ -46,25 +56,34 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
         except ValueError:
             rows.append({"experiment": name, "status": "skipped: no matching features"})
             continue
-        cv = cross_validate(samples.subset(names), samples.y, samples.polygon, groups, params, n_splits, seed)
+        X = samples.subset(names)
+        cv = cross_validate(X[dev], samples.y[dev], samples.polygon[dev], groups, params, n_splits, seed)
         oof = cv.pop("_oof")
         cv.pop("_oof_proba"), cv.pop("_classes")
         if reference_oof is None:
             reference_name, reference_oof = name, oof
-        test = metrics.mcnemar(samples.y, oof, reference_oof)
+        test = metrics.mcnemar(samples.y[dev], oof, reference_oof)
         row = {"experiment": name, "status": "ok", "n_features": len(names),
                "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"], "macro_f1": cv["macro_f1"],
                "macro_f1_fold_std": cv["fold_macro_f1_std"], "ece": cv["calibration"]["ece"],
                "vs": reference_name, "mcnemar_p": test["p_value"]}
         for t in targets or []:
             row[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
+        if hold.any():
+            pred = make_estimator(params, seed).fit(X[dev], samples.y[dev]).predict(X[hold]).astype(str)
+            h = metrics.summary(samples.y[hold], pred, labels=np.unique(samples.y))
+            if ref_hold is None:
+                ref_hold = pred
+            row.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"],
+                        "holdout_mcnemar_p": metrics.mcnemar(samples.y[hold], pred, ref_hold)["p_value"]})
         rows.append(row)
         full[name] = {"spec": spec, "features": names, "cv": cv}
     table = pd.DataFrame(rows)
     table.to_csv(out / "ablation.csv", index=False)
     (out / "ablation.json").write_text(json.dumps({
         "spatial_block_m": spatial_block_m, "n_splits": n_splits, "seed": seed, "params": params,
-        "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups))), "experiments": full},
+        "holdout_fraction": holdout_fraction, "holdout_samples": int(hold.sum()),
+        "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups_all))), "experiments": full},
         indent=2, default=str), encoding="utf8")
     return table
 

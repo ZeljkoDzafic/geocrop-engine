@@ -91,8 +91,11 @@ def test_unet_roundtrip(tmp_path, demo):
     y = (x[:, 0] > 0.7).astype("float32")
     np.save(tmp_path / "x.npy", x)
     np.save(tmp_path / "y.npy", y)
-    r = segmentation.unet_train(tmp_path / "x.npy", tmp_path / "y.npy", tmp_path / "b.pt", epochs=1, batch_size=2)
-    assert r["epochs"] == 1
+    with pytest.raises(ValueError, match="groups"):
+        segmentation.unet_train(tmp_path / "x.npy", tmp_path / "y.npy", tmp_path / "b.pt", epochs=1)
+    r = segmentation.unet_train(tmp_path / "x.npy", tmp_path / "y.npy", tmp_path / "b.pt", epochs=1, batch_size=2,
+                                groups=np.array(["a", "a", "b", "b"]))
+    assert r["epochs"] == 1 and r["split"]["kind"] == "grouped" and r["split"]["val_groups"] == 1
     raster = Path(demo["composites"]) / "P2"
     import rasterio
     with rasterio.open(raster / "B04.tif") as a, rasterio.open(raster / "B08.tif") as b:
@@ -104,3 +107,32 @@ def test_unet_roundtrip(tmp_path, demo):
     out = segmentation.unet_infer(tmp_path / "two.tif", tmp_path / "b.pt", tmp_path / "bp.tif", patch=64, overlap=8)
     with rasterio.open(out) as ds:
         assert ds.read(1).shape == (prof["height"], prof["width"])
+
+
+def test_patch_group_split_has_no_leakage():
+    groups = np.repeat(["g1", "g2", "g3", "g4", "g5"], 4)
+    tr, val = segmentation.split_patch_groups(groups, 0.2, seed=1)
+    assert not set(groups[tr]) & set(groups[val]) and len(tr) and len(val)
+    with pytest.raises(ValueError):
+        segmentation.split_patch_groups(np.array(["a", "a"]))
+
+
+def test_extract_patches(demo, tmp_path):
+    import rasterio
+    src = Path(demo["composites"]) / "P2" / "B08.tif"
+    with rasterio.open(src) as ds:
+        prof = ds.profile
+        mask = np.zeros(ds.shape, "uint8")
+        mask[::16, :] = 1
+        prof.update(dtype="uint8", nodata=None)
+    with rasterio.open(tmp_path / "m.tif", "w", **prof) as dst:
+        dst.write(mask, 1)
+    X, Y, G = segmentation.extract_patches(src, tmp_path / "m.tif", size=64, block_m=640)
+    assert X.shape[1:] == (1, 64, 64) and Y.shape[0] == len(G) and len(set(G)) > 1
+
+
+def test_ablation_with_holdout(samples, stack, tmp_path):
+    t = experiments.run(samples, features.load_manifest(stack), tmp_path,
+                        {"A": {"groups": ["s2_band"]}, "B": {"groups": ["s1"]}},
+                        {"n_estimators": 15, "n_jobs": 1}, 2, 500, holdout_fraction=0.25)
+    assert {"holdout_overall_accuracy", "holdout_macro_f1", "holdout_mcnemar_p"} <= set(t.columns)
