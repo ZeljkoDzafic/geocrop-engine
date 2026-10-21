@@ -1,0 +1,70 @@
+# Case study: summer-crop classification and declaration verification, 2023 season,
+# 25 local administrative units of northern Republic of Srpska (Bosnia and Herzegovina).
+# Window dates are PROVISIONAL until the 2023 scene inventory has been inspected.
+project: rs-north-2023
+seed: 42
+
+grid:
+  crs: EPSG:32634            # AOI spans ~16.3-19.3 E (UTM 33/34); one zone is used for the whole grid
+  resolution_m: 10
+  reference: data/reference/grid_rs_north_10m.tif
+
+windows:
+  P1: {start: "2023-04-01", end: "2023-05-31"}   # early season, bare/partly covered soil
+  P2: {start: "2023-06-01", end: "2023-07-15"}   # intensive vegetative growth
+  P3: {start: "2023-07-16", end: "2023-08-31"}   # closed canopy, high biomass
+  P4: {start: "2023-09-01", end: "2023-10-15"}   # senescence, approach to harvest
+
+paths:
+  s2_scenes: data/interim/s2
+  s1_scenes: data/interim/s1
+  composites: data/processed/composites_2023
+  features: data/features/stack_2023.tif
+  training: data/reference/training_2023.gpkg
+  parcels: data/reference/lpis_2023.gpkg
+  observations: data/reference/field_observations_2023.gpkg
+  output: outputs/rs_north_2023
+
+compositing:
+  statistic: median
+  mask_dilation_px: 2
+  min_valid_observations: 1
+
+s1:
+  separate_orbits: true
+
+features:
+  deltas: [NDVI, NDRE, NDMI, VH_dB, VHVV_dB]
+  seasonal: [NDVI, NDRE]
+
+classes:
+  targets: [soybean, sunflower, maize]
+  # 366 polygons / 10 classes: maize 89, soybean 65, grassland 45, sunflower 43, vegetables 34,
+  # built_up 29, winter_crops 26 (incl. wheat), tobacco 15, forest 14, water 6
+
+model:
+  n_estimators: 500
+  cv_folds: 5
+  spatial_block_m: 5000
+  tune_grid: {max_features: [sqrt, 0.2, 0.35], min_samples_leaf: [1, 3]}
+
+experiments:
+  E0_S2_bands: {groups: [s2_band]}
+  E1_S2_bands_indices: {groups: [s2_band, s2_index]}
+  E2_S2_temporal: {groups: [s2_band, s2_index, delta, seasonal]}
+  E3_S1_only: {groups: [s1]}
+  E4_S1_S2_fusion: {groups: [s2_band, s2_index, s1, delta, seasonal]}
+  E5_fusion_P1_P2: {groups: [s2_band, s2_index, s1, delta], periods: [P1, P2]}
+  E6_fusion_P1_P3: {groups: [s2_band, s2_index, s1, delta], periods: [P1, P2, P3]}
+
+parcels:
+  declared_field: declared_crop
+  crop_mapping: configs/crop_mapping.example.csv
+  strategy: combined
+  interior_buffer_px: 1
+  min_valid_pixels: 4
+
+validation:
+  year: 2023
+  training_exclusion_m: 50
+  window_px: 1

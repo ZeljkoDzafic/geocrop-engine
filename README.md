@@ -1,0 +1,123 @@
+# GeoCrop Engine
+
+**Open, reproducible Sentinel-1/Sentinel-2 crop-type classification, parcel-level aggregation and
+declaration verification — fully local, provider-neutral, Apache-2.0.**
+
+[![tests](https://github.com/ZeljkoDzafic/geocrop-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/ZeljkoDzafic/geocrop-engine/actions/workflows/tests.yml)
+![python](https://img.shields.io/badge/python-3.10%E2%80%933.12-blue)
+![license](https://img.shields.io/badge/license-Apache--2.0-green)
+
+GeoCrop Engine turns Copernicus Sentinel time series into crop maps with class probabilities,
+summarises them per agricultural parcel and compares the result with farmer declarations (LPIS/IACS)
+— with the validation discipline a scientific publication or an inspection workflow needs:
+spatially blocked cross-validation, independent field validation, area-adjusted accuracy,
+calibration and explicit *review* outcomes instead of forced decisions.
+
+It runs on a workstation or a single server, needs no cloud platform account and no GPU, and every
+stage reads and writes plain GeoTIFF / GeoPackage / CSV / JSON so any GIS (QGIS, ArcGIS, PostGIS,
+custom platforms) can consume the results.
+
+```
+ CDSE / STAC inventory ─► download ─► S2 L2A import ──► cloud/shadow-masked window composites ─┐
+                                      S1 GRD (SNAP) ──► linear-domain window composites ────────┤
+                                                                                                ▼
+   reference polygons ─► samples ◄─ multi-temporal feature stack (bands, indices, radar, Δ, season)
+                            │
+                            ▼
+      spatial-block CV · tuning · ablation (McNemar) ─► Random Forest ─► classes · probabilities · uncertainty
+                                                                              │
+             parcels (LPIS) ─► interior-buffered aggregation (majority | mean probability | combined + reject)
+                                                                              │
+                     agreement · discrepancy · uncertain · insufficient resolution  ─►  GIS / platform
+                                                                              │
+       independent field points ─► leakage-checked validation · bootstrap CIs · calibration · reject curve
+```
+
+## Why another crop-mapping tool?
+
+| Need | GeoCrop Engine |
+|---|---|
+| Local, reproducible processing without a proprietary cloud | Python + GDAL stack; optional ESA SNAP for Sentinel-1; resumable stages with fingerprints and run manifests |
+| Honest accuracy | Spatial-block, class-stratified CV; leakage assertions; independent point validation that automatically excludes observations near training polygons; bootstrap CIs; Olofsson et al. (2014) area-adjusted estimates; calibration (ECE) |
+| Parcel-level decisions | Interior buffer against mixed pixels; majority vs. mean-probability vs. combined-with-reject strategies; second-stage parcel classifier; declaration status that is a *review aid*, never a verdict |
+| Fragmented landscapes | Pixel counts per parcel, `insufficient_resolution` status, shape index, within-parcel variability |
+| Publishable experiments | One-line ablations (S2 / S1 / fusion / window subsets) on identical folds with McNemar tests, feature-reduction curves, group importance, index table with formulas and references |
+| Missing parcel boundaries | OBIA (SLIC) and an optional U-Net boundary model with watershed post-processing, scored with boundary F1 and object-level OS/US/IoU |
+
+## Install
+
+```bash
+conda env create -f environment.yml      # Python 3.11, GDAL stack from conda-forge
+conda activate geocrop
+# or: pip install -e '.[all]'   (Python >= 3.10)
+pip install -e '.[deep]'                 # optional: U-Net segmentation (PyTorch)
+```
+ESA SNAP (for Sentinel-1 preprocessing) is installed separately: <https://step.esa.int/main/download/snap-download/>.
+
+## Quick start (synthetic data, ~10 s)
+
+```bash
+geocrop demo --root outputs/demo
+```
+Generates a synthetic six-class scene with phenological NDVI trajectories and Sentinel-1 backscatter,
+then runs features → spatial CV → prediction → parcels → independent validation → ablation.
+**Synthetic metrics verify the software only; they say nothing about real-world accuracy.**
+
+## Real data in eight commands
+
+```bash
+geocrop catalog --aoi-wkt-file aoi.wkt --start 2023-04-01 --end 2023-10-15 --out manifests/s2.csv
+geocrop download --manifest manifests/s2.csv --out data/raw/s2            # CDSE_USERNAME / CDSE_PASSWORD
+geocrop grid --aoi aoi.gpkg --crs EPSG:32634 --out data/reference/grid.tif
+geocrop s2-import --safe data/raw/s2/<product>.SAFE --out data/interim/s2/<product>
+geocrop snap-graph --out configs/s1_sigma0.xml --crs EPSG:32634            # then: geocrop snap / s1-import
+geocrop inventory --scenes data/interim --config configs/example.yaml      # check availability per window
+geocrop check --training data/reference/training.gpkg --parcels data/reference/parcels.gpkg
+geocrop run --config configs/example.yaml                                  # resumable full pipeline
+```
+See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
+
+## Documentation
+
+| Topic | |
+|---|---|
+| [Getting started](docs/getting-started.md) | installation, demo, real-data walkthrough |
+| [Architecture](docs/architecture.md) | modules, stages, design principles |
+| [Data contracts](docs/data-contracts.md) | every input and output file |
+| [Preprocessing](docs/preprocessing.md) | Sentinel-2 masking & compositing, Sentinel-1 SNAP chain, grids |
+| [Features](docs/features.md) | feature groups, naming, index formulas and references |
+| [Classification & validation](docs/classification-validation.md) | spatial CV, tuning, ablation, independent validation, area estimation |
+| [Parcels & declarations](docs/parcels.md) | aggregation, decision strategies, declaration status, parcel model |
+| [Segmentation](docs/segmentation.md) | OBIA, U-Net, boundary/object metrics |
+| [Configuration](docs/configuration.md) | all YAML keys |
+| [CLI reference](docs/cli.md) | all commands |
+| [Reproducibility & privacy](docs/reproducibility.md) | manifests, caching, data protection |
+| [Deployment](docs/deployment.md) | hardware sizing, server layout |
+| [Scope & limitations](docs/limitations.md) | what is and is not validated |
+
+## Status
+
+Version 0.7 — research software. The complete pipeline is unit-tested and runs end-to-end on synthetic
+data; CDSE access, SNAP graphs and SAFE import follow the official product specifications but must be
+verified on real scenes for each study (see [limitations](docs/limitations.md)). The engine was developed
+for a 2023 soybean / sunflower declaration-verification study in northern Bosnia and Herzegovina; nothing
+about that study is hard-coded — area, season, classes, windows and rules are configuration.
+
+## Authors
+
+- **Željko Džafić** — HTEC Group; Faculty of Technical Sciences, University of Novi Sad
+- **Dragutin Adžić** — Faculty of Natural Sciences and Mathematics, University of Banja Luka
+
+## Citation
+
+If you use GeoCrop Engine, please cite it via [CITATION.cff](CITATION.cff):
+
+> Džafić, Ž.; Adžić, D. *GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and
+> parcel-level declaration verification* (version 0.7.0) [Software]. 2026.
+> https://github.com/ZeljkoDzafic/geocrop-engine
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Copernicus Sentinel data are provided
+under the Copernicus data policy; ESA SNAP and Python dependencies keep their own licences. No satellite
+data, parcel data or model weights are distributed with this repository.

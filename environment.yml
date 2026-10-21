@@ -1,0 +1,23 @@
+name: geocrop
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scikit-learn
+  - scikit-image
+  - scipy
+  - geopandas
+  - pyogrio
+  - rasterio
+  - shapely
+  - pyproj
+  - requests
+  - pyyaml
+  - joblib
+  - pystac-client
+  - pytest
+  - pip
+  - pip:
+      - -e .

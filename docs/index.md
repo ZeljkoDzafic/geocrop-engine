@@ -1,0 +1,15 @@
+# GeoCrop Engine documentation
+
+1. [Getting started](getting-started.md)
+2. [Architecture](architecture.md)
+3. [Data contracts](data-contracts.md)
+4. [Preprocessing: Sentinel-2, Sentinel-1, grids](preprocessing.md)
+5. [Features and index registry](features.md)
+6. [Classification and validation](classification-validation.md)
+7. [Parcels and declaration verification](parcels.md)
+8. [Segmentation](segmentation.md)
+9. [Configuration](configuration.md)
+10. [CLI reference](cli.md)
+11. [Reproducibility and data protection](reproducibility.md)
+12. [Deployment and sizing](deployment.md)
+13. [Scope, status and limitations](limitations.md)

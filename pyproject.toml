@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geocrop-engine"
+version = "0.7.0"
+description = "Open, reproducible Sentinel-1/Sentinel-2 crop-type classification, parcel aggregation and declaration verification engine"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+  {name = "Željko Džafić", email = "zeljkodzafic@gmail.com"},
+  {name = "Dragutin Adžić"},
+]
+keywords = ["remote sensing", "Sentinel-2", "Sentinel-1", "crop classification", "random forest", "LPIS", "parcel", "OBIA", "earth observation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+  "numpy>=1.26,<3",
+  "pandas>=2.0",
+  "scikit-learn>=1.3",
+  "rasterio>=1.3",
+  "geopandas>=0.14",
+  "shapely>=2",
+  "pyproj>=3.5",
+  "scipy>=1.11",
+  "requests>=2.31",
+  "PyYAML>=6",
+  "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+segmentation = ["scikit-image>=0.21"]
+stac = ["pystac-client>=0.8"]
+deep = ["torch>=2.1"]
+dev = ["pytest>=7", "ruff>=0.5", "scikit-image>=0.21"]
+all = ["scikit-image>=0.21", "pystac-client>=0.8"]
+
+[project.urls]
+Homepage = "https://github.com/ZeljkoDzafic/geocrop-engine"
+Documentation = "https://github.com/ZeljkoDzafic/geocrop-engine/tree/main/docs"
+Issues = "https://github.com/ZeljkoDzafic/geocrop-engine/issues"
+
+[project.scripts]
+geocrop = "geocrop.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B905"]
