@@ -17,14 +17,21 @@ def _json_arg(text):
     return json.loads(text) if text else None
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="geocrop", description="GeoCrop Engine: open Sentinel-1/2 crop classification "
+def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParser:
+    p = parser_class(prog="geocrop", description="GeoCrop Engine: open Sentinel-1/2 crop classification "
                                 "and parcel-level declaration verification.")
     p.add_argument("--version", action="version", version=f"geocrop-engine {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
 
     def cmd(name, help_):
         return sub.add_parser(name, help=help_, description=help_)
+
+    x = cmd("serve", "Start the local HTML workspace and HTTP API (optional web extra)")
+    x.add_argument("--host", choices=["127.0.0.1", "localhost", "::1"], default="127.0.0.1")
+    x.add_argument("--port", type=int, default=8765)
+    x.add_argument("--workspace", default=".", help="working directory for engine jobs")
+    x.add_argument("--state-dir", help="job database/log directory; default <workspace>/.geocrop-web")
+    x.add_argument("--token-env", default="GEOCROP_WEB_TOKEN", help="name of the variable containing the access token")
 
     x = cmd("demo", "Run the full pipeline on synthetic data (software check, not accuracy)")
     x.add_argument("--root", default="outputs/demo")
@@ -377,6 +384,21 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     a = build_parser().parse_args(argv)
     c = a.cmd
+    if c == "serve":
+        import os
+
+        try:
+            import uvicorn
+
+            from .web import create_app
+        except ImportError as exc:
+            raise RuntimeError('Install the web interface: pip install -e ".[web]"') from exc
+        token = os.environ.get(a.token_env)
+        if not token or len(token) < 32:
+            raise ValueError(f"Set {a.token_env} to a random access token of at least 32 characters")
+        app = create_app(a.workspace, token, a.state_dir, token_env=a.token_env)
+        uvicorn.run(app, host=a.host, port=a.port, proxy_headers=False)
+        return
     if c == "demo":
         from .demo import run
         _print(run(a.root, quick=a.quick))

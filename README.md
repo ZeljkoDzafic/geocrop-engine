@@ -101,6 +101,20 @@ These are study-design safeguards; independent real-data validation remains nece
 
 ## Documentation
 
+### HTML workspace and Jupyter
+
+```bash
+pip install -e '.[web]'
+# Set GEOCROP_WEB_TOKEN securely to a random token of at least 32 characters.
+geocrop serve --workspace /path/to/your/study --port 8765
+```
+
+The optional local web interface adds command forms, an engine CLI console, queued jobs, logs,
+cancellation and artifact downloads. Existing CLI commands and Python APIs remain available.
+An authenticated HTTP API and `geocrop.client.EngineClient` support Jupyter Notebook, JupyterLab
+and external Python tools. See [web/API setup](docs/web-interface.md) and the
+[runnable notebook](examples/web_notebook.ipynb). No frontend build tools are required.
+
 The current development additions include frozen-predictor holdout calibration, complete-output
 resume checks, reproducible classifier benchmarking and stricter STAC exports. They follow a
 [source review of operational and open EO systems](docs/open-source-review.md); no comparative
