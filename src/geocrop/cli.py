@@ -342,6 +342,29 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--parcels", help="parcels.gpkg to convert to GeoParquet")
     x.add_argument("--hcat", help="CSV class_name,hcat_code,hcat_name")
 
+    x = cmd("benchmark-models", "Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--models", nargs="*", default=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost"])
+    x.add_argument("--features", help="feature stack (manifest) to restrict --groups")
+    x.add_argument("--groups", nargs="*")
+    x.add_argument("--grids", type=_json_arg, help='JSON {"rf": {"max_features": ["sqrt", 0.3]}}')
+    x.add_argument("--block-m", type=float, default=5000)
+    x.add_argument("--folds", type=int, default=5)
+    x.add_argument("--repeats", type=int, default=3)
+    x.add_argument("--holdout", type=float, default=0.0)
+    x.add_argument("--targets", nargs="*", default=[])
+
+    x = cmd("benchmark-segmentation", "OBIA (with/without seam merging) vs U-Net against reference parcels")
+    x.add_argument("--raster", required=True)
+    x.add_argument("--reference", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--bands", nargs="*")
+    x.add_argument("--unet-model")
+    x.add_argument("--unet-bands", nargs="*")
+    x.add_argument("--tile-size", type=int, default=1024)
+    x.add_argument("--segments-per-km2", type=float, default=50)
+
     x = cmd("manifest", "Write a reproducibility manifest (versions, git, hashes)")
     x.add_argument("--out", required=True)
     x.add_argument("--config")
@@ -599,6 +622,23 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             assets["parcels"] = {"href": "parcels.parquet", "type": "application/vnd.apache.parquet", "roles": ["data"]}
         item = stac_item(out, a.id, a.start, a.end, out / "item.json", read_hcat(a.hcat) if a.hcat else None, assets)
         _print({"stac_item": str(out / "item.json"), "assets": list(item["assets"])})
+    elif c == "benchmark-models":
+        from . import benchmark
+        from .samples import Samples
+        s = Samples.load(a.samples)
+        feats = None
+        if a.groups:
+            from .features import load_manifest, select
+            feats = select([f for f in load_manifest(a.features) if f.name in s.features], groups=a.groups)
+        cands = {m: benchmark.DEFAULT_MODELS[m] for m in a.models}
+        t = benchmark.models(s, a.out, feats, cands, a.grids, a.folds, a.block_m, repeats=a.repeats,
+                             holdout_fraction=a.holdout, targets=a.targets)
+        print(t.to_string(index=False))
+    elif c == "benchmark-segmentation":
+        from . import benchmark
+        t = benchmark.segmentation(a.raster, a.reference, a.out, a.bands, a.unet_model, a.unet_bands, a.tile_size,
+                                   a.segments_per_km2)
+        print(t.to_string(index=False))
     elif c == "manifest":
         from .provenance import run_manifest
         cfg = None
