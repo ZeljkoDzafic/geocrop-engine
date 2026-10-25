@@ -101,6 +101,9 @@ These are study-design safeguards; independent real-data validation remains nece
 
 ## Documentation
 
+An English [presentation website](website/README.md) introduces the workflow and interfaces with
+actual web, CLI and QGIS captures. Preview it with `python3 -m http.server 8080 --directory website`.
+
 ### HTML workspace and Jupyter
 
 ```bash
