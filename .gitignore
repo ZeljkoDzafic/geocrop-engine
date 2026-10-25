@@ -26,3 +26,6 @@ venv/
 *.pt
 *.npz
 .geocrop-web/
+
+# Versioned download shipped with the static presentation.
+!website/assets/downloads/geocrop-qgis-0.1.0.zip
