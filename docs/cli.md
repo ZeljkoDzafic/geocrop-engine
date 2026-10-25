@@ -2,6 +2,18 @@
 
 Generated from `geocrop --help`. Every command prints JSON or a path; run `geocrop <command> --help` for details.
 
+## `geocrop serve`
+
+Start the local HTML workspace and HTTP API (optional web extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--host` |  | `127.0.0.1` |  |
+| `--port` |  | `8765` |  |
+| `--workspace` |  | `.` | working directory for engine jobs |
+| `--state-dir` |  |  | job database/log directory; default <workspace>/.geocrop-web |
+| `--token-env` |  | `GEOCROP_WEB_TOKEN` | name of the variable containing the access token |
+
 ## `geocrop demo`
 
 Run the full pipeline on synthetic data (software check, not accuracy)
@@ -96,6 +108,23 @@ Sentinel-2 L2A SAFE -> scene folder (reflectance, SCL, CLDPRB, scene.json)
 |---|---|---|---|
 | `--safe` | yes |  |  |
 | `--out` | yes |  |  |
+| `--reference` |  |  | write directly on the study grid (crop to AOI, saves disk) |
+
+## `geocrop stac-import`
+
+Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full downloads)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--reference` | yes |  | study grid GeoTIFF (geocrop grid) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | scene root, one folder per acquisition |
+| `--endpoint` |  | `https://earth-search.aws.element84.com/v1` |  |
+| `--collection` |  | `sentinel-2-l2a` |  |
+| `--max-cloud` |  | `80` | tile cloud cover pre-filter (%%) |
+| `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
+| `--max-items` |  | `500` |  |
 
 ## `geocrop s2-composite`
 
@@ -190,6 +219,24 @@ Quality checks for rasters and vector reference data
 | `--parcels` |  |  |  |
 | `--observations` |  |  |  |
 
+## `geocrop audit`
+
+Audit study inputs, conflicting labels and training/field leakage without changing data
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--training` |  |  |  |
+| `--parcels` |  |  |  |
+| `--observations` |  |  |  |
+| `--features` |  |  | feature stack GeoTIFF |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `polygon_id` |  |
+| `--parcel-id-field` |  | `parcel_id` |  |
+| `--observation-label-field` |  |  |  |
+| `--exclusion-m` |  |  |  |
+| `--distance-crs` |  |  | projected metric CRS for field exclusion distances |
+| `--out` |  |  | save the JSON report; exit 2 when errors are found |
+
 ## `geocrop folds`
 
 Assign class-stratified spatial-block folds to reference polygons (GIS-inspectable)
@@ -225,6 +272,7 @@ Spatial CV + final Random Forest
 | `--samples` | yes |  |  |
 | `--out` | yes |  |  |
 | `--block-m` |  | `5000` |  |
+| `--buffer-m` |  |  | purge training polygons near held-out sampled pixels |
 | `--folds` |  | `5` |  |
 | `--params` |  |  | JSON, e.g. {"n_estimators": 500} |
 | `--tune` |  |  | JSON grid, e.g. {"max_features": ["sqrt", 0.3]} |
@@ -232,6 +280,25 @@ Spatial CV + final Random Forest
 | `--manifest` |  |  | feature stack (for --groups) |
 | `--algorithm` |  |  |  |
 | `--no-calibrate` |  |  | skip temperature scaling |
+| `--holdout` |  |  | fraction of spatial blocks locked as final test |
+| `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |
+| `--calibration-fraction` |  | `0.2` | fraction of spatial groups held out |
+
+## `geocrop benchmark`
+
+Compare classifiers on identical spatial folds; internal model selection only
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  |  |
+| `--algorithms` |  | `['rf', 'extra_trees', 'hist_gb']` |  |
+| `--config` |  |  | inherit model settings and spatial validation policy |
+| `--params` |  |  | JSON estimator settings shared across candidates |
+| `--block-m` |  |  |  |
+| `--buffer-m` |  |  |  |
+| `--folds` |  |  |  |
+| `--seed` |  |  |  |
 
 ## `geocrop predict`
 
@@ -254,8 +321,10 @@ Feature-group ablation experiments on identical folds
 | `--out` | yes |  |  |
 | `--config` |  |  | experiments: and model: sections |
 | `--targets` |  | `[]` |  |
-| `--block-m` |  | `5000` |  |
-| `--folds` |  | `5` |  |
+| `--block-m` |  |  | override config model.spatial_block_m (default 5000) |
+| `--folds` |  |  | override config model.cv_folds (default 5) |
+| `--buffer-m` |  |  | override config model.spatial_buffer_m (default 0) |
+| `--seed` |  |  | override config seed (default 42) |
 
 ## `geocrop reduce-features`
 
@@ -265,7 +334,9 @@ Recursive feature elimination curve under spatial CV
 |---|---|---|---|
 | `--samples` | yes |  |  |
 | `--out` | yes |  |  |
-| `--block-m` |  | `5000` |  |
+| `--block-m` |  |  |  |
+| `--buffer-m` |  |  |  |
+| `--config` |  |  | inherit model and holdout calibration policy |
 | `--step` |  | `0.2` |  |
 
 ## `geocrop parcels`
@@ -289,6 +360,7 @@ Parcel aggregation, decision and declaration comparison
 | `--conformal` |  |  | conformal.json from training |
 | `--alpha` |  | `0.1` |  |
 | `--aoa` |  |  | aoa.tif from prediction |
+| `--min-aoa-fraction` |  | `0.5` | minimum inside-AOA share of valid probability pixels |
 | `--markers` |  |  | markers.csv from geocrop markers |
 | `--calendar` |  |  | crop calendar YAML |
 
@@ -355,6 +427,8 @@ SLIC superpixel segmentation (tile-bounded)
 | `--segments-per-km2` |  | `50` |  |
 | `--compactness` |  | `0.1` |  |
 | `--tile-size` |  | `1024` |  |
+| `--no-merge-seams` |  |  | keep segments split at tile borders |
+| `--merge-distance` |  | `0.08` | max RMS spectral difference for seam merges |
 
 ## `geocrop segment-unet-train`
 
@@ -367,6 +441,21 @@ Train the boundary U-Net (requires torch)
 | `--model` | yes |  |  |
 | `--epochs` |  | `30` |  |
 | `--batch-size` |  | `8` |  |
+| `--groups` |  |  | .npy/.txt with one spatial group id per patch (required for a fair split) |
+| `--allow-random-split` |  |  | accept an optimistic random patch split |
+
+## `geocrop segment-patches`
+
+Cut image/boundary patches with spatial group ids for U-Net training
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--raster` | yes |  |  |
+| `--mask` | yes |  | rasterised reference boundaries (1 = boundary) |
+| `--out` | yes |  | output prefix; writes _X.npy, _Y.npy, _groups.npy |
+| `--size` |  | `128` |  |
+| `--block-m` |  | `2000` |  |
+| `--bands` |  |  |  |
 
 ## `geocrop segment-unet-infer`
 
@@ -430,6 +519,8 @@ Time-series features (Whittaker, phenology, harmonics) from scene folders
 | `--output-step-days` |  | `15` |  |
 | `--lam` |  | `50.0` |  |
 | `--envelope` |  |  | upper-envelope iterations |
+| `--min-observed-fraction` |  |  | minimum occupied temporal-bin fraction |
+| `--max-gap-days` |  |  | maximum consecutive empty-bin duration, including edges |
 
 ## `geocrop merge-stacks`
 
@@ -510,6 +601,39 @@ Publish a prediction directory: COGs, STAC item, optional GeoParquet parcels
 | `--end` | yes |  |  |
 | `--parcels` |  |  | parcels.gpkg to convert to GeoParquet |
 | `--hcat` |  |  | CSV class_name,hcat_code,hcat_name |
+
+## `geocrop benchmark-models`
+
+Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  |  |
+| `--models` |  | `['rf', 'extra_trees', 'hist_gb', 'lightgbm', 'catboost']` |  |
+| `--features` |  |  | feature stack (manifest) to restrict --groups |
+| `--groups` |  |  |  |
+| `--grids` |  |  | JSON {"rf": {"max_features": ["sqrt", 0.3]}} |
+| `--block-m` |  | `5000` |  |
+| `--folds` |  | `5` |  |
+| `--repeats` |  | `3` |  |
+| `--holdout` |  |  |  |
+| `--targets` |  | `[]` |  |
+
+## `geocrop benchmark-segmentation`
+
+OBIA (with/without seam merging) vs U-Net against reference parcels
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--raster` | yes |  |  |
+| `--reference` | yes |  |  |
+| `--out` | yes |  |  |
+| `--bands` |  |  |  |
+| `--unet-model` |  |  |  |
+| `--unet-bands` |  |  |  |
+| `--tile-size` |  | `1024` |  |
+| `--segments-per-km2` |  | `50` |  |
 
 ## `geocrop manifest`
 

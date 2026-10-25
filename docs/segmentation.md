@@ -35,3 +35,15 @@ Report both segmentation paths on the same withheld reference parcels; do not la
 ## References
 Achanta et al. (2012) IEEE TPAMI 34:2274–2282 · Clinton et al. (2010) PE&RS 76:289–299 ·
 Ronneberger et al. (2015) MICCAI · Waldner & Diakogiannis (2020) RSE 245:111741 · Kerner et al. (2025) AAAI (Fields of The World).
+
+## Hardening in 0.9
+* **Leakage-free U-Net validation.** `unet_train` splits validation by patch *groups* (spatial blocks, sites or
+  parcels); a random patch split is refused unless `allow_random_split=True`. Per-channel mean/std are computed on
+  training patches only. `geocrop segment-patches --raster ... --mask ... --block-m 2000` cuts patches and writes
+  the matching `_groups.npy`; pass it with `segment-unet-train --groups`.
+* **Seam reconciliation.** OBIA normalises all tiles with one global 2–98 % stretch and merges segments from
+  different tiles that share at least `min_shared_px` pixels of a tile seam and differ by less than
+  `merge_distance` in mean stretched spectra (transitive union-find). Output ids are global and stable
+  (north→south, west→east); `tile`, `parts` and `seam_merged` support QA. Disable with `--no-merge-seams`.
+* **Benchmark.** `geocrop benchmark-segmentation --raster ... --reference parcels.gpkg [--unet-model ...]`
+  scores OBIA with and without seam merging and U-Net + watershed against the same reference parcels.

@@ -1,9 +1,10 @@
 """Content-addressed fingerprints for resumable runs.
 
 A stage is re-run when the *content* of any input changes, not when a file is merely touched or copied.
-SHA-256 digests are cached per (path, size, mtime) in `<output>/.hashcache.json`, so large rasters are
-hashed once; directories are fingerprinted from the digests of all files they contain. `mode="metadata"`
-(size + mtime only) is available for very large raw archives where hashing is impractical.
+SHA-256 digests of large files are cached per (path, size, mtime) in `<output>/.hashcache.json`, so large
+rasters are hashed once; small files are always re-hashed. Directories are fingerprinted from the digests
+of all files they contain. `mode="metadata"` (size + mtime only) is available for very large raw archives
+where hashing is impractical.
 """
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+
+SMALL_FILE_BYTES = 4 * 1024 * 1024
 
 
 class HashCache:
@@ -28,15 +31,19 @@ class HashCache:
             return f"meta:{st.st_size}:{st.st_mtime_ns}"
         key = str(p)
         hit = self.entries.get(key)
-        if hit and hit["size"] == st.st_size and hit["mtime_ns"] == st.st_mtime_ns:
+        # Small files (metadata, sidecars, configs) are always re-hashed: an edit that preserves size and
+        # timestamp must still be detected. Only large rasters reuse the cached digest.
+        if hit and st.st_size > SMALL_FILE_BYTES and hit["size"] == st.st_size and hit["mtime_ns"] == st.st_mtime_ns:
             return hit["sha256"]
         h = hashlib.sha256()
         with p.open("rb") as fh:
             for block in iter(lambda: fh.read(8 * 1024 * 1024), b""):
                 h.update(block)
-        self.entries[key] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": h.hexdigest()}
-        self.dirty = True
-        return self.entries[key]["sha256"]
+        digest = h.hexdigest()
+        if st.st_size > SMALL_FILE_BYTES:
+            self.entries[key] = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": digest}
+            self.dirty = True
+        return digest
 
     def tree(self, path: str | Path, suffixes=(".tif", ".tiff", ".json", ".gpkg", ".npz", ".joblib", ".csv",
                                                ".jp2", ".xml", ".yaml", ".yml")) -> str:

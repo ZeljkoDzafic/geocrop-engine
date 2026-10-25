@@ -39,6 +39,10 @@ def make_estimator(params: dict, seed: int):
         p.setdefault("class_weight", "balanced")
         if p.get("class_weight") == "balanced_subsample":
             p["class_weight"] = "balanced"
+        # Shared model configuration includes forest-only feature-count defaults.
+        # Histogram boosting uses a fraction instead; keep numeric overrides.
+        if p.get("max_features") in ("sqrt", "log2"):
+            p.pop("max_features")
         n_iter = p.pop("n_estimators", 300)
         p.setdefault("max_iter", n_iter)
         return HistGradientBoostingClassifier(random_state=seed, **_filtered(HistGradientBoostingClassifier, p))

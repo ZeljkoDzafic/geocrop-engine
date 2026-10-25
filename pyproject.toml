@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geocrop-engine"
-version = "0.8.0"
+version = "0.9.0"
 description = "Open, reproducible Sentinel-1/Sentinel-2 crop-type classification, parcel aggregation and declaration verification engine"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -41,6 +41,7 @@ segmentation = ["scikit-image>=0.21"]
 stac = ["pystac-client>=0.8"]
 deep = ["torch>=2.1"]
 dev = ["pytest>=7", "ruff>=0.5", "scikit-image>=0.21"]
+web = ["fastapi>=0.115", "uvicorn>=0.30", "httpx>=0.27"]
 boost = ["lightgbm>=4", "catboost>=1.2"]
 cloud = ["omnicloudmask>=1.0"]
 parquet = ["pyarrow>=14"]
@@ -57,9 +58,16 @@ geocrop = "geocrop.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+geocrop = ["web_static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not network'"
+markers = [
+  "network: integration tests that read real Sentinel data over the internet (pytest -m network)",
+  "slow: larger rasters and memory benchmarks",
+]
 
 [tool.ruff]
 line-length = 110

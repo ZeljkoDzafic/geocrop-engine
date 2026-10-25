@@ -44,6 +44,36 @@ Statuses prioritise field inspections; they are **not** findings of non-complian
 `parcels.summary.json` contains decision and status counts, also per declared class — the basis of the
 agreement table in a report.
 
+## Decision reasons and evidence warnings
+
+`decision_reasons` contains semicolon-separated stable codes. An accepted parcel has an empty string.
+`decision_details()` returns these codes as a list alongside the class and decision; `decide()` keeps
+its existing two-value return interface. Every failed configured condition is recorded, so reasons
+are not mutually exclusive. `decision_reason_counts` counts parcels with each reason and must not be
+summed as distinct reviewed parcels.
+
+| Codes | Meaning |
+|---|---|
+| `insufficient_valid_pixels` | fewer valid probability pixels than `min_valid_pixels` |
+| `strategies_disagree` | combined strategy cannot select a class |
+| `low_confidence`, `low_margin`, `low_majority_share` | a configured threshold fails |
+| `missing_confidence`, `missing_margin`, `missing_majority_share` | evidence needed by a configured threshold is absent/nonfinite |
+| `aoa_missing_support` | requested AOA has no known binary flags on valid probability support |
+| `aoa_below_threshold` | inside-AOA fraction is below the configured threshold |
+
+If an AOA layer is supplied, `n_aoa_valid` and `aoa_coverage` describe known binary flags among valid
+probability pixels. `aoa_fraction` is the number of known inside flags divided by **all valid
+probability pixels**. Unknown flags never increase applicability; all-unknown support forces review.
+For complete AOA coverage this agrees with the ordinary mean of its binary flags. Partial coverage
+now uses a conservative denominator. `--min-aoa-fraction` / `parcels.min_aoa_fraction` defaults to 0.5.
+AOA CRS/grid/shape must match probabilities. Aggregation requires a projected metric CRS and valid
+probability vectors in [0, 1] summing to one within floating-point tolerance.
+
+`evidence_warnings` is separate: `interior_buffer_fallback` marks use of the full narrow parcel;
+`aoa_partial_support` marks missing/invalid AOA flags among probability pixels. Warnings alone do not
+change acceptance; `evidence_warning_counts` counts them separately. A reason describes the configured
+rule, not a verified crop error or legal verdict. The CSV and GeoPackage preserve both columns.
+
 ## Second-stage parcel model
 `geocrop parcel-model --parcels parcels.gpkg --label-field verified_class` trains a Random Forest on the
 aggregated descriptors (`p_*`, `f_*`, confidence, margin, entropy, homogeneity, area, shape) with spatially

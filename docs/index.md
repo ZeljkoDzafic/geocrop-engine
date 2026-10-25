@@ -17,3 +17,5 @@
 15. [Reproducibility and data protection](reproducibility.md)
 16. [Deployment and sizing](deployment.md)
 17. [Scope, status and limitations](limitations.md)
+18. [Open-source review and implementation evidence](open-source-review.md)
+19. [Testing](testing.md)

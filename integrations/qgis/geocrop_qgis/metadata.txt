@@ -1,0 +1,17 @@
+[general]
+name=GeoCrop Engine
+description=Run GeoCrop jobs and load crop maps and parcel results through the local HTTP API.
+about=Standalone Processing provider for a separately installed GeoCrop Engine. Includes command, synthetic demo and existing-job workflows. No engine scientific packages are required in QGIS Python.
+version=0.1.0
+qgisMinimumVersion=3.28
+qgisMaximumVersion=3.99
+author=GeoCrop contributors
+email=zeljkodzafic@gmail.com
+category=Raster
+icon=icon.svg
+experimental=True
+deprecated=False
+hasProcessingProvider=True
+homepage=https://github.com/ZeljkoDzafic/geocrop-engine
+repository=https://github.com/ZeljkoDzafic/geocrop-engine
+tracker=https://github.com/ZeljkoDzafic/geocrop-engine/issues

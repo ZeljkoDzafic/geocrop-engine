@@ -31,6 +31,12 @@ from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned
 from .s2 import DEFAULT_SCL_INVALID, clear_mask
 
 PHENOLOGY = ("sos", "eos", "los", "peak_doy", "peak_value", "amplitude", "greenup_rate", "senescence_rate", "integral")
+QUALITY_METRICS = ("observation_count", "observed_bin_fraction", "longest_gap_days", "passes_policy")
+
+
+def quality_path(output: str | Path) -> Path:
+    path = Path(output)
+    return path.with_name(path.stem + "_quality.tif")
 
 
 def _doy(d: date) -> int:
@@ -41,7 +47,16 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                            s2_indices=("NDVI", "NDRE", "NDMI"), s1_indices=("VHVV_dB",), step_days: int = 5,
                            output_step_days: int = 15, lam: float = 50.0, envelope_iterations: int = 0,
                            harmonic_order: int = 2, scl_invalid=DEFAULT_SCL_INVALID, cloud_probability_max=None,
-                           orbit: str | None = None, block_size: int = 256) -> Path:
+                           orbit: str | None = None, block_size: int = 256,
+                           min_observed_fraction: float = 0, max_gap_days: float | None = None) -> Path:
+    if not np.isfinite(min_observed_fraction) or not 0 <= min_observed_fraction <= 1:
+        raise ValueError("min_observed_fraction must be between zero and one")
+    if max_gap_days is not None and (not np.isfinite(max_gap_days) or max_gap_days < 0):
+        raise ValueError("max_gap_days must be nonnegative or None")
+    if step_days < 1 or output_step_days < 1 or output_step_days % step_days:
+        raise ValueError("output_step_days must be a positive multiple of step_days")
+    if start.year != end.year:
+        raise ValueError("Time-series DOY features require a single calendar year; split cross-year seasons explicitly")
     roots = [scene_root] if isinstance(scene_root, (str, Path)) else list(scene_root)
     metas = sorted((m for r in roots if Path(r).exists() for m in scene_meta.discover(r) if start <= m["date"] <= end),
                    key=lambda m: m["date"])
@@ -68,15 +83,22 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         if missing:
             raise FileNotFoundError(f"{m['path']} lacks {missing}")
     out = ensure_parent(output)
-    with rasterio.open(reference) as ref, rasterio.open(out, "w", **float_profile(ref, count=len(names))) as sink:
+    qa_path = quality_path(out)
+    qa_names = [f"qa_{name}_{metric}" for _, name, _ in series for metric in QUALITY_METRICS]
+    totals = {name: {"pixels": 0, "passes_policy": 0, "without_observations": 0} for _, name, _ in series}
+    with rasterio.open(reference) as ref, rasterio.open(out, "w", **float_profile(ref, count=len(names))) as sink, \
+            rasterio.open(qa_path, "w", **float_profile(ref, count=len(qa_names))) as qa_sink:
         for i, n in enumerate(names, 1):
             sink.set_band_description(i, n)
+        for i, n in enumerate(qa_names, 1):
+            qa_sink.set_band_description(i, n)
         handles = {}
         try:
             for w in blocks(ref.width, ref.height, block_size):
                 transform, shape = ref.window_transform(w), (int(w.height), int(w.width))
                 npx = shape[0] * shape[1]
                 values: dict[str, np.ndarray] = {}
+                qa_values = {}
                 for sensor, name, scenes in series:
                     obs = np.full((npx, len(scenes)), np.nan)
                     ok = np.zeros((npx, len(scenes)), dtype=bool)
@@ -109,13 +131,27 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                         obs[:, j] = v.ravel()
                         ok[:, j] = good.ravel()
                     y, wgt = ts.bin_to_grid([m["date"] for m in scenes], obs, ok, grid)
+                    support = ts.temporal_support(wgt, step_days)
+                    passes = ((wgt > 0).sum(axis=1) >= 4) & (support["observed_bin_fraction"] >= min_observed_fraction)
+                    if max_gap_days is not None:
+                        passes &= support["longest_gap_days"] <= max_gap_days
+                    support["passes_policy"] = passes.astype(float)
+                    for metric, arr in support.items():
+                        qa_values[f"qa_{name}_{metric}"] = arr
+                    totals[name]["pixels"] += npx
+                    totals[name]["passes_policy"] += int(passes.sum())
+                    totals[name]["without_observations"] += int((support["observation_count"] == 0).sum())
                     z = ts.whittaker(y, wgt, lam=lam, envelope_iterations=envelope_iterations)
+                    z[~passes] = np.nan
                     for k in out_idx:
                         values[f"ts_{name}_d{int(days[k])}"] = z[:, k]
                     for metric, arr in ts.phenology(z, days).items():
                         values[f"phen_{name}_{metric}"] = arr
                     for c, arr in ts.harmonics(y, wgt, days, harmonic_order).items():
+                        arr[~passes] = np.nan
                         values[f"harm_{name}_{c}"] = arr
+                for i, n in enumerate(qa_names, 1):
+                    qa_sink.write(qa_values[n].reshape(shape).astype("float32"), i, window=w)
                 for i, n in enumerate(names, 1):
                     v = values[n].reshape(shape)
                     sink.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), i, window=w)
@@ -127,6 +163,15 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         "step_days": step_days, "lambda": lam, "envelope_iterations": envelope_iterations,
         "scenes": {"S2": len(s2), "S1": len(s1)}, "nodata": NODATA,
         "features": [asdict(f) for f in features]}, indent=2), encoding="utf8")
+    qa_path.with_suffix(".json").write_text(json.dumps({
+        "schema": "geocrop-temporal-support/1", "quality_raster": qa_path.name,
+        "start": start.isoformat(), "end": end.isoformat(), "grid_bins": len(grid), "step_days": step_days,
+        "min_observed_fraction": min_observed_fraction, "max_gap_days": max_gap_days,
+        "min_occupied_bins": 4, "bands": qa_names, "series": totals,
+        "scope": "Before interpolation; gap = consecutive empty grid bins times step_days, including edges. "
+                 "Input observations sharing a bin do not increase coverage. Policy pass does not guarantee "
+                 "all phenology/harmonic features are finite or classification is accurate. "
+                 "QA bands are separate from classifier features."}, indent=2), encoding="utf8")
     return out
 
 

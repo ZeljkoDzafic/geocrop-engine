@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.9.0 — 2026-10-26
+Hardening release: leakage-free validation for ML and DL, reliable resumable execution, seam-free
+segmentation, reproducible benchmarks, real-data integration tests and VM deployment; plus the web
+workspace, QGIS integration and audit tooling.
+
+### Added
+- Nested spatial cross-validation for tuned models and an optional locked spatial test holdout in training,
+  ablation and benchmarks (scored once, McNemar on the holdout).
+- U-Net validation split by spatial patch groups (random patch split refused unless explicitly allowed);
+  normalisation statistics from training patches only; `segment-patches` with spatial group ids.
+- OBIA with one global stretch, seam reconciliation across tiles (spectral similarity + shared border,
+  union-find) and stable global segment ids.
+- Content-addressed stage fingerprints (SHA-256, cached for large files, small files always re-hashed),
+  upstream dependency chain, run lock and `run.log` with peak memory per stage.
+- `benchmark-models` (repeated seeds, nested tuning, holdout, timing, McNemar) and `benchmark-segmentation`
+  (OBIA with/without seam merging vs U-Net, object and boundary metrics), alongside the strict
+  fingerprinted `benchmark` report.
+- Cloud-native Sentinel-2 import from STAC COGs (`stac-import`): only the study-grid window is read,
+  provider-applied BOA offsets are honoured, implausible radiometry is rejected. `s2-import --reference`
+  writes SAFE products directly on the study grid (AOI crop).
+- Test tiers: golden-value feature regression, bounded-memory benchmark (`slow`), integration tests on real
+  Sentinel-2 data over Semberija, July 2023 (`network`, weekly workflow).
+- VM deployment: `deploy/setup_ubuntu.sh`, systemd run template, Dockerfile, runbook.
+- Standalone QGIS Processing plugin with command/demo/job workflows, authenticated API access and GIS-layer downloads.
+- Optional HTML workspace, authenticated HTTP job API, persistent job logs/cancellation and notebook client.
+- Per-parcel non-exclusive decision reasons and separate evidence warnings, with summary counts.
+- Separate temporal-support rasters/summaries, optional coverage/gap masking and explicit temporal-grid validation.
+- Input audit, optional spatially buffered CV, and selected-class parcel confidence/margin evidence.
+- Frozen-predictor calibration on held-out spatial groups with conservative sparse-class inclusion,
+  explicit calibration roles and saved-model SHA-256 binding through prediction and parcel aggregation.
+- Multi-estimator benchmark on identical spatial folds with sample/fold hashes, explicit failures and timings.
+- Richer STAC raster/projection/classification metadata, asset/grid/legend/date validation and correct relative paths.
+- Primary-source ecosystem review with exact commits and a real-data benchmark protocol.
+
+### Fixed
+- Missing requested AOA evidence now forces review; partial AOA support uses all valid probability pixels
+  as its denominator. Misaligned AOA grids and malformed probability vectors are rejected.
+- Atomic, versioned pipeline running/failure/success states; complete output contracts and dependency identities
+  prevent reuse of partial reruns, missing sidecars and stale sensor/orbit composites.
+- Unsupported OOF split-conformal guarantee removed; calibration-fit diagnostics separated from independent evidence.
+- Parcel decisions use the selected class's evidence; explicit review outcomes retain yellow traffic lights.
+- U-Net train/validation overlap when only a few patches were available.
+- Earth Search COGs with `earthsearch:boa_offset_applied` would otherwise receive the -0.1 offset twice.
+
 ## 0.8.0 — 2026-10-21
 Second development wave, informed by a review of WorldCereal, Sen4CAP, sits, eo-learn, JRC CbM, FORCE and
 Fields of The World.

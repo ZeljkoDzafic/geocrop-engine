@@ -23,6 +23,8 @@ _trapz = getattr(np, "trapezoid", None) or np.trapz   # numpy >= 2 renamed trapz
 def make_grid(start: date, end: date, step_days: int = 5) -> list[date]:
     if step_days < 1:
         raise ValueError("step_days must be >= 1")
+    if end < start:
+        raise ValueError("end must not precede start")
     n = (end - start).days // step_days + 1
     return [start + timedelta(days=i * step_days) for i in range(n)]
 
@@ -48,6 +50,28 @@ def bin_to_grid(obs_dates: list[date], values: np.ndarray, valid: np.ndarray, gr
     with np.errstate(invalid="ignore", divide="ignore"):
         y = np.where(count > 0, total / count, np.nan)
     return y, count
+
+
+def temporal_support(weights: np.ndarray, step_days: int = 5) -> dict:
+    """Observed support before interpolation, including leading/trailing missing bins.
+
+    Longest gap is consecutive empty grid bins multiplied by step_days, not an exact
+    inter-acquisition interval. Repeated acquisitions in one bin increase observation
+    count but not occupied-bin coverage. No observations gives zero coverage/full gap.
+    """
+    w = np.asarray(weights, dtype=float)
+    if w.ndim != 2 or not w.shape[1] or not np.isfinite(w).all() or (w < 0).any():
+        raise ValueError("weights must be a finite nonnegative (pixels, nonempty grid) array")
+    if not np.isfinite(step_days) or step_days <= 0:
+        raise ValueError("step_days must be positive")
+    occupied = w > 0
+    run = np.zeros(len(w), dtype=int)
+    longest = run.copy()
+    for column in occupied.T:
+        run = np.where(column, 0, run + 1)
+        longest = np.maximum(longest, run)
+    return {"observation_count": w.sum(axis=1), "observed_bin_fraction": occupied.mean(axis=1),
+            "longest_gap_days": longest * step_days}
 
 
 def _penalty(n: int, order: int = 2) -> np.ndarray:

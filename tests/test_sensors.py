@@ -81,6 +81,7 @@ def test_s1_composite_linear_mean(tmp_path):
 
 
 def test_import_safe_scaling(tmp_path):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     """Mini SAFE with GeoTIFF payloads named like JP2 files (GDAL opens by content)."""
     name = "S2A_MSIL2A_20230705T093041_N0509_R136_T34TCQ_20230705T140000.SAFE"
     safe = tmp_path / name
@@ -141,3 +142,16 @@ def test_external_mask_respected(tmp_path):
     with rasterio.open(out / "B04.tif") as ds:
         v = ds.read(1)
     assert np.allclose(v[:2], 0.1) and np.allclose(v[2:], 0.2)
+
+
+def test_import_safe_onto_reference_grid(tmp_path):
+    """SAFE written directly on a smaller study grid (AOI crop)."""
+    test_import_safe_scaling(tmp_path / "full")
+    safe = next((tmp_path / "full").glob("*.SAFE"))
+    ref = tmp_path / "grid.tif"
+    with rasterio.open(ref, "w", driver="GTiff", height=2, width=2, count=1, dtype="uint8", crs="EPSG:32634",
+                       transform=from_origin(500010, 4999990, 10, 10)) as dst:
+        dst.write(np.ones((2, 2), "uint8"), 1)
+    out = s2.import_safe(safe, tmp_path / "cropped", reference=ref)
+    with rasterio.open(out / "B04.tif") as ds:
+        assert ds.shape == (2, 2) and np.allclose(ds.read(1), 0.2)
