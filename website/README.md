@@ -44,9 +44,23 @@ trademarks; integration does not imply their endorsement.
 ## Publish
 
 The complete `website/` folder can be uploaded to any static host. Relative asset paths support both
-a domain root and a project subpath, including GitHub Pages. To use GitHub Pages, publish this directory
-through your chosen Pages build/artifact workflow. No hosting service is provisioned or deployed by
-this change. Source/docs links and installation commands target the public main branch.
+a domain root and a project subpath, including GitHub Pages. Source/docs links and installation
+commands target the public main branch.
+
+### GitHub Pages
+
+1. Ensure `website/`, `tools/check_presentation_site.py` and `.github/workflows/pages.yml` are on `main`.
+2. Open the repository **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.
+3. Open **Actions → Deploy presentation to GitHub Pages → Run workflow**, select `main` and run it.
+4. After the deployment succeeds, open <https://zeljkodzafic.github.io/geocrop-engine/>.
+
+Later changes to the website on `main` deploy automatically. The workflow checks local links,
+screenshots and the bundled plugin before publishing. The repository's Actions settings must allow
+GitHub Actions; any configured `github-pages` environment approval still applies. Adding the workflow
+does not enable repository Pages settings or perform a deployment by itself.
+
+GitHub Pages serves the static presentation, images and plugin download. Start the engine API/web
+workspace separately on your own computer or server; Pages does not execute Python services.
 
 For an offline copy, archive the complete directory rather than only `index.html`. The screenshot
 viewer and tabs work locally; clipboard access may be restricted by the browser, in which case the
