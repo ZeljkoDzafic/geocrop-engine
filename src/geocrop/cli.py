@@ -229,6 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--conformal", help="conformal.json from training")
     x.add_argument("--alpha", type=float, default=0.1)
     x.add_argument("--aoa", help="aoa.tif from prediction")
+    x.add_argument("--min-aoa-fraction", type=float, default=0.5,
+                   help="minimum inside-AOA share of valid probability pixels")
     x.add_argument("--markers", help="markers.csv from geocrop markers")
     x.add_argument("--calendar", help="crop calendar YAML")
 
@@ -556,6 +558,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(aggregate(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.strategy, a.buffer_px,
                          a.min_pixels, a.min_confidence, a.min_majority_share, a.min_margin,
                          read_mapping(a.crop_mapping) or None, a.conformal, a.alpha, a.aoa,
+                         min_aoa_fraction=a.min_aoa_fraction,
                          markers=pd.read_csv(a.markers) if a.markers else None,
                          calendar=yaml.safe_load(Path(a.calendar).read_text()) if a.calendar else None))
     elif c == "parcel-model":

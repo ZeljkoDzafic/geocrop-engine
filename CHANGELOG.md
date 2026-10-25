@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Per-parcel non-exclusive decision reasons and separate evidence warnings, with summary counts.
 - Separate temporal-support rasters/summaries, optional coverage/gap masking and explicit temporal-grid validation.
 - Input audit, optional spatially buffered CV, and selected-class parcel confidence/margin evidence.
 - Frozen-predictor calibration on held-out spatial groups with conservative sparse-class inclusion,
@@ -12,6 +13,8 @@
 - Primary-source ecosystem review with exact commits and a real-data benchmark protocol.
 
 ### Fixed
+- Missing requested AOA evidence now forces review; partial AOA support uses all valid probability pixels
+  as its denominator. Misaligned AOA grids and malformed probability vectors are rejected.
 - Atomic, versioned pipeline running/failure/success states; complete output contracts and dependency identities
   prevent reuse of partial reruns, missing sidecars and stale sensor/orbit composites.
 - Unsupported OOF split-conformal guarantee removed; calibration-fit diagnostics separated from independent evidence.
