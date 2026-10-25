@@ -128,3 +128,18 @@ For convenience samples (e.g. opportunistic field visits) report only the confus
 Olofsson et al. (2014) RSE 148:42–57 · Roberts et al. (2017) Ecography 40:913–929 ·
 Ploton et al. (2020) Nat. Commun. 11:4540 · Schulthess et al. (2023) Remote Sens. 15:608 ·
 Breiman (2001) Mach. Learn. 45:5–32 · McNemar (1947) Psychometrika 12:153–157 · Foody (2004) PE&RS 70:627–633.
+
+## Nested CV and locked final holdout (0.9)
+* **Nested spatial CV.** With a tuning grid, `train_report.json → nested_cv` reports outer-fold scores of the
+  *whole tuning procedure*: hyperparameters are selected by an inner spatial CV that sees only the outer
+  training blocks (Varma & Simon, 2006). The re-run `cross_validation` with the selected parameters is kept for
+  calibration and diagnostics and is labelled as optimistic. The same spatial buffer applies in both loops.
+* **Locked holdout.** `model.holdout_fraction` (CLI `--holdout`) removes whole, class-stratified spatial blocks
+  *before* the calibration split, tuning, ablation or benchmarking. They are scored exactly once
+  (`report["holdout"]`, `holdout_predictions.csv`, `holdout_*` columns in ablation and benchmark tables with a
+  McNemar test on the holdout). In `oof` calibration mode the mapping model is then refitted on all samples;
+  in `holdout` calibration mode the predictor stays frozen so that conformal thresholds remain bound to it.
+* **Extended benchmark.** `geocrop benchmark-models` compares RF, ExtraTrees, HistGB, LightGBM and CatBoost on
+  identical folds over repeated seeds (mean ± SD), with optional nested tuning per model, locked holdout,
+  training time, prediction throughput and McNemar tests against the reference model; the fold signature is
+  recorded. `geocrop benchmark` remains the strict single-run fingerprinted report.

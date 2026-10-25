@@ -64,3 +64,19 @@ masks such as OmniCloudMask, multi-temporal outlier screening) and for time-seri
 * `valid_count` maps per window; gaps over target fields.
 * Visual check of a few composites per window for residual clouds/shadows, especially over target crops.
 * SAR: anomalies over water, built-up edges and steep slopes; ascending vs descending level differences.
+
+## Cloud-native import from STAC (0.9)
+`geocrop stac-import --reference grid.tif --start 2023-03-15 --end 2023-10-31 --out data/interim/s2` searches a
+STAC API (default: Element 84 Earth Search, public Sentinel-2 L2A COGs, no credentials) over the grid footprint,
+skips acquisitions whose clear fraction *inside the grid* is below `--min-clear`, and reads only the grid window of
+each band over HTTP. The result is a normal scene folder per acquisition, so compositing, time series and CbM work
+unchanged — without downloading full ~1 GB products.
+
+**Radiometric offset.** For processing baseline ≥ 04.00 Earth Search already removes the −1000 DN offset
+(`earthsearch:boa_offset_applied: true`) but still advertises `offset: −0.1` in `raster:bands`. Applying it would
+shift reflectance by −0.1 (on 2023 scenes over Semberija, 71 % of red values became negative). The importer
+therefore applies only the scale when the provider declares the offset as applied, and rejects any scene whose
+valid red reflectance is more than 5 % negative.
+
+`geocrop s2-import --safe ... --reference grid.tif` writes SAFE products directly on the study grid, which crops
+each 110 km tile to the AOI and avoids a second resampling step.

@@ -67,16 +67,20 @@ def _locate(safe: Path, band: str) -> Path:
     return hits[0]
 
 
-def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shadow_projection: bool = True) -> Path:
-    """Convert one L2A SAFE to the scene-folder contract on the native 10 m grid of B02.
+def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shadow_projection: bool = True,
+                reference: str | Path | None = None) -> Path:
+    """Convert one L2A SAFE to the scene-folder contract.
 
+    By default the output keeps the native 10 m grid of B02 (the whole 110 km tile). With `reference`
+    (the study grid from `geocrop grid`) the bands are written directly on that grid, i.e. cropped to the
+    AOI and already aligned for compositing, which saves most of the disk space on regional runs.
     20 m bands are bilinearly resampled to 10 m (no information gain; recorded in provenance);
     SCL and CLDPRB use nearest neighbour.
     """
     safe, out = Path(safe), Path(out)
     out.mkdir(parents=True, exist_ok=True)
     quant, offsets = safe_metadata(safe)
-    with rasterio.open(_locate(safe, "B02")) as ref:
+    with rasterio.open(reference or _locate(safe, "B02")) as ref:
         if ref.crs is None:
             raise ValueError("Missing raster CRS")
         profile = float_profile(ref)

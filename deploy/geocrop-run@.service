@@ -1,0 +1,22 @@
+# systemd template: one long pipeline run per configuration file, resumable after reboot.
+#   sudo cp deploy/geocrop-run@.service /etc/systemd/system/
+#   sudo systemctl start geocrop-run@rs_north_2023        # uses configs/rs_north_2023.yaml
+#   journalctl -u geocrop-run@rs_north_2023 -f             # plus <output>/run.log
+[Unit]
+Description=GeoCrop Engine pipeline run (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=geocrop
+WorkingDirectory=/srv/geocrop/geocrop-engine
+EnvironmentFile=-/etc/geocrop/credentials.env
+ExecStart=/bin/bash -lc 'source ~/miniforge3/etc/profile.d/conda.sh && conda activate geocrop && geocrop run --config configs/%i.yaml'
+Nice=5
+IOSchedulingClass=best-effort
+Restart=on-failure
+RestartSec=300
+
+[Install]
+WantedBy=multi-user.target

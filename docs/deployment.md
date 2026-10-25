@@ -1,5 +1,7 @@
 # Deployment and sizing
 
+Step-by-step VM runbook: [`deploy/README.md`](../deploy/README.md) (setup script, systemd template, Docker).
+
 The engine runs on one machine; the bottleneck is I/O and concurrent raster work, not the GPU.
 
 | Component | Pilot (≤ 1 000 km²) | Regional (~10 000 km², one season) |

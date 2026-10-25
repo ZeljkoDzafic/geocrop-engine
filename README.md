@@ -76,7 +76,8 @@ then runs features → spatial CV → prediction → parcels → independent val
 geocrop catalog --aoi-wkt-file aoi.wkt --start 2023-04-01 --end 2023-10-15 --out manifests/s2.csv
 geocrop download --manifest manifests/s2.csv --out data/raw/s2            # CDSE_USERNAME / CDSE_PASSWORD
 geocrop grid --aoi aoi.gpkg --crs EPSG:32634 --out data/reference/grid.tif
-geocrop s2-import --safe data/raw/s2/<product>.SAFE --out data/interim/s2/<product>
+geocrop stac-import --reference data/reference/grid.tif --start 2023-03-15 --end 2023-10-31 --out data/interim/s2
+#   (or: geocrop download + geocrop s2-import --safe ... --reference data/reference/grid.tif)
 geocrop snap-graph --out configs/s1_sigma0.xml --crs EPSG:32634            # then: geocrop snap / s1-import
 geocrop inventory --scenes data/interim --config configs/example.yaml      # check availability per window
 geocrop check --training data/reference/training.gpkg --parcels data/reference/parcels.gpkg
@@ -168,11 +169,13 @@ empirical OOF calibration; independent field evaluation is required for both mod
 
 ## Status
 
-Version 0.8 — research software. The complete pipeline is unit-tested and runs end-to-end on synthetic
-data; CDSE access, SNAP graphs and SAFE import follow the official product specifications but must be
-verified on real scenes for each study (see [limitations](docs/limitations.md)). The engine was developed
-for a 2023 soybean / sunflower declaration-verification study in northern Bosnia and Herzegovina; nothing
-about that study is hard-coded — area, season, classes, windows and rules are configuration.
+Version 0.9 — research software. The complete pipeline is unit-tested, runs end-to-end on synthetic
+data, and its Sentinel-2 ingestion, compositing and features are integration-tested on real 2023 Sentinel-2
+L2A data (public COGs over Semberija). CDSE access, SNAP graphs and SAFE import follow the official product
+specifications but must be verified on real scenes for each study (see [limitations](docs/limitations.md)).
+The engine was developed for a 2023 soybean / sunflower declaration-verification study in northern Bosnia
+and Herzegovina; nothing about that study is hard-coded — area, season, classes, windows and rules are
+configuration.
 
 ## Authors
 
@@ -184,7 +187,7 @@ about that study is hard-coded — area, season, classes, windows and rules are 
 If you use GeoCrop Engine, please cite it via [CITATION.cff](CITATION.cff):
 
 > Džafić, Ž.; Adžić, D. *GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and
-> parcel-level declaration verification* (version 0.8.0) [Software]. 2026.
+> parcel-level declaration verification* (version 0.9.0) [Software]. 2026.
 > https://github.com/ZeljkoDzafic/geocrop-engine
 
 ## License

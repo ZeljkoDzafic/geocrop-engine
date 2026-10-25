@@ -42,3 +42,12 @@ inside active windows, preserving unknown user files instead of mixing old featu
   the lookup private.
 * Credentials are read from environment variables only (`CDSE_USERNAME`, `CDSE_PASSWORD`, `CDSE_ACCESS_TOKEN`).
 * Run manifests contain file hashes and paths but no data content.
+
+## Content-addressed resumption (0.9)
+* Stage fingerprints use SHA-256 **content** digests of inputs (large files cached by path/size/mtime in
+  `<output>/.hashcache.json`; small files such as sidecars and configs are always re-hashed), the engine source
+  code and the fingerprints of upstream stages (`composite → features → samples → train → predict → parcels`).
+  Touching or copying a file does not trigger reprocessing; any content, code or upstream change does.
+* `cache.hash: metadata` switches to size + mtime for raw archives too large to hash.
+* A lock file prevents two runs from writing the same output directory; `run.log` records every stage with
+  duration and peak resident memory.

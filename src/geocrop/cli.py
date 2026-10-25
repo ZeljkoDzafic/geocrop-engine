@@ -84,6 +84,18 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("s2-import", "Sentinel-2 L2A SAFE -> scene folder (reflectance, SCL, CLDPRB, scene.json)")
     x.add_argument("--safe", required=True)
     x.add_argument("--out", required=True)
+    x.add_argument("--reference", help="write directly on the study grid (crop to AOI, saves disk)")
+
+    x = cmd("stac-import", "Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full downloads)")
+    x.add_argument("--reference", required=True, help="study grid GeoTIFF (geocrop grid)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help="scene root, one folder per acquisition")
+    x.add_argument("--endpoint", default="https://earth-search.aws.element84.com/v1")
+    x.add_argument("--collection", default="sentinel-2-l2a")
+    x.add_argument("--max-cloud", type=float, default=80, help="tile cloud cover pre-filter (%%)")
+    x.add_argument("--min-clear", type=float, default=0.2, help="minimum clear fraction inside the grid")
+    x.add_argument("--max-items", type=int, default=500)
 
     x = cmd("s2-composite", "Cloud-masked temporal composite of S2 scene folders")
     x.add_argument("--scenes", nargs="+", required=True)
@@ -469,7 +481,16 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         print(make_grid(a.aoi, a.crs, a.resolution, a.out, a.buffer_m))
     elif c == "s2-import":
         from .s2 import import_safe
-        print(import_safe(a.safe, a.out))
+        print(import_safe(a.safe, a.out, reference=a.reference))
+    elif c == "stac-import":
+        from .stac_import import import_season
+        res = import_season(a.reference, a.out, a.start, a.end, a.endpoint, a.collection, a.max_cloud, a.min_clear,
+                            a.max_items)
+        counts = {}
+        for r in res:
+            key = r["status"].split(":")[0]
+            counts[key] = counts.get(key, 0) + 1
+        _print({"items": len(res), "status": counts, "out": a.out})
     elif c == "s2-composite":
         from .s2 import composite
         print(composite(a.scenes, a.out, a.reference, a.statistic, cloud_probability_max=a.cloud_prob_max,
