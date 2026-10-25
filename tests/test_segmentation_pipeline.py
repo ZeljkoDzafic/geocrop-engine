@@ -13,7 +13,7 @@ from geocrop.cli import build_parser, main
 def test_obia_tiles(demo, tmp_path):
     raster = Path(demo["composites"]) / "P3" / "B08.tif"
     r = segmentation.obia(raster, tmp_path / "seg.gpkg", tile_size=64, segments_per_km2=60)
-    assert r["segments"] > 10 and not r["seams_merged"]
+    assert r["segments"] > 10 and r["segments"] <= r["segments_before_merge"]
 
 
 def test_object_scores_identity(demo):
@@ -173,3 +173,25 @@ def test_hash_cache_content_not_mtime(tmp_path):
     assert hc.file(f) == d1
     f.write_bytes(b"abd")
     assert hc.file(f) != d1
+
+
+def test_obia_merges_fields_across_tile_seams(tmp_path):
+    import rasterio
+    from rasterio.transform import from_origin
+    arr = np.full((2, 128, 128), 0.1, "float32")
+    arr[:, 20:100, 30:110] = 0.6               # one homogeneous field crossing the seams at 64 px
+    arr[1, 20:100, 30:110] = 0.3
+    arr += np.random.default_rng(0).normal(0, 0.005, arr.shape).astype("float32")
+    prof = {"driver": "GTiff", "height": 128, "width": 128, "count": 2, "dtype": "float32", "crs": "EPSG:32634",
+            "transform": from_origin(600000, 4980000, 10, 10), "nodata": -9999.0}
+    with rasterio.open(tmp_path / "img.tif", "w", **prof) as dst:
+        dst.write(arr)
+    kept = segmentation.obia(tmp_path / "img.tif", tmp_path / "split.gpkg", tile_size=64, segments_per_km2=20,
+                             merge_seams=False)
+    merged = segmentation.obia(tmp_path / "img.tif", tmp_path / "merged.gpkg", tile_size=64, segments_per_km2=20)
+    assert merged["seam_merges"] > 0 and merged["segments"] < kept["segments"]
+    seg = gpd.read_file(tmp_path / "merged.gpkg")
+    seam_x = 600000 + 64 * 10
+    crossing = seg[(seg.geometry.bounds.minx < seam_x) & (seg.geometry.bounds.maxx > seam_x) & seg.seam_merged]
+    assert len(crossing) >= 1
+    assert list(seg.segment_id) == list(range(1, len(seg) + 1))

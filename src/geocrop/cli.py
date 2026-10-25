@@ -239,6 +239,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--segments-per-km2", type=float, default=50)
     x.add_argument("--compactness", type=float, default=0.1)
     x.add_argument("--tile-size", type=int, default=1024)
+    x.add_argument("--no-merge-seams", action="store_true", help="keep segments split at tile borders")
+    x.add_argument("--merge-distance", type=float, default=0.08, help="max RMS spectral difference for seam merges")
 
     x = cmd("segment-unet-train", "Train the boundary U-Net (requires torch)")
     x.add_argument("--images", required=True)
@@ -512,7 +514,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                  a.pseudonymise))
     elif c == "segment-obia":
         from .segmentation import obia
-        _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness))
+        _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness,
+                    merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
         r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,

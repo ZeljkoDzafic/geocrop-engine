@@ -1,6 +1,7 @@
 """Parcel delineation, for areas without reliable parcel geometries.
 
-Path A (CPU): object-based image analysis with SLIC superpixels, tile-bounded for regional rasters.
+Path A (CPU): object-based image analysis with SLIC superpixels, tiled for regional rasters, with a global
+stretch and seam reconciliation so that fields cut by tile borders become one object.
 Path B (optional GPU): a compact U-Net predicting field-boundary probability, followed by
 watershed post-processing into candidate parcel objects.
 
@@ -38,37 +39,112 @@ def _write(frame: gpd.GeoDataFrame, output: str | Path) -> Path:
     return target
 
 
+def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 98) -> np.ndarray:
+    """Per-band percentiles from a decimated read of the whole raster, so every tile is normalised identically."""
+    f = max(1, int(np.ceil(max(src.width, src.height) / sample)))
+    arr = src.read(idx, out_shape=(len(idx), max(1, src.height // f), max(1, src.width // f))).astype("float32")
+    ok = valid_mask(arr, src.nodata)
+    if not ok.any():
+        raise ValueError("No valid pixels")
+    return np.array([np.percentile(arr[b][ok], [low, high]) for b in range(len(idx))])
+
+
+def _stretch(arr, ok, ranges):
+    out = np.empty_like(arr, dtype="float32")
+    for b, (lo, hi) in enumerate(ranges):
+        out[b] = np.clip((arr[b] - lo) / max(hi - lo, 1e-8), 0, 1)
+    out[:, ~ok] = 0
+    return out
+
+
 def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 1024, segments_per_km2: float = 50,
-         compactness: float = 0.1, min_area_pixels: int = 9) -> dict:
-    """SLIC superpixels per tile -> polygons. `bands` selects stack bands by name or 1-based index
-    (e.g. peak-season red, NIR, SWIR and NDVI). Segments are never merged across tile seams; the
-    `tile` column allows seam QA."""
+         compactness: float = 0.1, min_area_pixels: int = 9, merge_seams: bool = True, merge_distance: float = 0.08,
+         min_shared_px: float = 3.0) -> dict:
+    """SLIC superpixels per tile -> polygons, with seam reconciliation across tiles.
+
+    `bands` selects stack bands by name or 1-based index (e.g. peak-season red, NIR, SWIR and NDVI). All tiles
+    use one global 2-98 % stretch. With `merge_seams`, two segments from different tiles are merged when they
+    share at least `min_shared_px` pixels of border along a tile seam and their mean (stretched) spectra differ by
+    less than `merge_distance` (Euclidean, RMS per band); merging is transitive (union-find). Output segments
+    carry stable global ids ordered north-to-south, west-to-east, the tiles they span and whether they were merged.
+    """
     from skimage.segmentation import slic
 
-    pieces = []
+    pieces, means = [], []
     with rasterio.open(raster) as src:
         names = list(src.descriptions)
         idx = [names.index(b) + 1 if isinstance(b, str) else int(b) for b in bands] if bands else list(range(1, src.count + 1))
-        px_km2 = abs(src.transform.a * src.transform.e) / 1e6
+        px_area = abs(src.transform.a * src.transform.e)
+        px_size = abs(src.transform.a)
+        ranges = global_stretch(src, idx)
         for w in blocks(src.width, src.height, tile_size):
             arr = src.read(idx, window=w).astype("float32")
             ok = valid_mask(arr, src.nodata)
             if ok.sum() < min_area_pixels:
                 continue
-            n_seg = max(2, int(ok.sum() * px_km2 * segments_per_km2))
-            labels = slic(np.moveaxis(_normalise(arr, ok), 0, -1), n_segments=n_seg, compactness=compactness,
-                          mask=ok, start_label=1, channel_axis=-1)
+            norm = _stretch(arr, ok, ranges)
+            n_seg = max(2, int(ok.sum() * px_area / 1e6 * segments_per_km2))
+            labels = slic(np.moveaxis(norm, 0, -1), n_segments=n_seg, compactness=compactness, mask=ok,
+                          start_label=1, channel_axis=-1)
+            counts = np.bincount(labels.ravel())
+            sums = np.stack([np.bincount(labels.ravel(), weights=norm[b].ravel(), minlength=len(counts))
+                             for b in range(len(idx))], axis=1)
+            tile = f"{int(w.row_off)}_{int(w.col_off)}"
             for geom, value in shapes(labels.astype("int32"), mask=ok, transform=src.window_transform(w)):
                 g = shape(geom)
-                area_px = g.area / abs(src.transform.a * src.transform.e)
+                area_px = g.area / px_area
                 if value > 0 and area_px >= min_area_pixels:
-                    pieces.append({"segment_id": len(pieces) + 1, "tile": f"{int(w.row_off)}_{int(w.col_off)}",
-                                   "area_px": round(area_px, 1), "geometry": g})
+                    pieces.append({"tile": tile, "area_px": area_px, "geometry": g})
+                    means.append(sums[int(value)] / max(counts[int(value)], 1))
         crs = src.crs
+        seams_x = {src.bounds.left + c * px_size for c in range(tile_size, src.width, tile_size)}
+        seams_y = {src.bounds.top - r * px_size for r in range(tile_size, src.height, tile_size)}
     if not pieces:
         raise ValueError("No segments produced")
-    path = _write(gpd.GeoDataFrame(pieces, geometry="geometry", crs=crs), output)
-    return {"path": str(path), "segments": len(pieces), "seams_merged": False}
+    frame = gpd.GeoDataFrame(pieces, geometry="geometry", crs=crs)
+    means = np.asarray(means)
+    parent = np.arange(len(frame))
+    merges = 0
+    if merge_seams and (seams_x or seams_y):
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+        b = frame.geometry.bounds
+        on_seam = np.zeros(len(frame), bool)
+        for x in seams_x:
+            on_seam |= np.isclose(b.minx, x) | np.isclose(b.maxx, x)
+        for y in seams_y:
+            on_seam |= np.isclose(b.miny, y) | np.isclose(b.maxy, y)
+        cand = np.flatnonzero(on_seam)
+        sub = frame.iloc[cand]
+        pairs = sub.sindex.query(sub.geometry, predicate="touches")
+        tiles = frame.tile.to_numpy()
+        for i, j in zip(cand[pairs[0]], cand[pairs[1]]):
+            if i >= j or tiles[i] == tiles[j]:
+                continue
+            shared = frame.geometry.iloc[i].boundary.intersection(frame.geometry.iloc[j].boundary).length
+            if shared < min_shared_px * px_size:
+                continue
+            if np.sqrt(np.mean((means[i] - means[j]) ** 2)) <= merge_distance:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[rj] = ri
+                    merges += 1
+        parent = np.array([find(i) for i in range(len(frame))])
+    frame["group"] = parent
+    frame["w_area"] = frame.area_px
+    merged = frame.dissolve(by="group", aggfunc={"area_px": "sum", "tile": lambda t: ";".join(sorted(set(t)))})
+    merged["parts"] = frame.groupby("group").size()
+    merged["seam_merged"] = merged["parts"] > 1
+    c = merged.geometry.centroid
+    merged = merged.assign(_y=-c.y, _x=c.x).sort_values(["_y", "_x"]).drop(columns=["_y", "_x"]).reset_index(drop=True)
+    merged.insert(0, "segment_id", np.arange(1, len(merged) + 1))
+    merged["area_px"] = merged.area_px.round(1)
+    path = _write(merged[["segment_id", "tile", "parts", "seam_merged", "area_px", "geometry"]], output)
+    return {"path": str(path), "segments": int(len(merged)), "segments_before_merge": int(len(frame)),
+            "seam_merges": int(merges), "seams_merged": bool(merge_seams)}
 
 
 def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, threshold: float = 0.5,
