@@ -1,0 +1,43 @@
+{
+  "schema": "geocrop-presentation-captures/1",
+  "recorded_utc": "2026-10-25T13:25:36.166786+00:00",
+  "note": "Actual application captures. Synthetic results demonstrate software behavior only; CLI image shows help/version without study data. No credentials are included.",
+  "screenshots": [
+    {
+      "interface": "web",
+      "file": "assets/images/web.png",
+      "sha256": "4a8f5cdddadad0426fc252e998729e11cf3aeb30f2839e757c0b5ec025bbed9c",
+      "source_commit": "78709351d46934543627c4439eaef79f7c1dd60a",
+      "capture_method": "Unmodified Chromium screenshot of the authenticated local GeoCrop web workspace; selected an existing succeeded demo job.",
+      "commands_or_inputs": [
+        "geocrop serve --workspace <synthetic-demo-workspace> --port 8765"
+      ],
+      "synthetic_data": true
+    },
+    {
+      "interface": "cli",
+      "file": "assets/images/cli.png",
+      "sha256": "86d9723d38dc10095e7b4174b77145b01257d5bcf3e137842af3e72387991573",
+      "source_commit": "78709351d46934543627c4439eaef79f7c1dd60a",
+      "capture_method": "Captured the actual Xfce Terminal window through the X11/Qt screen API. A shell script printed the command labels and ran the real CLI; no command output was edited.",
+      "commands_or_inputs": [
+        "geocrop --version",
+        "geocrop train --help"
+      ],
+      "synthetic_data": false
+    },
+    {
+      "interface": "qgis",
+      "file": "assets/images/qgis.png",
+      "sha256": "a47cf8ae9baeafcd68a693c3dc5312ef576a46d32a9ecb98c31d15c155553ea6",
+      "source_commit": "78709351d46934543627c4439eaef79f7c1dd60a",
+      "capture_method": "Unmodified grab of the actual QGIS 3.40.6 desktop window with the GeoCrop Processing provider. Raster palette and transparent parcel review outlines configured natively in QGIS.",
+      "commands_or_inputs": [
+        "QGIS 3.40.6 with GeoCrop Processing provider",
+        "classes.tif from synthetic holdout prediction",
+        "parcels.gpkg from synthetic parcel evidence check"
+      ],
+      "synthetic_data": true
+    }
+  ]
+}

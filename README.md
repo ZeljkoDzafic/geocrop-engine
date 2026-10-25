@@ -84,7 +84,67 @@ geocrop run --config configs/example.yaml                                  # res
 ```
 See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
 
+## Audit inputs and separate training from test samples
+
+```bash
+geocrop audit --training training.gpkg --parcels parcels.gpkg --observations observations.gpkg \
+  --features stack.tif --exclusion-m 50 --out outputs/input-audit.json
+geocrop train --samples samples.npz --out outputs/model --block-m 5000 --buffer-m 100
+```
+
+The read-only audit reports invalid schemas/geometries, conflicting training labels, class support,
+field/training proximity and stack coverage; errors return exit status 2. Optional buffered CV removes
+whole training polygons near held-out sampled pixels and reports exclusions and retained distances.
+Set `model.spatial_buffer_m` in YAML to apply the same policy to pipeline training and ablations.
+These are study-design safeguards; independent real-data validation remains necessary. See
+[classification and validation](docs/classification-validation.md) for assumptions and limits.
+
 ## Documentation
+
+An English [presentation website](website/README.md) introduces the workflow and interfaces with
+actual web, CLI and QGIS captures. Preview it with `python3 -m http.server 8080 --directory website`.
+
+### HTML workspace and Jupyter
+
+```bash
+pip install -e '.[web]'
+# Set GEOCROP_WEB_TOKEN securely to a random token of at least 32 characters.
+geocrop serve --workspace /path/to/your/study --port 8765
+```
+
+The optional local web interface adds command forms, an engine CLI console, queued jobs, logs,
+cancellation and artifact downloads. Existing CLI commands and Python APIs remain available.
+An authenticated HTTP API and `geocrop.client.EngineClient` support Jupyter Notebook, JupyterLab
+and external Python tools. See [web/API setup](docs/web-interface.md) and the
+[runnable notebook](examples/web_notebook.ipynb). No frontend build tools are required.
+
+### QGIS Processing integration
+
+The standalone QGIS plugin adds `geocrop:runcommand`, `geocrop:demo` and `geocrop:loadjob` to the
+Processing Toolbox. It submits jobs to the HTTP API, streams logs, supports cancellation/reconnection
+and downloads GIS results into fresh local directories for loading as layers. It does not require
+engine scientific dependencies in QGIS's Python. See [QGIS installation, authentication and examples](docs/qgis.md).
+
+```bash
+python tools/build_qgis_plugin.py --out /path/to/new/geocrop-qgis.zip
+```
+
+The current development additions include frozen-predictor holdout calibration, complete-output
+resume checks, reproducible classifier benchmarking and stricter STAC exports. They follow a
+[source review of operational and open EO systems](docs/open-source-review.md); no comparative
+real-data superiority is claimed.
+
+Time-series processing additionally writes separate observation-support rasters and summaries, with
+optional coverage/gap thresholds for reconstructed features. See [temporal QA](docs/timeseries.md).
+
+```bash
+geocrop train --samples samples.npz --out outputs/model --calibration-mode holdout --calibration-fraction 0.2
+geocrop benchmark --samples samples.npz --out outputs/benchmark --config study.yaml --algorithms rf extra_trees hist_gb
+```
+
+Holdout calibration reserves entire spatial groups and deploys the same frozen model used for scoring
+them. It requires enough class/group support and leaves less data for fitting. The default remains
+empirical OOF calibration; independent field evaluation is required for both modes.
 
 | Topic | |
 |---|---|

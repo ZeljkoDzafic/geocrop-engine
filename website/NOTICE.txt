@@ -1,0 +1,6 @@
+GeoCrop Engine
+Copyright 2026 Željko Džafić and Dragutin Adžić
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+Copernicus Sentinel data, ESA SNAP and third-party Python libraries retain
+their own licences and terms of use; none are redistributed here.

@@ -1,14 +1,12 @@
 """Probability calibration, conformal prediction sets and label-noise screening.
 
 * Temperature scaling (Guo et al., 2017), fitted on out-of-fold probabilities: p_T ∝ p^(1/T).
-  One parameter, so it cannot overfit a small reference set; it corrects the typical
-  under-confidence of Random Forest vote fractions.
-* Split conformal prediction, class-conditional ("Mondrian"; Vovk et al., 2005; Angelopoulos & Bates,
-  2023): for each class c the threshold q_c is the ⌈(n_c+1)(1-α)⌉/n_c empirical quantile of the
-  non-conformity scores 1 - p(c) of calibration objects whose true class is c. The prediction set of a
-  new object is {c : 1 - p(c) <= q_c}; it contains the true class with probability >= 1-α for every
-  class, provided calibration and target objects are exchangeable. Spatially clustered data weaken this
-  guarantee — calibrate on spatially held-out objects (the engine uses out-of-fold polygon means).
+  This one-parameter fit can still overfit; ECE measured on the fitting labels is descriptive.
+* Class-conditional ("Mondrian") conformal score quantiles (Vovk et al., 2005; Angelopoulos & Bates,
+  2023). Standard split-conformal guarantees require a fixed predictor and separate exchangeable
+  calibration objects. The training workflow instead pools out-of-fold polygon means and fits
+  temperature on the same labels: its prediction sets are empirical diagnostics, not guaranteed
+  split-conformal coverage for the final refitted model. Evaluate coverage on independent parcels.
 * Label-noise screening (confident-learning style; Northcutt et al., 2021): reference polygons whose
   out-of-fold probability for their own label is low are listed for re-interpretation.
 """
@@ -43,8 +41,19 @@ def fit_temperature(proba: np.ndarray, y, classes) -> float:
     return float(math.exp(res.x))
 
 
-def conformal_thresholds(proba: np.ndarray, y, classes, alphas=(0.05, 0.1, 0.2), mondrian: bool = True) -> dict:
-    """Per-class (Mondrian) or pooled split-conformal thresholds on the score 1 - p(true class)."""
+def conformal_thresholds(proba: np.ndarray, y, classes, alphas=(0.05, 0.1, 0.2), mondrian: bool = True,
+                         sparse_class_policy: str = "pooled") -> dict:
+    """Score quantiles; ``include`` conservatively includes classes with insufficient calibration objects.
+
+    The default pooled fallback preserves the exploratory OOF workflow. Class-conditional split
+    calibration must use ``include``: a scarce class gets threshold 1, never an unjustified pooled
+    class-conditional threshold. A proper calibration protocol and exchangeability remain necessary.
+    """
+    if sparse_class_policy not in ("pooled", "include"):
+        raise ValueError("sparse_class_policy must be pooled or include")
+    alphas = tuple(alphas)
+    if any(not np.isfinite(a) or not 0 < a < 1 for a in alphas):
+        raise ValueError("Conformal alphas must be finite and between zero and one")
     classes = [str(c) for c in classes]
     y = np.asarray(y).astype(str)
     idx = np.array([classes.index(v) for v in y])
@@ -63,12 +72,18 @@ def conformal_thresholds(proba: np.ndarray, y, classes, alphas=(0.05, 0.1, 0.2),
             per = {c: q(scores[y == c], a) for c in classes}
             # classes with too few calibration objects use the pooled (marginal) threshold
             fallback[str(a)] = sorted(c for c, v in per.items() if v is None)
-            out[str(a)] = {c: (pooled if v is None else v) for c, v in per.items()}
+            out[str(a)] = {c: ((1.0 if sparse_class_policy == "include" else pooled) if v is None else v)
+                           for c, v in per.items()}
         else:
             out[str(a)] = {c: pooled for c in classes}
     return {"alphas": list(map(float, alphas)), "mondrian": mondrian, "thresholds": out,
-            "pooled_fallback_classes": fallback, "n_calibration": {c: int((y == c).sum()) for c in classes},
-            "note": "Class-conditional coverage holds only for classes not listed in pooled_fallback_classes."}
+            "pooled_fallback_classes": fallback if sparse_class_policy == "pooled" else {},
+            "always_include_classes": fallback if sparse_class_policy == "include" else {},
+            "sparse_class_policy": sparse_class_policy,
+            "n_calibration": {c: int((y == c).sum()) for c in classes},
+            "note": "Coverage guarantees require a fixed predictor and separate exchangeable calibration data; "
+                    "OOF calibration in geocrop train does not establish them. Pooled fallback does not "
+                    "establish class-conditional coverage."}
 
 
 def prediction_sets(proba: np.ndarray, classes, thresholds: dict) -> list[list[str]]:
@@ -86,8 +101,20 @@ def coverage(sets: list[list[str]], y) -> dict:
             "singleton_rate": float((size == 1).mean()), "empty_rate": float((size == 0).mean())}
 
 
+def validate_polygon_labels(y, polygon) -> None:
+    """One physical calibration object must have one label, including after ID string conversion."""
+    if len(y) != len(polygon):
+        raise ValueError("Each reference label needs one polygon ID")
+    pairs = pd.DataFrame({"polygon": np.asarray(polygon).astype(str), "label": np.asarray(y).astype(str)})
+    counts = pairs.groupby("polygon")["label"].nunique()
+    mixed = counts[counts > 1].index.tolist()
+    if mixed:
+        raise ValueError(f"Polygon IDs must have one class label; mixed labels for {mixed[:5]}")
+
+
 def polygon_oof(proba: np.ndarray, y, polygon, classes) -> pd.DataFrame:
     """Polygon-level mean of out-of-fold pixel probabilities (one calibration object per polygon)."""
+    validate_polygon_labels(y, polygon)
     frame = pd.DataFrame(np.asarray(proba), columns=[f"p_{c}" for c in classes])
     frame["polygon"] = np.asarray(polygon).astype(str)
     frame["label"] = np.asarray(y).astype(str)

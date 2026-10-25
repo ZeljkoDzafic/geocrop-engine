@@ -190,6 +190,22 @@ Quality checks for rasters and vector reference data
 | `--parcels` |  |  |  |
 | `--observations` |  |  |  |
 
+## `geocrop audit`
+
+Read-only study audit with JSON diagnostics. Errors exit 2; warnings require analyst review.
+Inputs may be supplied independently; at least one is required.
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--training`, `--parcels`, `--observations` | | | vector paths |
+| `--features` | | | feature stack GeoTIFF |
+| `--label-field`, `--id-field` | | class_name, polygon_id | training schema |
+| `--parcel-id-field` | | parcel_id | parcel identifier |
+| `--observation-label-field` | | training label field | field observation labels |
+| `--exclusion-m` | | 0 | report observations within this distance of training polygons |
+| `--distance-crs` | | auto | metric projection for buffered leakage checks |
+| `--out` | | | save JSON report; input paths cannot be overwritten |
+
 ## `geocrop folds`
 
 Assign class-stratified spatial-block folds to reference polygons (GIS-inspectable)
@@ -218,7 +234,7 @@ Extract training samples from a stack and reference polygons
 
 ## `geocrop train`
 
-Spatial CV + final Random Forest
+Spatial CV and a fitted mapping classifier.
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
@@ -232,6 +248,37 @@ Spatial CV + final Random Forest
 | `--manifest` |  |  | feature stack (for --groups) |
 | `--algorithm` |  |  |  |
 | `--no-calibrate` |  |  | skip temperature scaling |
+| `--calibration-mode` | | `oof` | `holdout` reserves spatial groups before model selection and fitting |
+| `--calibration-fraction` | | `0.2` | fraction of spatial groups reserved in holdout mode |
+
+`--buffer-m` purges whole training polygons near held-out sampled pixels (metres).
+Default 0 disables buffering. Geographic and foot-based CRSs cannot be used with a positive buffer.
+
+In `holdout` mode, tuning and spatial CV use only proper-training samples. The deployed
+classifier is frozen before temperature and conformal calibration on the reserved polygons;
+it is not refitted on those polygons. The default `oof` mode retains its diagnostic status
+because its final classifier is refitted on all samples. See [uncertainty](uncertainty.md)
+for the assumptions and limitations of both modes.
+
+## `geocrop benchmark`
+
+Compare classifier candidates on identical spatial folds. This is internal model selection;
+it does not establish external accuracy or superiority over other mapping software.
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes | | sample archive |
+| `--out` | yes | | writes `benchmark.json` and `benchmark.csv` |
+| `--algorithms` | | `rf extra_trees hist_gb` | candidate algorithms, each listed once |
+| `--config` | | | inherit model parameters, seed, CV and calibration policy |
+| `--params` | | | JSON estimator parameters shared across candidates |
+| `--block-m`, `--buffer-m`, `--folds`, `--seed` | | configuration values | CLI overrides |
+
+The report records sample and fold fingerprints, metrics, runtimes and failed candidates.
+A failed candidate makes the report `incomplete`; no winner is automatically selected.
+With a holdout configuration, candidates use only proper-training samples so the reserved
+calibration groups remain available for the final model. Use that same configuration for
+subsequent selection experiments and training.
 
 ## `geocrop predict`
 
@@ -257,6 +304,12 @@ Feature-group ablation experiments on identical folds
 | `--block-m` |  | `5000` |  |
 | `--folds` |  | `5` |  |
 
+`--buffer-m` purges whole training polygons near held-out sampled pixels (metres).
+Absent `--block-m`, `--folds`, `--buffer-m` and `--seed` inherit the configuration values
+(`5000`, `5`, `0`, `42` without a config). CLI flags override those values. Estimator algorithm/settings
+also come from the configuration. This preserves the pipeline CV policy in standalone ablations.
+With a holdout configuration, ablations use only proper-training samples.
+
 ## `geocrop reduce-features`
 
 Recursive feature elimination curve under spatial CV
@@ -266,7 +319,15 @@ Recursive feature elimination curve under spatial CV
 | `--samples` | yes |  |  |
 | `--out` | yes |  |  |
 | `--block-m` |  | `5000` |  |
+| `--buffer-m` | | `0` | overrides the configured spatial buffer |
+| `--config` | | | inherit model, CV and holdout calibration policy |
 | `--step` |  | `0.2` |  |
+
+`--buffer-m` purges whole training polygons near held-out sampled pixels (metres).
+Default 0 disables buffering. Geographic and foot-based CRSs cannot be used with a positive buffer.
+When supplied, configuration values define the default spatial block, buffer and CV policy.
+With a holdout configuration, feature selection uses only proper-training samples; preserve
+the same configuration when fitting the final model.
 
 ## `geocrop parcels`
 
@@ -416,6 +477,11 @@ Boundary raster precision/recall/F1 with tolerance
 ## `geocrop ts-features`
 
 Time-series features (Whittaker, phenology, harmonics) from scene folders
+
+Each stack also emits `<stem>_quality.tif` and `<stem>_quality.json` with observed support before
+interpolation. `--min-observed-fraction` (default 0) and `--max-gap-days` (default disabled) optionally
+mask reconstructed features; gaps include empty leading/trailing bins. QA bands are not classifier
+features. See [temporal support and limits](timeseries.md#observed-support-and-optional-rejection-policy).
 
 | Option | Required | Default | Notes |
 |---|---|---|---|

@@ -17,14 +17,21 @@ def _json_arg(text):
     return json.loads(text) if text else None
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="geocrop", description="GeoCrop Engine: open Sentinel-1/2 crop classification "
+def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParser:
+    p = parser_class(prog="geocrop", description="GeoCrop Engine: open Sentinel-1/2 crop classification "
                                 "and parcel-level declaration verification.")
     p.add_argument("--version", action="version", version=f"geocrop-engine {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
 
     def cmd(name, help_):
         return sub.add_parser(name, help=help_, description=help_)
+
+    x = cmd("serve", "Start the local HTML workspace and HTTP API (optional web extra)")
+    x.add_argument("--host", choices=["127.0.0.1", "localhost", "::1"], default="127.0.0.1")
+    x.add_argument("--port", type=int, default=8765)
+    x.add_argument("--workspace", default=".", help="working directory for engine jobs")
+    x.add_argument("--state-dir", help="job database/log directory; default <workspace>/.geocrop-web")
+    x.add_argument("--token-env", default="GEOCROP_WEB_TOKEN", help="name of the variable containing the access token")
 
     x = cmd("demo", "Run the full pipeline on synthetic data (software check, not accuracy)")
     x.add_argument("--root", default="outputs/demo")
@@ -132,6 +139,19 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--parcels")
     x.add_argument("--observations")
 
+    x = cmd("audit", "Audit study inputs, conflicting labels and training/field leakage without changing data")
+    x.add_argument("--training")
+    x.add_argument("--parcels")
+    x.add_argument("--observations")
+    x.add_argument("--features", help="feature stack GeoTIFF")
+    x.add_argument("--label-field", default="class_name")
+    x.add_argument("--id-field", default="polygon_id")
+    x.add_argument("--parcel-id-field", default="parcel_id")
+    x.add_argument("--observation-label-field")
+    x.add_argument("--exclusion-m", type=float, default=0)
+    x.add_argument("--distance-crs", help="projected metric CRS for field exclusion distances")
+    x.add_argument("--out", help="save the JSON report; exit 2 when errors are found")
+
     x = cmd("folds", "Assign class-stratified spatial-block folds to reference polygons (GIS-inspectable)")
     x.add_argument("--polygons", required=True)
     x.add_argument("--out", required=True)
@@ -152,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--samples", required=True)
     x.add_argument("--out", required=True)
     x.add_argument("--block-m", type=float, default=5000)
+    x.add_argument("--buffer-m", type=float, default=0, help="purge training polygons near held-out sampled pixels")
     x.add_argument("--folds", type=int, default=5)
     x.add_argument("--params", type=_json_arg, help='JSON, e.g. {"n_estimators": 500}')
     x.add_argument("--tune", type=_json_arg, help='JSON grid, e.g. {"max_features": ["sqrt", 0.3]}')
@@ -160,6 +181,21 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"])
     x.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling")
     x.add_argument("--holdout", type=float, default=0.0, help="fraction of spatial blocks locked as final test")
+    x.add_argument("--calibration-mode", choices=["oof", "holdout"], default="oof",
+                   help="holdout freezes a predictor without fitting on calibration polygons")
+    x.add_argument("--calibration-fraction", type=float, default=0.2, help="fraction of spatial groups held out")
+
+    x = cmd("benchmark", "Compare classifiers on identical spatial folds; internal model selection only")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--algorithms", nargs="+", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"],
+                   default=["rf", "extra_trees", "hist_gb"])
+    x.add_argument("--config", help="inherit model settings and spatial validation policy")
+    x.add_argument("--params", type=_json_arg, help="JSON estimator settings shared across candidates")
+    x.add_argument("--block-m", type=float)
+    x.add_argument("--buffer-m", type=float)
+    x.add_argument("--folds", type=int)
+    x.add_argument("--seed", type=int)
 
     x = cmd("predict", "Blockwise prediction: classes, probabilities, uncertainty")
     x.add_argument("--features", required=True)
@@ -172,13 +208,17 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--out", required=True)
     x.add_argument("--config", help="experiments: and model: sections")
     x.add_argument("--targets", nargs="*", default=[])
-    x.add_argument("--block-m", type=float, default=5000)
-    x.add_argument("--folds", type=int, default=5)
+    x.add_argument("--block-m", type=float, help="override config model.spatial_block_m (default 5000)")
+    x.add_argument("--folds", type=int, help="override config model.cv_folds (default 5)")
+    x.add_argument("--buffer-m", type=float, help="override config model.spatial_buffer_m (default 0)")
+    x.add_argument("--seed", type=int, help="override config seed (default 42)")
 
     x = cmd("reduce-features", "Recursive feature elimination curve under spatial CV")
     x.add_argument("--samples", required=True)
     x.add_argument("--out", required=True)
-    x.add_argument("--block-m", type=float, default=5000)
+    x.add_argument("--block-m", type=float)
+    x.add_argument("--buffer-m", type=float)
+    x.add_argument("--config", help="inherit model and holdout calibration policy")
     x.add_argument("--step", type=float, default=0.2)
 
     x = cmd("parcels", "Parcel aggregation, decision and declaration comparison")
@@ -197,6 +237,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--conformal", help="conformal.json from training")
     x.add_argument("--alpha", type=float, default=0.1)
     x.add_argument("--aoa", help="aoa.tif from prediction")
+    x.add_argument("--min-aoa-fraction", type=float, default=0.5,
+                   help="minimum inside-AOA share of valid probability pixels")
     x.add_argument("--markers", help="markers.csv from geocrop markers")
     x.add_argument("--calendar", help="crop calendar YAML")
 
@@ -296,6 +338,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--output-step-days", type=int, default=15)
     x.add_argument("--lam", type=float, default=50.0)
     x.add_argument("--envelope", type=int, default=0, help="upper-envelope iterations")
+    x.add_argument("--min-observed-fraction", type=float, default=0, help="minimum occupied temporal-bin fraction")
+    x.add_argument("--max-gap-days", type=float, help="maximum consecutive empty-bin duration, including edges")
 
     x = cmd("merge-stacks", "Concatenate feature stacks on one grid")
     x.add_argument("--stacks", nargs="+", required=True)
@@ -376,6 +420,21 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     a = build_parser().parse_args(argv)
     c = a.cmd
+    if c == "serve":
+        import os
+
+        try:
+            import uvicorn
+
+            from .web import create_app
+        except ImportError as exc:
+            raise RuntimeError('Install the web interface: pip install -e ".[web]"') from exc
+        token = os.environ.get(a.token_env)
+        if not token or len(token) < 32:
+            raise ValueError(f"Set {a.token_env} to a random access token of at least 32 characters")
+        app = create_app(a.workspace, token, a.state_dir, token_env=a.token_env)
+        uvicorn.run(app, host=a.host, port=a.port, proxy_headers=False)
+        return
     if c == "demo":
         from .demo import run
         _print(run(a.root, quick=a.quick))
@@ -453,6 +512,25 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "folds":
         from .splits import assign_folds
         _print(assign_folds(a.polygons, a.out, a.label_field, a.block_m, a.folds))
+    elif c == "audit":
+        from .audit import audit_inputs
+        if a.out:
+            target = Path(a.out)
+            for source in (a.training, a.parcels, a.observations, a.features):
+                if source and (target.resolve() == Path(source).resolve() or
+                               (target.exists() and Path(source).exists() and target.samefile(source))):
+                    raise ValueError("Audit output must differ from every input path")
+        report = audit_inputs(training=a.training, parcels=a.parcels, observations=a.observations,
+                              stack=a.features, label_field=a.label_field, id_field=a.id_field,
+                              parcel_id_field=a.parcel_id_field, observation_label_field=a.observation_label_field,
+                              training_exclusion_m=a.exclusion_m, distance_crs=a.distance_crs)
+        if a.out:
+            target = Path(a.out)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf8")
+        _print(report)
+        if not report["ok"]:
+            sys.exit(2)
     elif c == "samples":
         from .samples import extract
         s = extract(a.features, a.polygons, a.label_field, a.id_field, a.max_per_polygon, a.inner_buffer_m)
@@ -468,31 +546,66 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         if a.algorithm:
             params["algorithm"] = a.algorithm
         r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate,
-                  holdout_fraction=a.holdout)
+                  holdout_fraction=a.holdout, spatial_buffer_m=a.buffer_m, calibration_mode=a.calibration_mode,
+                  calibration_fraction=a.calibration_fraction)
         _print({k: r["cross_validation"][k] for k in ("overall_accuracy", "kappa", "macro_f1", "fold_macro_f1_std")})
+    elif c == "benchmark":
+        from .benchmark import run
+        from .config import load
+        from .model import RF_KEYS
+        from .samples import Samples
+        cfg = load(a.config)
+        m = cfg["model"]
+        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        params.update(a.params or {})
+        if len(set(a.algorithms)) != len(a.algorithms):
+            raise ValueError("Each benchmark algorithm must be listed once")
+        report = run(Samples.load(a.samples), a.out,
+                     {name: {**params, "algorithm": name} for name in a.algorithms},
+                     n_splits=a.folds if a.folds is not None else m["cv_folds"],
+                     spatial_block_m=a.block_m if a.block_m is not None else m["spatial_block_m"],
+                     seed=a.seed if a.seed is not None else cfg["seed"],
+                     spatial_buffer_m=a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"],
+                     calibration_mode=m["calibration_mode"], calibration_fraction=m["calibration_fraction"])
+        _print({"status": report["status"], "summary": report["summary"], "note": report["note"]})
+        if report["status"] != "complete":
+            sys.exit(2)
     elif c == "predict":
         from .model import predict
         _print(predict(a.features, a.model, a.out))
     elif c == "ablation":
         from . import experiments
+        from .config import load
         from .features import load_manifest
+        from .model import RF_KEYS
         from .samples import Samples
-        exps, params = None, None
-        if a.config:
-            from .config import load
-            cfg = load(a.config)
-            exps = cfg["experiments"] or None
-            m = cfg["model"]
-            params = {k: m[k] for k in ("n_estimators", "max_features", "min_samples_leaf", "class_weight", "n_jobs")}
-        t = experiments.run(Samples.load(a.samples), load_manifest(a.features), a.out, exps, params, a.folds,
-                            a.block_m, targets=a.targets)
+        cfg = load(a.config)
+        exps = cfg["experiments"] or None
+        m = cfg["model"]
+        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        n_splits = a.folds if a.folds is not None else m["cv_folds"]
+        block_m = a.block_m if a.block_m is not None else m["spatial_block_m"]
+        buffer_m = a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"]
+        seed = a.seed if a.seed is not None else cfg["seed"]
+        t = experiments.run(Samples.load(a.samples), load_manifest(a.features), a.out, exps, params, n_splits,
+                            block_m, seed=seed, targets=a.targets or cfg["classes"]["targets"],
+                            spatial_buffer_m=buffer_m, calibration_mode=m["calibration_mode"],
+                            calibration_fraction=m["calibration_fraction"])
         print(t.to_string(index=False))
     elif c == "reduce-features":
+        from .config import load
         from .experiments import feature_reduction
+        from .model import RF_KEYS
         from .samples import Samples
         s = Samples.load(a.samples)
-        t = feature_reduction(s, s.features, {"n_estimators": 300, "class_weight": "balanced_subsample", "n_jobs": -1},
-                              a.out, a.block_m, step=a.step)
+        cfg = load(a.config)
+        m = cfg["model"]
+        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        t = feature_reduction(s, s.features, params, a.out,
+                              a.block_m if a.block_m is not None else m["spatial_block_m"],
+                              n_splits=m["cv_folds"], seed=cfg["seed"], step=a.step,
+                              spatial_buffer_m=a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"],
+                              calibration_mode=m["calibration_mode"], calibration_fraction=m["calibration_fraction"])
         print(t[["n_features", "macro_f1", "overall_accuracy"]].to_string(index=False))
     elif c == "parcels":
         import pandas as pd
@@ -503,6 +616,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(aggregate(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.strategy, a.buffer_px,
                          a.min_pixels, a.min_confidence, a.min_majority_share, a.min_margin,
                          read_mapping(a.crop_mapping) or None, a.conformal, a.alpha, a.aoa,
+                         min_aoa_fraction=a.min_aoa_fraction,
                          markers=pd.read_csv(a.markers) if a.markers else None,
                          calendar=yaml.safe_load(Path(a.calendar).read_text()) if a.calendar else None))
     elif c == "parcel-model":
@@ -569,7 +683,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
 
         from .tsfeatures import build_timeseries_stack
         print(build_timeseries_stack(a.scenes, a.reference, a.out, date.fromisoformat(a.start), date.fromisoformat(a.end),
-                                     a.s2_indices, a.s1_indices, a.step_days, a.output_step_days, a.lam, a.envelope))
+                                     a.s2_indices, a.s1_indices, a.step_days, a.output_step_days, a.lam, a.envelope,
+                                     min_observed_fraction=a.min_observed_fraction, max_gap_days=a.max_gap_days))
     elif c == "merge-stacks":
         from .tsfeatures import merge_stacks
         print(merge_stacks(a.stacks, a.out))

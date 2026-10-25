@@ -1,30 +1,132 @@
-"""Reproducible benchmarks: classifiers on identical spatial folds, and OBIA vs U-Net segmentation.
+"""Benchmarks on identical sampled support and spatial folds.
 
-Model benchmark
-    Every algorithm is evaluated on the same samples, the same spatial folds and (optionally) the same
-    locked holdout blocks; tuning grids are applied with nested CV, so no algorithm is favoured by
-    selection on its own test folds. Each run is repeated over `repeats` seeds and reported as
-    mean ± SD, together with training time, prediction throughput and a McNemar test against the
-    first (reference) algorithm on out-of-fold and holdout predictions.
+`run`          strict internal model-selection report (single seed, sample/fold fingerprints, failures kept).
+`models`       extended comparison: repeated seeds, nested tuning, locked holdout, timing, McNemar tests.
+`segmentation` OBIA (with/without seam reconciliation) vs U-Net + watershed against reference parcels.
 
-Segmentation benchmark
-    OBIA (with and without seam reconciliation) and, when a trained checkpoint is given, U-Net +
-    watershed are run on the same raster and scored against the same reference parcels with
-    object-level OS/US/D and matched-IoU F1, and with boundary precision/recall/F1 at a tolerance.
+These are internal diagnostics, not evidence of external accuracy or superiority over other software.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import platform
 import time
 from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import sklearn
 
 from . import metrics
-from .model import cross_validate, folds, holdout_mask, make_estimator, nested_cross_validate, spatial_blocks
+from .estimators import ALGORITHMS, channels_from_names, make_estimator
+from .model import _fold_plan, cross_validate, selection_samples, spatial_blocks
 from .samples import Samples
+
+
+def _digest_array(values) -> str:
+    values = np.ascontiguousarray(values)
+    h = hashlib.sha256()
+    h.update(str(values.dtype).encode())
+    h.update(str(values.shape).encode())
+    if values.dtype.hasobject:
+        h.update(json.dumps(values.tolist(), ensure_ascii=False).encode())
+    else:
+        h.update(memoryview(values).cast("B"))
+    return h.hexdigest()
+
+
+def _json_safe(value):
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, (float, np.floating)) and not np.isfinite(value):
+        return None
+    return value.item() if isinstance(value, np.generic) else value
+
+
+def run(samples: Samples, output_dir: str | Path,
+        candidates: dict[str, dict] | None = None, n_splits: int = 5,
+        spatial_block_m: float | None = 5000, seed: int = 42,
+        spatial_buffer_m: float = 0, calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> dict:
+    """Run named parameter sets on the same folds, persisting successful and failed outcomes.
+
+    Optional-model dependency failures remain visible as failed candidates. A partial run
+    has status ``incomplete``; callers must inspect it instead of selecting from only the
+    survivors. No winner is chosen automatically and no mapping model is fitted afterward.
+    """
+    if candidates is None:
+        candidates = {a: {"algorithm": a, "n_estimators": 100, "n_jobs": 1,
+                           "class_weight": "balanced_subsample"}
+                      for a in ("rf", "extra_trees", "hist_gb")}
+    if not candidates:
+        raise ValueError("Supply at least one benchmark candidate")
+    for name, params in candidates.items():
+        if not isinstance(name, str) or not name.strip() or not isinstance(params, dict):
+            raise ValueError("Candidates must map nonempty names to estimator parameter dictionaries")
+        if params.get("algorithm", "rf") not in ALGORITHMS:
+            raise ValueError(f"Unknown algorithm in candidate {name!r}")
+    input_count = len(samples.y)
+    samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
+                                                   calibration_mode, calibration_fraction)
+    groups = spatial_blocks(samples, spatial_block_m)
+    spatial = {"polygon": samples.polygon, "coordinates": np.column_stack([samples.x, samples.yy]),
+               "crs": samples.crs, "spatial_buffer_m": spatial_buffer_m}
+    # Validate the shared design before doing costly candidate fits or creating a report.
+    plan = _fold_plan(samples.y, groups, n_splits, seed, **spatial)
+    identity = {key: _digest_array(getattr(samples, key)) for key in ("X", "y", "polygon", "x", "yy")}
+    identity.update({"features": samples.features, "crs": samples.crs})
+    sample_fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    fold_records = [{"fold": k, **diagnostics, "n_test": len(te),
+                     "train_index_sha256": _digest_array(tr), "test_index_sha256": _digest_array(te)}
+                    for k, (tr, te, diagnostics) in enumerate(plan)]
+    fold_fingerprint = hashlib.sha256(json.dumps(fold_records, sort_keys=True).encode()).hexdigest()
+    rows, results = [], {}
+    for name, raw in candidates.items():
+        params = dict(raw)
+        started = time.perf_counter()
+        try:
+            if params.get("algorithm") == "tempcnn" and "n_channels" not in params:
+                params["n_channels"] = channels_from_names(samples.features)
+            cv = cross_validate(samples.X, samples.y, samples.polygon, groups, params, n_splits, seed,
+                                coordinates=spatial["coordinates"], crs=samples.crs,
+                                spatial_buffer_m=spatial_buffer_m)
+            for key in ("_oof", "_oof_proba", "_classes"):
+                cv.pop(key)
+            row = {"candidate": name, "algorithm": params.get("algorithm", "rf"), "status": "ok",
+                   **{k: cv[k] for k in ("overall_accuracy", "macro_f1", "kappa", "fold_macro_f1_std")},
+                   "ece": cv["calibration"]["ece"]}
+            results[name] = {"status": "ok", "params": params, "cv": cv}
+        except Exception as exc:  # Candidate/backend failures are report outcomes; interrupts still propagate.
+            row = {"candidate": name, "algorithm": params.get("algorithm", "rf"), "status": "failed",
+                   "error": f"{type(exc).__name__}: {exc}"}
+            results[name] = {"status": "failed", "params": params, "error": row["error"]}
+        row["seconds"] = round(time.perf_counter() - started, 6)
+        rows.append(row)
+    report = {"schema": "geocrop-benchmark/1", "status": "complete" if all(
+        r["status"] == "ok" for r in rows) else "incomplete", "internal_only": True,
+        "note": "Internal model-selection diagnostics on supplied reference samples. No external accuracy or "
+                "cross-engine superiority is established. Timings include CV fit/prediction on this machine.",
+        "samples": len(samples.y), "input_samples": input_count, "features": samples.features,
+        "calibration_mode": calibration_mode, "calibration_split": calibration_split,
+        "sample_fingerprint": sample_fingerprint,
+        "fold_fingerprint": fold_fingerprint, "folds": fold_records,
+        "seed": seed, "requested_folds": n_splits, "actual_folds": len(plan),
+        "spatial_block_m": spatial_block_m, "spatial_buffer_m": spatial_buffer_m,
+        "runtime": {"python": platform.python_version(), "platform": platform.platform(),
+                    "sklearn": sklearn.__version__, "numpy": np.__version__},
+        "results": results, "summary": rows}
+    report = _json_safe(report)
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "benchmark.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf8")
+    pd.DataFrame(rows).to_csv(out / "benchmark.csv", index=False)
+    return report
+
+
+# --------------------------------------------------------------------------- extended comparison
 
 DEFAULT_MODELS = {
     "rf": {"algorithm": "rf", "n_estimators": 500, "max_features": "sqrt", "class_weight": "balanced_subsample",
@@ -48,17 +150,29 @@ def _available(params: dict) -> str | None:
 
 def models(samples: Samples, output_dir: str | Path, features: list[str] | None = None, candidates: dict | None = None,
            grids: dict | None = None, n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42,
-           repeats: int = 3, holdout_fraction: float = 0.0, targets=()) -> pd.DataFrame:
+           repeats: int = 3, holdout_fraction: float = 0.0, targets=(), spatial_buffer_m: float = 0,
+           calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> pd.DataFrame:
+    """Extended comparison: repeated seeds, nested tuning, locked holdout, timing and McNemar tests.
+
+    Uses only the objects allowed for model selection under the declared calibration design
+    (`selection_samples`) and the same optional spatial buffer as training."""
+    from .model import _subset, holdout_mask, nested_cross_validate
+
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     candidates = candidates or DEFAULT_MODELS
     grids = grids or {}
-    X_all = samples.subset(features) if features else samples.X
-    y_all = samples.y
-    g_all = spatial_blocks(samples, spatial_block_m)
-    hold = holdout_mask(y_all, g_all, holdout_fraction, seed) if holdout_fraction else np.zeros(len(y_all), bool)
-    dev = ~hold
-    X, y, poly, groups = X_all[dev], y_all[dev], samples.polygon[dev], g_all[dev]
+    test = None
+    if holdout_fraction:
+        tm = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), holdout_fraction, seed)
+        test, samples = _subset(samples, tm), _subset(samples, ~tm)
+    samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
+                                                   calibration_mode, calibration_fraction)
+    X = samples.subset(features) if features else samples.X
+    y, poly, groups = samples.y, samples.polygon, spatial_blocks(samples, spatial_block_m)
+    spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
+               "spatial_buffer_m": spatial_buffer_m}
+    hold = test is not None
     rows, details, reference = [], {}, {}
     for name, params in candidates.items():
         missing = _available(params)
@@ -70,10 +184,10 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
             s = seed + 101 * r
             t0 = time.perf_counter()
             if name in grids:
-                cv = nested_cross_validate(X, y, poly, groups, params, grids[name], n_splits, 3, s)
+                cv = nested_cross_validate(X, y, poly, groups, params, grids[name], n_splits, 3, s, **spatial)
                 oof = None
             else:
-                cv = cross_validate(X, y, poly, groups, params, n_splits, s)
+                cv = cross_validate(X, y, poly, groups, params, n_splits, s, **spatial)
                 oof = cv.pop("_oof")
                 cv.pop("_oof_proba"), cv.pop("_classes")
             cv_seconds = time.perf_counter() - t0
@@ -92,13 +206,14 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
             if r == 0 and oof is not None:
                 reference.setdefault("oof", (name, oof))
                 run["mcnemar_p_vs_reference"] = metrics.mcnemar(y, oof, reference["oof"][1])["p_value"]
-            if hold.any():
-                pred = np.asarray(est.predict(X_all[hold])).astype(str)
-                h = metrics.summary(y_all[hold], pred, labels=np.unique(y_all))
+            if hold:
+                Xt = test.subset(features) if features else test.X
+                pred = np.asarray(est.predict(Xt)).astype(str)
+                h = metrics.summary(test.y, pred, labels=np.unique(np.concatenate([y, test.y])))
                 run.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"]})
                 if r == 0:
                     reference.setdefault("hold", (name, pred))
-                    run["holdout_mcnemar_p_vs_reference"] = metrics.mcnemar(y_all[hold], pred,
+                    run["holdout_mcnemar_p_vs_reference"] = metrics.mcnemar(test.y, pred,
                                                                             reference["hold"][1])["p_value"]
             runs.append(run)
         frame = pd.DataFrame(runs)
@@ -117,7 +232,9 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
     table.to_csv(out / "benchmark_models.csv", index=False)
     (out / "benchmark_models.json").write_text(json.dumps({
         "reference_model": reference.get("oof", (None,))[0], "n_splits": n_splits, "spatial_block_m": spatial_block_m,
-        "holdout_fraction": holdout_fraction, "samples": int(len(y_all)), "details": details,
+        "holdout_fraction": holdout_fraction, "samples": int(len(y)), "details": details,
+        "spatial_buffer_m": spatial_buffer_m, "calibration_mode": calibration_mode,
+        "calibration_split": calibration_split,
         "fold_signature": fold_signature(samples, spatial_block_m, n_splits, seed) if spatial_block_m else None,
         "note": "Same samples and spatial folds for every model; tuned models evaluated with nested CV."},
         indent=2, default=str), encoding="utf8")
@@ -182,9 +299,6 @@ def segmentation(raster: str | Path, reference: str | Path, output_dir: str | Pa
 
 def fold_signature(samples: Samples, spatial_block_m: float, n_splits: int, seed: int) -> str:
     """Hash of the fold assignment, recorded so that benchmark runs can prove they used identical folds."""
-    import hashlib
     groups = spatial_blocks(samples, spatial_block_m)
-    h = hashlib.sha256()
-    for k, (_, te) in enumerate(folds(samples.y, groups, n_splits, seed)):
-        h.update(f"{k}:{','.join(map(str, te[:2000]))}".encode())
-    return h.hexdigest()[:16]
+    plan = _fold_plan(samples.y, groups, n_splits, seed)
+    return hashlib.sha256(json.dumps([[k, _digest_array(te)] for k, (_, te, _) in enumerate(plan)]).encode()).hexdigest()[:16]

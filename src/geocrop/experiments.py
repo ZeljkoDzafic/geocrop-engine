@@ -15,7 +15,7 @@ import pandas as pd
 
 from . import metrics
 from .features import Feature, select
-from .model import cross_validate, spatial_blocks
+from .model import cross_validate, selection_samples, spatial_blocks
 from .samples import Samples
 
 # Default design mirrors the study protocol; override in the YAML `experiments:` section.
@@ -30,21 +30,31 @@ DEFAULT_EXPERIMENTS = {
 
 def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, experiments: dict | None = None,
         params: dict | None = None, n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42,
-        targets: list[str] | None = None, holdout_fraction: float = 0.0) -> pd.DataFrame:
-    """With holdout_fraction > 0, whole spatial blocks are locked away first: cross-validation runs on the
-    remaining blocks and every experiment is additionally trained on them and scored once on the holdout
-    (columns `holdout_*`, McNemar on the holdout), so the comparison is not decided on the folds it was tuned on."""
-    from .model import holdout_mask, make_estimator
+        targets: list[str] | None = None, holdout_fraction: float = 0.0, spatial_buffer_m: float = 0,
+        calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> pd.DataFrame:
+    """Compare feature subsets on identical samples and spatial folds.
 
+    * holdout_fraction > 0 locks away whole spatial blocks first: every experiment is additionally trained
+      on the remaining data and scored once on the holdout (`holdout_*` columns, McNemar on the holdout).
+    * In ``holdout`` calibration mode only the proper-training objects (same deterministic split as `train`)
+      are used, so calibration objects never influence feature selection.
+    * spatial_buffer_m purges training polygons near test samples in every fold.
+    """
+    from .model import _subset, holdout_mask, make_estimator
+
+    test = None
+    if holdout_fraction:
+        test_mask = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), holdout_fraction, seed)
+        test, samples = _subset(samples, test_mask), _subset(samples, ~test_mask)
+    samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
+                                                   calibration_mode, calibration_fraction)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     experiments = experiments or DEFAULT_EXPERIMENTS
     params = params or {"n_estimators": 300, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1}
-    groups_all = spatial_blocks(samples, spatial_block_m)
-    hold = holdout_mask(samples.y, groups_all, holdout_fraction, seed) if holdout_fraction else \
-        np.zeros(len(samples.y), bool)
-    dev = ~hold
-    groups = groups_all[dev]
+    groups = spatial_blocks(samples, spatial_block_m)
+    spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
+               "spatial_buffer_m": spatial_buffer_m}
     ref_hold = None
     available = [f for f in manifest if f.name in samples.features]
     rows, full = [], {}
@@ -57,49 +67,55 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
             rows.append({"experiment": name, "status": "skipped: no matching features"})
             continue
         X = samples.subset(names)
-        cv = cross_validate(X[dev], samples.y[dev], samples.polygon[dev], groups, params, n_splits, seed)
+        cv = cross_validate(X, samples.y, samples.polygon, groups, params, n_splits, seed, **spatial)
         oof = cv.pop("_oof")
         cv.pop("_oof_proba"), cv.pop("_classes")
         if reference_oof is None:
             reference_name, reference_oof = name, oof
-        test = metrics.mcnemar(samples.y[dev], oof, reference_oof)
+        test_p = metrics.mcnemar(samples.y, oof, reference_oof)
         row = {"experiment": name, "status": "ok", "n_features": len(names),
                "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"], "macro_f1": cv["macro_f1"],
                "macro_f1_fold_std": cv["fold_macro_f1_std"], "ece": cv["calibration"]["ece"],
-               "vs": reference_name, "mcnemar_p": test["p_value"]}
+               "vs": reference_name, "mcnemar_p": test_p["p_value"]}
         for t in targets or []:
             row[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
-        if hold.any():
-            pred = make_estimator(params, seed).fit(X[dev], samples.y[dev]).predict(X[hold]).astype(str)
-            h = metrics.summary(samples.y[hold], pred, labels=np.unique(samples.y))
+        if test is not None:
+            pred = np.asarray(make_estimator(params, seed).fit(X, samples.y).predict(test.subset(names))).astype(str)
+            h = metrics.summary(test.y, pred, labels=np.unique(np.concatenate([samples.y, test.y])))
             if ref_hold is None:
                 ref_hold = pred
             row.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"],
-                        "holdout_mcnemar_p": metrics.mcnemar(samples.y[hold], pred, ref_hold)["p_value"]})
+                        "holdout_mcnemar_p": metrics.mcnemar(test.y, pred, ref_hold)["p_value"]})
         rows.append(row)
         full[name] = {"spec": spec, "features": names, "cv": cv}
     table = pd.DataFrame(rows)
     table.to_csv(out / "ablation.csv", index=False)
     (out / "ablation.json").write_text(json.dumps({
-        "spatial_block_m": spatial_block_m, "n_splits": n_splits, "seed": seed, "params": params,
-        "holdout_fraction": holdout_fraction, "holdout_samples": int(hold.sum()),
-        "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups_all))), "experiments": full},
+        "spatial_block_m": spatial_block_m, "spatial_buffer_m": spatial_buffer_m, "n_splits": n_splits, "seed": seed,
+        "params": params, "calibration_mode": calibration_mode, "calibration_split": calibration_split,
+        "holdout_fraction": holdout_fraction, "holdout_samples": 0 if test is None else int(len(test.y)),
+        "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups))), "experiments": full},
         indent=2, default=str), encoding="utf8")
     return table
 
 
 def group_importance(samples: Samples, manifest: list[Feature], features: list[str], params: dict,
                                     spatial_block_m: float | None = 5000, n_splits: int = 5, seed: int = 42,
-                                    by: str = "group") -> pd.DataFrame:
+                                    by: str = "group", spatial_buffer_m: float = 0,
+                                    calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> pd.DataFrame:
     """Permute-and-retrain group importance: drop in spatial-CV macro-F1 when all features of a
     group (or window) are shuffled jointly before cross-validation, which removes their information.
 
     Working on whole groups avoids the dilution of single-feature importance across correlated
     features (e.g. the same index in adjacent windows)."""
+    samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
+                                                   calibration_mode, calibration_fraction)
     rng = np.random.default_rng(seed)
     groups = spatial_blocks(samples, spatial_block_m)
+    spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
+               "spatial_buffer_m": spatial_buffer_m}
     X = samples.subset(features).copy()
-    base = cross_validate(X, samples.y, samples.polygon, groups, params, n_splits, seed)["macro_f1"]
+    base = cross_validate(X, samples.y, samples.polygon, groups, params, n_splits, seed, **spatial)["macro_f1"]
     lookup = {f.name: f for f in manifest}
     keys = {}
     for i, n in enumerate(features):
@@ -111,14 +127,17 @@ def group_importance(samples: Samples, manifest: list[Feature], features: list[s
         Xp = X.copy()
         perm = rng.permutation(len(Xp))
         Xp[:, cols] = Xp[perm][:, cols]
-        score = cross_validate(Xp, samples.y, samples.polygon, groups, params, n_splits, seed)["macro_f1"]
+        score = cross_validate(Xp, samples.y, samples.polygon, groups, params, n_splits, seed, **spatial)["macro_f1"]
         rows.append({by: key, "n_features": len(cols), "macro_f1_drop": base - score})
-    return pd.DataFrame(rows).sort_values("macro_f1_drop", ascending=False)
+    table = pd.DataFrame(rows).sort_values("macro_f1_drop", ascending=False)
+    table.attrs["calibration_split"] = calibration_split
+    return table
 
 
 def feature_reduction(samples: Samples, features: list[str], params: dict, output_dir: str | Path,
                       spatial_block_m: float | None = 5000, n_splits: int = 5, seed: int = 42,
-                      step: float = 0.2, min_features: int = 5) -> pd.DataFrame:
+                      step: float = 0.2, min_features: int = 5, spatial_buffer_m: float = 0,
+                      calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> pd.DataFrame:
     """Recursive elimination: repeatedly drop the `step` fraction of least important features
     (impurity importance of a model fitted on all samples) and record spatial-CV accuracy.
 
@@ -128,14 +147,18 @@ def feature_reduction(samples: Samples, features: list[str], params: dict, outpu
     from .estimators import importances
     from .model import make_rf
 
+    samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
+                                                   calibration_mode, calibration_fraction)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     groups = spatial_blocks(samples, spatial_block_m)
+    spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
+               "spatial_buffer_m": spatial_buffer_m}
     current = list(features)
     rows = []
     while True:
         X = samples.subset(current)
-        cv = cross_validate(X, samples.y, samples.polygon, groups, params, n_splits, seed)
+        cv = cross_validate(X, samples.y, samples.polygon, groups, params, n_splits, seed, **spatial)
         rows.append({"n_features": len(current), "macro_f1": cv["macro_f1"],
                      "overall_accuracy": cv["overall_accuracy"], "features": ";".join(current)})
         if len(current) <= min_features:
@@ -146,4 +169,8 @@ def feature_reduction(samples: Samples, features: list[str], params: dict, outpu
         current = [current[i] for i in sorted(order[drop:])]
     table = pd.DataFrame(rows)
     table.to_csv(out / "feature_reduction.csv", index=False)
+    (out / "feature_reduction.json").write_text(json.dumps({
+        "calibration_mode": calibration_mode, "calibration_split": calibration_split,
+        "note": "Model selection on proper-training samples only; not independent test accuracy.",
+        "samples": len(samples.y), "curve": rows}, indent=2), encoding="utf8")
     return table

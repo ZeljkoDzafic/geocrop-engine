@@ -3,8 +3,8 @@
 Spatial CV only removes optimism if test blocks are farther from training data than the range of
 spatial autocorrelation (Roberts et al., 2017; Ploton et al., 2020). `variogram` estimates an empirical
 semivariogram of any per-object variable (e.g. the first principal component of the features, or the
-out-of-fold error indicator) and fits a spherical model; its range is a defensible lower bound for
-`spatial_block_m`.
+out-of-fold error indicator) and fits a spherical model. A covariate-PC range is exploratory;
+it is not a guaranteed lower bound on residual dependence or an automatically valid block size.
 """
 from __future__ import annotations
 

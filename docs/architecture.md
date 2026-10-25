@@ -36,6 +36,7 @@
 | `export` | COG, GeoParquet, STAC items, HCAT mapping |
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
+| `audit` | read-only input audit: schema, geometry, class support, contradictory overlaps and field/training proximity |
 | `pipeline`, `config`, `provenance`, `cli` | orchestration, configuration, manifests and checks, command line |
 
 ## Stage graph
