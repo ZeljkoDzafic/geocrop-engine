@@ -14,5 +14,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e '.[dev,stac,web]'
       - run: ruff check src tests
+      - run: ruff check integrations/qgis tools/build_qgis_plugin.py
       - run: python -m pytest
       - run: geocrop demo --root /tmp/geocrop-demo

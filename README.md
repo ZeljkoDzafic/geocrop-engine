@@ -115,6 +115,17 @@ An authenticated HTTP API and `geocrop.client.EngineClient` support Jupyter Note
 and external Python tools. See [web/API setup](docs/web-interface.md) and the
 [runnable notebook](examples/web_notebook.ipynb). No frontend build tools are required.
 
+### QGIS Processing integration
+
+The standalone QGIS plugin adds `geocrop:runcommand`, `geocrop:demo` and `geocrop:loadjob` to the
+Processing Toolbox. It submits jobs to the HTTP API, streams logs, supports cancellation/reconnection
+and downloads GIS results into fresh local directories for loading as layers. It does not require
+engine scientific dependencies in QGIS's Python. See [QGIS installation, authentication and examples](docs/qgis.md).
+
+```bash
+python tools/build_qgis_plugin.py --out /path/to/new/geocrop-qgis.zip
+```
+
 The current development additions include frozen-predictor holdout calibration, complete-output
 resume checks, reproducible classifier benchmarking and stricter STAC exports. They follow a
 [source review of operational and open EO systems](docs/open-source-review.md); no comparative

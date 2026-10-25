@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Standalone QGIS Processing plugin with command/demo/job workflows, authenticated API access and GIS-layer downloads.
 - Optional HTML workspace, authenticated HTTP job API, persistent job logs/cancellation and notebook client.
 - Per-parcel non-exclusive decision reasons and separate evidence warnings, with summary counts.
 - Separate temporal-support rasters/summaries, optional coverage/gap masking and explicit temporal-grid validation.
