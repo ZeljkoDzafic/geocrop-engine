@@ -107,34 +107,82 @@ def tune(X, y, polygon, groups, base: dict, grid: dict, n_splits: int = 5, seed:
     return {"best_params": {k: best[k] for k in keys}, "trials": trials}
 
 
+def holdout_mask(y, groups, fraction: float, seed: int = 42) -> np.ndarray:
+    """Lock away ~`fraction` of the spatial groups (class-stratified) as a final test set."""
+    if not 0 < fraction < 0.5:
+        raise ValueError("holdout fraction must be in (0, 0.5)")
+    k = max(2, int(round(1 / fraction)))
+    splitter = StratifiedGroupKFold(n_splits=min(k, len(np.unique(groups))), shuffle=True, random_state=seed + 1000)
+    _, te = next(splitter.split(np.zeros(len(y)), y, groups))
+    mask = np.zeros(len(y), dtype=bool)
+    mask[te] = True
+    return mask
+
+
+def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer: int = 5, n_inner: int = 3,
+                          seed: int = 42) -> dict:
+    """Unbiased estimate of the *tuned* procedure: hyperparameters are selected by an inner spatial CV that
+    sees only the outer training blocks; the outer test blocks are predicted once (Varma & Simon, 2006)."""
+    classes = np.unique(y)
+    oof = np.empty(len(y), dtype=object)
+    chosen = []
+    for k, (tr, te) in enumerate(folds(y, groups, n_outer, seed)):
+        inner = tune(X[tr], y[tr], polygon[tr], groups[tr], base, grid, n_inner, seed + k)
+        params = {**base, **inner["best_params"]}
+        oof[te] = make_estimator(params, seed + k).fit(X[tr], y[tr]).predict(X[te])
+        chosen.append({"fold": k, **inner["best_params"]})
+    s = metrics.summary(y, oof.astype(str), labels=classes)
+    s["selected_params_per_fold"] = chosen
+    s["note"] = "Nested spatial CV: outer-fold scores of the full tuning procedure (not optimistic)."
+    return s
+
+
 def train(samples: Samples, output_dir: str | Path, features: list[str] | None = None, params: dict | None = None,
           n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42, tune_grid: dict | None = None,
           bootstrap: int = 1000, provenance: dict | None = None, calibrate: bool = True,
-          conformal_alphas=(0.05, 0.1, 0.2)) -> dict:
-    """Spatial CV (optionally after tuning), then fit the mapping model on all samples.
+          conformal_alphas=(0.05, 0.1, 0.2), holdout_fraction: float = 0.0, refit_all: bool = True,
+          inner_splits: int = 3) -> dict:
+    """Spatial CV (nested when tuning), optional locked holdout, then the mapping model.
 
-    From the out-of-fold probabilities it also fits a temperature (calibration), split-conformal
-    thresholds on polygon-level probabilities (`conformal.json`) and lists suspicious reference labels
-    (`suspect_labels.csv`).
+    * holdout_fraction > 0 locks away whole spatial blocks before any tuning, calibration or model
+      comparison; they are scored once at the end (`report["holdout"]`).
+    * With a tuning grid, `report["nested_cv"]` gives the unbiased score of the tuning procedure;
+      `report["cross_validation"]` (re-run with the selected parameters) then serves only calibration,
+      conformal thresholds and diagnostics.
+    * From the out-of-fold probabilities: temperature (calibration), split-conformal thresholds on
+      polygon-level probabilities (`conformal.json`) and suspicious reference labels (`suspect_labels.csv`).
     """
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
-    X = samples.subset(features)
-    y = samples.y
-    groups = spatial_blocks(samples, spatial_block_m)
+    X_all = samples.subset(features)
+    y_all = samples.y
+    groups_all = spatial_blocks(samples, spatial_block_m)
     params = dict(params or {"n_estimators": 500, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1})
     if params.get("algorithm") == "tempcnn" and "n_channels" not in params:
         params["n_channels"] = channels_from_names(features)
-    report: dict = {"features": len(features), "samples": int(len(y)), "polygons": int(len(np.unique(samples.polygon))),
-                    "spatial_groups": int(len(np.unique(groups))), "spatial_block_m": spatial_block_m,
-                    "class_counts": pd.Series(y).value_counts().to_dict(),
-                    "polygon_counts": pd.Series(samples.polygon).groupby(y).nunique().to_dict()}
+    report: dict = {"features": len(features), "samples": int(len(y_all)),
+                    "polygons": int(len(np.unique(samples.polygon))),
+                    "spatial_groups": int(len(np.unique(groups_all))), "spatial_block_m": spatial_block_m,
+                    "class_counts": pd.Series(y_all).value_counts().to_dict(),
+                    "polygon_counts": pd.Series(samples.polygon).groupby(y_all).nunique().to_dict()}
+    hold = holdout_mask(y_all, groups_all, holdout_fraction, seed) if holdout_fraction else np.zeros(len(y_all), bool)
+    dev = ~hold
+    X, y, polygon, groups = X_all[dev], y_all[dev], samples.polygon[dev], groups_all[dev]
+    if hold.any():
+        report["holdout_design"] = {"fraction": holdout_fraction, "samples": int(hold.sum()),
+                                    "polygons": int(len(np.unique(samples.polygon[hold]))),
+                                    "blocks": int(len(np.unique(groups_all[hold]))),
+                                    "classes_missing": sorted(set(y_all) - set(y_all[hold]))}
     if tune_grid:
-        report["tuning"] = tune(X, y, samples.polygon, groups, params, tune_grid, n_splits, seed)
+        report["nested_cv"] = nested_cross_validate(X, y, polygon, groups, params, tune_grid, n_splits,
+                                                    inner_splits, seed)
+        report["tuning"] = tune(X, y, polygon, groups, params, tune_grid, n_splits, seed)
         params.update(report["tuning"]["best_params"])
     report["params"] = params
-    cv = cross_validate(X, y, samples.polygon, groups, params, n_splits, seed, bootstrap)
+    cv = cross_validate(X, y, polygon, groups, params, n_splits, seed, bootstrap)
+    if tune_grid:
+        cv["note"] += " Parameters were tuned on these folds: use nested_cv for performance."
     report["cross_validation"] = cv
     cv.pop("_oof")
     oof_proba, classes = cv.pop("_oof_proba"), cv.pop("_classes")
@@ -144,7 +192,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
         oof_proba = uncertainty.apply_temperature(oof_proba, temperature)
         cv["calibration_after_temperature"] = metrics.calibration(oof_proba, y, classes)
     cv["temperature"] = temperature
-    poly = uncertainty.polygon_oof(oof_proba, y, samples.polygon, classes)
+    poly = uncertainty.polygon_oof(oof_proba, y, polygon, classes)
     poly.to_csv(out / "oof_polygons.csv", index=False)
     conformal = uncertainty.conformal_thresholds(poly[[f"p_{c}" for c in classes]].to_numpy(), poly.label, classes,
                                                  conformal_alphas)
@@ -159,6 +207,21 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     suspects.to_csv(out / "suspect_labels.csv", index=False)
     report["suspect_labels"] = int(len(suspects))
     model = make_estimator(params, seed).fit(X, y)
+    if hold.any():
+        proba = uncertainty.apply_temperature(model.predict_proba(X_all[hold]), temperature)
+        pred = np.asarray(model.classes_)[proba.argmax(axis=1)].astype(str)
+        h = metrics.summary(y_all[hold], pred, labels=np.unique(y_all))
+        if bootstrap:
+            h["bootstrap"] = metrics.bootstrap(y_all[hold], pred, groups=samples.polygon[hold], n_boot=bootstrap,
+                                               seed=seed)
+        h["note"] = "Locked spatial holdout, scored once; interpreted polygons, not independent field data."
+        report["holdout"] = h
+        pd.DataFrame({"polygon": samples.polygon[hold], "label": y_all[hold], "predicted": pred}).to_csv(
+            out / "holdout_predictions.csv", index=False)
+        if refit_all:
+            X, y, groups = X_all, y_all, groups_all
+            model = make_estimator(params, seed).fit(X, y)
+    report["final_model_samples"] = int(len(y))
     imp = importances(model, len(features))
     importance = pd.DataFrame({"feature": features, "importance": imp})
     fold_id = np.empty(len(y), dtype=int)

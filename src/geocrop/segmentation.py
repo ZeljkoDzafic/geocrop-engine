@@ -1,6 +1,7 @@
 """Parcel delineation, for areas without reliable parcel geometries.
 
-Path A (CPU): object-based image analysis with SLIC superpixels, tile-bounded for regional rasters.
+Path A (CPU): object-based image analysis with SLIC superpixels, tiled for regional rasters, with a global
+stretch and seam reconciliation so that fields cut by tile borders become one object.
 Path B (optional GPU): a compact U-Net predicting field-boundary probability, followed by
 watershed post-processing into candidate parcel objects.
 
@@ -38,37 +39,112 @@ def _write(frame: gpd.GeoDataFrame, output: str | Path) -> Path:
     return target
 
 
+def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 98) -> np.ndarray:
+    """Per-band percentiles from a decimated read of the whole raster, so every tile is normalised identically."""
+    f = max(1, int(np.ceil(max(src.width, src.height) / sample)))
+    arr = src.read(idx, out_shape=(len(idx), max(1, src.height // f), max(1, src.width // f))).astype("float32")
+    ok = valid_mask(arr, src.nodata)
+    if not ok.any():
+        raise ValueError("No valid pixels")
+    return np.array([np.percentile(arr[b][ok], [low, high]) for b in range(len(idx))])
+
+
+def _stretch(arr, ok, ranges):
+    out = np.empty_like(arr, dtype="float32")
+    for b, (lo, hi) in enumerate(ranges):
+        out[b] = np.clip((arr[b] - lo) / max(hi - lo, 1e-8), 0, 1)
+    out[:, ~ok] = 0
+    return out
+
+
 def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 1024, segments_per_km2: float = 50,
-         compactness: float = 0.1, min_area_pixels: int = 9) -> dict:
-    """SLIC superpixels per tile -> polygons. `bands` selects stack bands by name or 1-based index
-    (e.g. peak-season red, NIR, SWIR and NDVI). Segments are never merged across tile seams; the
-    `tile` column allows seam QA."""
+         compactness: float = 0.1, min_area_pixels: int = 9, merge_seams: bool = True, merge_distance: float = 0.08,
+         min_shared_px: float = 3.0) -> dict:
+    """SLIC superpixels per tile -> polygons, with seam reconciliation across tiles.
+
+    `bands` selects stack bands by name or 1-based index (e.g. peak-season red, NIR, SWIR and NDVI). All tiles
+    use one global 2-98 % stretch. With `merge_seams`, two segments from different tiles are merged when they
+    share at least `min_shared_px` pixels of border along a tile seam and their mean (stretched) spectra differ by
+    less than `merge_distance` (Euclidean, RMS per band); merging is transitive (union-find). Output segments
+    carry stable global ids ordered north-to-south, west-to-east, the tiles they span and whether they were merged.
+    """
     from skimage.segmentation import slic
 
-    pieces = []
+    pieces, means = [], []
     with rasterio.open(raster) as src:
         names = list(src.descriptions)
         idx = [names.index(b) + 1 if isinstance(b, str) else int(b) for b in bands] if bands else list(range(1, src.count + 1))
-        px_km2 = abs(src.transform.a * src.transform.e) / 1e6
+        px_area = abs(src.transform.a * src.transform.e)
+        px_size = abs(src.transform.a)
+        ranges = global_stretch(src, idx)
         for w in blocks(src.width, src.height, tile_size):
             arr = src.read(idx, window=w).astype("float32")
             ok = valid_mask(arr, src.nodata)
             if ok.sum() < min_area_pixels:
                 continue
-            n_seg = max(2, int(ok.sum() * px_km2 * segments_per_km2))
-            labels = slic(np.moveaxis(_normalise(arr, ok), 0, -1), n_segments=n_seg, compactness=compactness,
-                          mask=ok, start_label=1, channel_axis=-1)
+            norm = _stretch(arr, ok, ranges)
+            n_seg = max(2, int(ok.sum() * px_area / 1e6 * segments_per_km2))
+            labels = slic(np.moveaxis(norm, 0, -1), n_segments=n_seg, compactness=compactness, mask=ok,
+                          start_label=1, channel_axis=-1)
+            counts = np.bincount(labels.ravel())
+            sums = np.stack([np.bincount(labels.ravel(), weights=norm[b].ravel(), minlength=len(counts))
+                             for b in range(len(idx))], axis=1)
+            tile = f"{int(w.row_off)}_{int(w.col_off)}"
             for geom, value in shapes(labels.astype("int32"), mask=ok, transform=src.window_transform(w)):
                 g = shape(geom)
-                area_px = g.area / abs(src.transform.a * src.transform.e)
+                area_px = g.area / px_area
                 if value > 0 and area_px >= min_area_pixels:
-                    pieces.append({"segment_id": len(pieces) + 1, "tile": f"{int(w.row_off)}_{int(w.col_off)}",
-                                   "area_px": round(area_px, 1), "geometry": g})
+                    pieces.append({"tile": tile, "area_px": area_px, "geometry": g})
+                    means.append(sums[int(value)] / max(counts[int(value)], 1))
         crs = src.crs
+        seams_x = {src.bounds.left + c * px_size for c in range(tile_size, src.width, tile_size)}
+        seams_y = {src.bounds.top - r * px_size for r in range(tile_size, src.height, tile_size)}
     if not pieces:
         raise ValueError("No segments produced")
-    path = _write(gpd.GeoDataFrame(pieces, geometry="geometry", crs=crs), output)
-    return {"path": str(path), "segments": len(pieces), "seams_merged": False}
+    frame = gpd.GeoDataFrame(pieces, geometry="geometry", crs=crs)
+    means = np.asarray(means)
+    parent = np.arange(len(frame))
+    merges = 0
+    if merge_seams and (seams_x or seams_y):
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+        b = frame.geometry.bounds
+        on_seam = np.zeros(len(frame), bool)
+        for x in seams_x:
+            on_seam |= np.isclose(b.minx, x) | np.isclose(b.maxx, x)
+        for y in seams_y:
+            on_seam |= np.isclose(b.miny, y) | np.isclose(b.maxy, y)
+        cand = np.flatnonzero(on_seam)
+        sub = frame.iloc[cand]
+        pairs = sub.sindex.query(sub.geometry, predicate="touches")
+        tiles = frame.tile.to_numpy()
+        for i, j in zip(cand[pairs[0]], cand[pairs[1]]):
+            if i >= j or tiles[i] == tiles[j]:
+                continue
+            shared = frame.geometry.iloc[i].boundary.intersection(frame.geometry.iloc[j].boundary).length
+            if shared < min_shared_px * px_size:
+                continue
+            if np.sqrt(np.mean((means[i] - means[j]) ** 2)) <= merge_distance:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[rj] = ri
+                    merges += 1
+        parent = np.array([find(i) for i in range(len(frame))])
+    frame["group"] = parent
+    frame["w_area"] = frame.area_px
+    merged = frame.dissolve(by="group", aggfunc={"area_px": "sum", "tile": lambda t: ";".join(sorted(set(t)))})
+    merged["parts"] = frame.groupby("group").size()
+    merged["seam_merged"] = merged["parts"] > 1
+    c = merged.geometry.centroid
+    merged = merged.assign(_y=-c.y, _x=c.x).sort_values(["_y", "_x"]).drop(columns=["_y", "_x"]).reset_index(drop=True)
+    merged.insert(0, "segment_id", np.arange(1, len(merged) + 1))
+    merged["area_px"] = merged.area_px.round(1)
+    path = _write(merged[["segment_id", "tile", "parts", "seam_merged", "area_px", "geometry"]], output)
+    return {"path": str(path), "segments": int(len(merged)), "segments_before_merge": int(len(frame)),
+            "seam_merges": int(merges), "seams_merged": bool(merge_seams)}
 
 
 def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, threshold: float = 0.5,
@@ -115,13 +191,66 @@ def _dice_bce(logits, target, pos_weight: float):
     return bce + dice.mean()
 
 
+def split_patch_groups(groups, val_fraction: float = 0.2, seed: int = 42):
+    """Hold out whole groups (spatial blocks, parcels, sites) so no location is in both train and validation."""
+    groups = np.asarray(groups).astype(str)
+    uniq = np.unique(groups)
+    if len(uniq) < 2:
+        raise ValueError("Need at least two patch groups for a grouped validation split")
+    rng = np.random.default_rng(seed)
+    rng.shuffle(uniq)
+    target = max(1, int(round(len(groups) * val_fraction)))
+    val_groups, n = [], 0
+    for g in uniq[:-1]:                      # always leave at least one group for training
+        if n >= target:
+            break
+        val_groups.append(g)
+        n += int((groups == g).sum())
+    val = np.flatnonzero(np.isin(groups, val_groups))
+    tr = np.flatnonzero(~np.isin(groups, val_groups))
+    assert not set(groups[tr]) & set(groups[val]), "patch group leakage"
+    return tr, val
+
+
+def extract_patches(raster: str | Path, boundary_mask: str | Path, size: int = 128, stride: int | None = None,
+                    block_m: float = 2000.0, bands=None, min_valid: float = 0.9):
+    """Cut aligned image / boundary-mask patches and give each the id of the spatial block containing its centre.
+
+    Returns (X [N,C,H,W], Y [N,H,W], groups [N]) ready for `unet_train(..., groups=groups)`."""
+    stride = stride or size
+    with rasterio.open(raster) as src, rasterio.open(boundary_mask) as msk:
+        if src.shape != msk.shape or not src.transform.almost_equals(msk.transform):
+            raise ValueError("Image and boundary mask must share one grid")
+        names = list(src.descriptions)
+        idx = [names.index(b) + 1 if isinstance(b, str) else int(b) for b in bands] if bands else list(range(1, src.count + 1))
+        X, Y, G = [], [], []
+        for r in range(0, src.height - size + 1, stride):
+            for c in range(0, src.width - size + 1, stride):
+                w = rasterio.windows.Window(c, r, size, size)
+                img = src.read(idx, window=w).astype("float32")
+                ok = valid_mask(img, src.nodata)
+                if ok.mean() < min_valid:
+                    continue
+                img[:, ~ok] = 0
+                X.append(img)
+                Y.append((msk.read(1, window=w) > 0).astype("float32"))
+                cx, cy = rasterio.transform.xy(src.transform, r + size // 2, c + size // 2)
+                G.append(f"{int(np.floor(cx / block_m))}:{int(np.floor(cy / block_m))}")
+    if not X:
+        raise ValueError("No valid patches")
+    return np.stack(X), np.stack(Y), np.array(G)
+
+
 def unet_train(images: str | Path, masks: str | Path, model_path: str | Path, epochs: int = 30, batch_size: int = 8,
-               lr: float = 1e-3, val_fraction: float = 0.2, seed: int = 42, device: str | None = None) -> dict:
+               lr: float = 1e-3, val_fraction: float = 0.2, seed: int = 42, device: str | None = None,
+               groups=None, allow_random_split: bool = False) -> dict:
     """Train the boundary U-Net. images: .npy [N,C,H,W]; masks: .npy [N,H,W] with 1 = boundary.
 
-    Loss = class-weighted BCE + Dice (boundaries are a small minority of pixels). Per-channel
-    mean/std are stored in the checkpoint and reapplied at inference (normalisation contract).
-    Patches should come from spatially separate sites; the validation split here is by patch.
+    Validation is split by `groups` (one id per patch: spatial block, parcel or site; a .npy/.txt path or
+    an array), so that overlapping or neighbouring patches never appear in both training and validation.
+    A random patch split is refused unless `allow_random_split=True` (it overestimates performance).
+    Per-channel mean/std are computed on the TRAINING patches only, stored in the checkpoint and
+    reapplied at inference. Loss = class-weighted BCE + Dice (boundaries are a small minority of pixels).
     """
     import torch
 
@@ -133,13 +262,25 @@ def unet_train(images: str | Path, masks: str | Path, model_path: str | Path, ep
         raise ValueError("Expected images [N,C,H,W] and masks [N,H,W]")
     if X.shape[0] < 2:
         raise ValueError("Need at least two patches")
-    mean = X.mean(axis=(0, 2, 3))
-    std = X.std(axis=(0, 2, 3)) + 1e-6
+    if groups is None:
+        if not allow_random_split:
+            raise ValueError("Provide patch groups (spatial blocks/sites) for a leakage-free validation split, "
+                             "or set allow_random_split=True explicitly")
+        groups = np.arange(len(X)).astype(str)
+        split_kind = "random_patches"
+    else:
+        if isinstance(groups, (str, Path)):
+            groups = np.load(groups, allow_pickle=False) if str(groups).endswith(".npy") else \
+                np.loadtxt(groups, dtype=str)
+        groups = np.asarray(groups).astype(str)
+        if len(groups) != len(X):
+            raise ValueError("groups must have one entry per patch")
+        split_kind = "grouped"
+    tr, val = split_patch_groups(groups, val_fraction, seed)
+    mean = X[tr].mean(axis=(0, 2, 3))
+    std = X[tr].std(axis=(0, 2, 3)) + 1e-6
     X = (X - mean[None, :, None, None]) / std[None, :, None, None]
     rng = np.random.default_rng(seed)
-    order = rng.permutation(len(X))
-    n_val = max(1, int(round(len(X) * val_fraction)))
-    val, tr = order[:n_val], order[n_val:] if len(order) > n_val else order
     torch.manual_seed(seed)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     net = UNet(X.shape[1]).to(device)
@@ -170,10 +311,14 @@ def unet_train(images: str | Path, masks: str | Path, model_path: str | Path, ep
             best, best_state = v, {k: t.detach().cpu().clone() for k, t in net.state_dict().items()}
     target = Path(model_path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    split = {"kind": split_kind, "train_patches": int(len(tr)), "val_patches": int(len(val)),
+             "train_groups": int(len(np.unique(groups[tr]))), "val_groups": int(len(np.unique(groups[val]))),
+             "normalisation": "train patches only"}
     torch.save({"state": best_state, "channels": int(X.shape[1]), "mean": mean.tolist(), "std": std.tolist(),
-                "history": history, "architecture": "geocrop.unet.UNet"}, target)
-    target.with_suffix(".json").write_text(json.dumps({"history": history, "best_val_loss": best}, indent=2))
-    return {"best_val_loss": best, "epochs": epochs, "history": history}
+                "history": history, "split": split, "architecture": "geocrop.unet.UNet"}, target)
+    target.with_suffix(".json").write_text(json.dumps({"history": history, "best_val_loss": best, "split": split},
+                                                      indent=2))
+    return {"best_val_loss": best, "epochs": epochs, "history": history, "split": split}
 
 
 def unet_infer(raster: str | Path, model_path: str | Path, output: str | Path, patch: int = 256, overlap: int = 32,
