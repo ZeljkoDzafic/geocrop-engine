@@ -43,6 +43,27 @@ them (`groups: [ts, phenology]` vs `groups: [s2_band, s2_index]`).
 Timing features are what separate crops with similar spectra but shifted calendars — in the study region
 sunflower peaks and senesces weeks before soybean, and winter cereals are harvested in early summer.
 
+## Observed support and optional rejection policy
+
+Every time-series stack now has a separate `<stem>_quality.tif` and `<stem>_quality.json`. For each
+index they record observation count, occupied-bin fraction, longest consecutive empty-bin duration
+and `passes_policy`. Empty leading/trailing bins count toward the gap; its duration is empty bins
+times `step_days`, not the exact interval between acquisition timestamps. Counts describe input
+observations assigned to grid bins; same-date/overlapping inputs are not independent evidence.
+No-data locations have zero support and a full-grid gap, rather than fabricated clear observations.
+
+`timeseries.min_observed_fraction` (default 0) and `timeseries.max_gap_days` (default null) optionally
+mask reconstructed values, phenology and harmonics for an index that fails the policy. Four occupied
+bins are always required by the smoother. Passing that policy does not ensure harmonic/phenology
+eligibility or correct cloud masking. QA bands stay outside the classifier manifest and stack merges.
+The summary records per-index pixel counts; the pipeline repairs missing QA companions on resume.
+
+CLI equivalents are `geocrop ts-features --min-observed-fraction 0.5 --max-gap-days 30 ...`.
+Choose thresholds on development data, inspect exclusions by class/region, and freeze them before
+final validation; no default scientific adequacy is implied. `output_step_days` must be a positive
+multiple of `step_days`. Current DOY features require a single calendar year: cross-year seasons
+are rejected explicitly, since a DOY reset would invalidate derivatives and phenology timing.
+
 ## References
 Eilers (2003) Anal. Chem. 75:3631–3636 · Jönsson & Eklundh (2004) Comput. Geosci. 30:833–845 ·
 Zhu & Woodcock (2012) RSE 118:83–94 · Zhu & Woodcock (2014) RSE 152:217–234 ·

@@ -10,9 +10,11 @@ peak, harvest or bare soil — combined into a green / yellow / red outcome per 
                        after peak), bare-soil days, consistency with a crop calendar of the declared crop
 * `traffic_light`      combines declaration status, conformal prediction set and markers:
                        green  = classification agrees, unambiguous, markers consistent
-                       red    = confident discrepancy (declared crop outside the prediction set) or
-                                markers contradict the declared crop's calendar
+                       red    = accepted decision with a discrepancy (declared crop outside the
+                                prediction set) or contradictory crop-calendar markers
                        yellow = everything else that has data; grey = insufficient data
+
+Explicit review decisions remain yellow, including parcels outside the model's area of applicability.
 """
 from __future__ import annotations
 
@@ -175,14 +177,21 @@ def calendar_consistency(markers_df: pd.DataFrame, declared: pd.Series, calendar
 
 
 def traffic_light(frame: pd.DataFrame) -> pd.Series:
-    """Combine `declaration_status`, optional `cp_status` and optional `calendar_consistent` columns."""
+    """Combine parcel evidence without promoting a review decision to a confident discrepancy.
+
+    Explicit review/uncertain outcomes remain yellow even when the prediction set or calendar
+    disagrees. An insufficient-resolution decision remains grey.
+    """
     out = []
     for r in frame.itertuples():
         status = getattr(r, "declaration_status", None)
         cp = getattr(r, "cp_status", None)
         cal = getattr(r, "calendar_consistent", None)
-        if status in ("insufficient_resolution", "not_declared", None):
+        decision = getattr(r, "decision", None)
+        if status in ("insufficient_resolution", "not_declared", None) or decision == "insufficient_resolution":
             out.append("grey")
+        elif status == "uncertain" or decision == "review":
+            out.append("yellow")
         elif cal is False or cp == "discrepancy" or (status == "discrepancy" and cp is None):
             out.append("red")
         elif status == "agreement" and cp in (None, "agreement") and cal is not False:

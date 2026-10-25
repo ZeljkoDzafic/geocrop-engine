@@ -9,11 +9,12 @@ For each parcel j, pixels whose centres fall inside the parcel after an inward b
     margin, entropy        top-2 margin and normalised entropy of the mean probability vector
     prob_std               within-parcel std. dev. of the chosen class probability (homogeneity)
     p_<class>, f_<class>   mean probability and pixel fraction per class (parcel-model descriptors)
+    decision_confidence, decision_margin   probability and signed margin of the strategy's selected class
     area_m2, shape_index   geometry descriptors (perimeter / (2 sqrt(pi A)), 1 = circle)
 
 Strategy C ("combined") accepts a class only when A and B agree and all configured thresholds
-pass; otherwise the parcel is sent to review. Thresholds are *not* built in: they must be chosen
-on validation data (see `metrics.reject_curve`).
+pass; otherwise the parcel is sent to review. Thresholds are *not* built in: choose them on
+development/calibration data and freeze them before independent validation.
 
 Declaration status (never a legal finding):
     agreement | discrepancy | uncertain | insufficient_resolution | not_declared
@@ -59,9 +60,30 @@ def _summarise(z: np.ndarray, classes: list[str]) -> dict:
     return row
 
 
+def _decision_evidence(row: dict, cls: str | None) -> tuple[float | None, float | None]:
+    """Probability and signed margin for the selected class, leaving mean-winner descriptors intact.
+
+    A majority winner can differ from the mean-probability winner. In that case its margin is
+    measured against the strongest competing mean probability and is negative. Missing candidate
+    probabilities cannot justify a confidence or margin threshold.
+    """
+    if cls is None:
+        return None, None
+    if cls == row.get("mean_class"):
+        return row.get("confidence"), row.get("margin")
+    confidence = row.get(f"p_{cls}")
+    others = [v for k, v in row.items() if k.startswith("p_") and k != f"p_{cls}"]
+    margin = confidence - max(others) if confidence is not None and others else None
+    return confidence, margin
+
+
 def decide(row: dict, strategy: str, min_valid_pixels: int, min_confidence=None, min_majority_share=None,
            min_margin=None) -> tuple[str | None, str]:
-    """Return (predicted_class, decision) where decision is accepted | review | insufficient_resolution."""
+    """Return (predicted_class, decision), applying probability thresholds to that selected class.
+
+    `min_majority_share` always constrains the largest pixel-vote share; `min_confidence` and
+    `min_margin` constrain the selected class's mean probability and signed probability margin.
+    """
     if row.get("n_valid", 0) < min_valid_pixels:
         return None, "insufficient_resolution"
     if strategy == "majority":
@@ -72,8 +94,9 @@ def decide(row: dict, strategy: str, min_valid_pixels: int, min_confidence=None,
         cls = row["mean_class"] if row["strategies_agree"] else None
     else:
         raise ValueError(f"Unknown strategy {strategy}; use one of {STRATEGIES}")
-    checks = [(min_confidence, row["confidence"]), (min_majority_share, row["majority_share"]), (min_margin, row["margin"])]
-    if cls is None or any(t is not None and v < t for t, v in checks):
+    confidence, margin = _decision_evidence(row, cls)
+    checks = [(min_confidence, confidence), (min_majority_share, row["majority_share"]), (min_margin, margin)]
+    if cls is None or any(t is not None and (v is None or not np.isfinite(v) or v < t) for t, v in checks):
         return cls, "review"
     return cls, "accepted"
 
@@ -109,8 +132,10 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
     from . import cbm
 
     cp = None
+    calibration_model = None
     if conformal is not None:
         cp = conformal if isinstance(conformal, dict) else json.loads(Path(conformal).read_text(encoding="utf8"))
+        calibration_model = cp.get("model_sha256")
         if str(alpha) not in cp["thresholds"]:
             raise ValueError(f"alpha {alpha} not calibrated; available {list(cp['thresholds'])}")
         cp = cp["thresholds"][str(alpha)]
@@ -127,6 +152,12 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         classes = list(ds.descriptions)
         if not all(classes):
             raise ValueError("Probability bands need class-name descriptions")
+        if cp is not None:
+            if set(cp) != set(classes):
+                raise ValueError("Calibration threshold classes must exactly match probability-band classes")
+            if calibration_model and ds.tags().get("model_sha256") != calibration_model:
+                raise ValueError("Calibration model_sha256 does not match the probability raster; "
+                                 "regenerate probabilities and thresholds from the same saved model")
         gdf = gdf.to_crs(ds.crs)
         pixel = abs(ds.transform.a)
         for parcel in gdf.itertuples():
@@ -154,6 +185,7 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                     ins = inside & (a != aoa_ds.nodata)
                     row["aoa_fraction"] = float(a[ins].mean()) if ins.any() else None
             cls, decision = decide(row, strategy, min_valid_pixels, min_confidence, min_majority_share, min_margin)
+            row["decision_confidence"], row["decision_margin"] = _decision_evidence(row, cls)
             if decision == "accepted" and row.get("aoa_fraction") is not None and row["aoa_fraction"] < min_aoa_fraction:
                 decision = "review"
             declared = getattr(parcel, declared_field) if declared_field and declared_field in gdf else None
@@ -195,6 +227,7 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         "declaration_status_counts": result["declaration_status"].value_counts().to_dict(),
         "traffic_light_counts": result["traffic_light"].value_counts().to_dict(),
         "conformal_alpha": alpha if cp is not None else None,
+        "calibration_model_sha256": calibration_model,
         "status_by_declared_class": (result.groupby("declared_class")["declaration_status"].value_counts()
                                      .unstack(fill_value=0).to_dict(orient="index")
                                      if result["declared_class"].notna().any() else {}),

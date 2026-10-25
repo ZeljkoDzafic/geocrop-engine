@@ -27,13 +27,16 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
 | | `step_days`, `output_step_days`, `lambda`, `envelope_iterations`, `harmonic_order` | 5, 15, 50, 0, 2 | grid, output sampling, smoothness, upper envelope, harmonics |
+| | `min_observed_fraction`, `max_gap_days` | 0, null | optional occupied-bin/gap policy for reconstructed features; separate QA products always emitted |
 | `cbm` | `enabled`, `index`, `calendar`, `min_coverage` | false, NDVI, –, 0.5 | parcel signatures + markers; crop-calendar YAML |
 | `classes` | `label_field`, `id_field`, `targets` | `class_name`, `polygon_id`, [] | reference schema; target classes get extra columns in ablation tables |
 | `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn` |
 | | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs`, `learning_rate` | 500, sqrt, 1, null, balanced_subsample, −1, null | estimator settings (keys unknown to an algorithm are ignored) |
 | | `calibrate` | true | temperature scaling of probabilities |
+| | `calibration_mode`, `calibration_fraction` | oof, 0.2 | empirical OOF sets or frozen-predictor holdout; fraction of spatial groups reserved in holdout |
 | | `max_samples_per_polygon` | 250 | sampling cap |
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
+| | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
 | `experiments` | `<id>: {groups, periods, features, exclude}` | E0–E4 ladder | ablation definitions |
 | `parcels` | `id_field`, `declared_field`, `crop_mapping` | `parcel_id`, `declared_crop`, null | parcel schema |

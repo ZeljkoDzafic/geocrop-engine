@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -17,17 +19,47 @@ from . import config as cfgmod
 from . import scenes
 
 STAGES = ("composite", "features", "samples", "train", "predict", "cbm", "parcels", "validate", "experiments")
+CACHE_SCHEMA = 2
+_HASHED_SUFFIXES = {".json", ".yaml", ".yml", ".csv", ".txt", ".py"}
+
+
+def _file_identity(path: Path) -> dict:
+    """Cheap identity for large products; hash small metadata to detect preserved-timestamp edits."""
+    st = path.stat()
+    identity = {"bytes": st.st_size, "mtime_ns": st.st_mtime_ns}
+    if path.suffix.lower() in _HASHED_SUFFIXES and st.st_size <= 1024 * 1024:
+        identity["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return identity
+
+
+def _part_identity(part):
+    if isinstance(part, (str, Path)):
+        path = Path(part)
+        if path.is_file():
+            return {"path": str(path.resolve()), **_file_identity(path)}
+        if path.is_dir():
+            return {"directory": str(path.resolve()), "files": {
+                str(p.relative_to(path)): _file_identity(p) for p in sorted(path.rglob("*")) if p.is_file()}}
+    if isinstance(part, dict):
+        return {str(k): _part_identity(v) for k, v in part.items()}
+    if isinstance(part, (list, tuple)):
+        return [_part_identity(v) for v in part]
+    return part
 
 
 def _fp(*parts) -> str:
-    h = hashlib.sha256()
-    for p in parts:
-        if isinstance(p, (str, Path)) and Path(p).is_file():
-            st = Path(p).stat()
-            h.update(f"{p}:{st.st_size}:{st.st_mtime_ns}".encode())
-        else:
-            h.update(json.dumps(p, sort_keys=True, default=str).encode())
-    return h.hexdigest()[:16]
+    body = json.dumps([_part_identity(p) for p in parts], sort_keys=True, default=str).encode()
+    return hashlib.sha256(body).hexdigest()[:16]
+
+
+def _output_identity(outputs) -> dict | None:
+    result = {}
+    for raw in outputs:
+        path = Path(raw)
+        if not path.is_file() or path.stat().st_size == 0:
+            return None
+        result[str(path.resolve())] = _file_identity(path)
+    return result or None
 
 
 class Runner:
@@ -38,23 +70,60 @@ class Runner:
         self.out.mkdir(parents=True, exist_ok=True)
         self.state_path = self.out / "stages.json"
         self.state = json.loads(self.state_path.read_text()) if self.state_path.exists() else {}
+        if not isinstance(self.state, dict):
+            raise ValueError(f"Invalid stage state in {self.state_path}: expected a JSON object")
+        self.code_fp = _fp(sorted(Path(__file__).parent.glob("*.py")))
 
     def _done(self, stage, fp, outputs) -> bool:
-        return (not self.force and self.state.get(stage, {}).get("fingerprint") == fp
-                and all(Path(o).exists() for o in outputs))
+        entry = self.state.get(stage, {})
+        identity = _output_identity(outputs)
+        return (not self.force and entry.get("cache_schema") == CACHE_SCHEMA and entry.get("status") == "success"
+                and entry.get("fingerprint") == fp and identity is not None and entry.get("outputs") == identity)
 
-    def _record(self, stage, fp, started, info=None):
-        self.state[stage] = {"fingerprint": fp, "seconds": round(time.time() - started, 1), "info": info or {}}
-        self.state_path.write_text(json.dumps(self.state, indent=2, default=str), encoding="utf8")
+    def _save_state(self):
+        # The previous JSON remains readable if the process stops before replacement.
+        with tempfile.NamedTemporaryFile("w", dir=self.out, prefix=".stages-", suffix=".tmp", delete=False,
+                                         encoding="utf8") as fh:
+            tmp = Path(fh.name)
+            try:
+                json.dump(self.state, fh, indent=2, default=str)
+                fh.flush()
+                os.fsync(fh.fileno())
+            except BaseException:
+                tmp.unlink(missing_ok=True)
+                raise
+        try:
+            os.replace(tmp, self.state_path)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def _record(self, stage, fp, started, status, info=None, outputs=None, error=None):
+        self.state[stage] = {"cache_schema": CACHE_SCHEMA, "status": status, "fingerprint": fp,
+                             "seconds": round(time.time() - started, 1), "info": info or {}}
+        if outputs is not None:
+            self.state[stage]["outputs"] = outputs
+        if error is not None:
+            self.state[stage]["error"] = {"type": type(error).__name__, "message": str(error)}
+        self._save_state()
 
     def stage(self, name, fp, outputs, fn):
+        fp = _fp(CACHE_SCHEMA, self.code_fp, fp)
         if self._done(name, fp, outputs):
             self.log(f"[skip] {name} (unchanged)")
             return self.state[name].get("info")
         self.log(f"[run ] {name}")
         started = time.time()
-        info = fn()
-        self._record(name, fp, started, info)
+        self._record(name, fp, started, "running")
+        try:
+            info = fn()
+            identity = _output_identity(outputs)
+            if identity is None:
+                missing = [str(p) for p in outputs if not Path(p).is_file() or Path(p).stat().st_size == 0]
+                raise RuntimeError(f"Stage {name} did not produce its complete nonempty output set: {missing}")
+            self._record(name, fp, started, "success", info, identity)
+        except BaseException as exc:
+            self._record(name, fp, started, "failed", error=exc)
+            raise
         return info
 
     # ------------------------------------------------------------------ stages
@@ -68,9 +137,32 @@ class Runner:
         s2_scenes = scenes.assign(scenes.discover(self.paths["s2_scenes"]), windows) if self.paths["s2_scenes"].exists() else {}
         s1_scenes = scenes.assign(scenes.discover(self.paths["s1_scenes"]), windows) if self.paths["s1_scenes"].exists() else {}
         grid = self.cfg["grid"].get("reference")
-        outputs = [comp / w / "B02.tif" for w in windows if s2_scenes.get(w)]
+        missing = [w for w in windows if not s2_scenes.get(w) and not s1_scenes.get(w)]
+        if missing:
+            raise RuntimeError(f"No scenes for windows {missing}; inspect the inventory and adjust windows")
+        outputs = []
+        for w in windows:
+            if s2_scenes.get(w):
+                outputs.extend(comp / w / name for name in
+                               [*[f"{band}.tif" for band in s2.S2_BANDS], "valid_count.tif", "composite.json"])
+            if s1_scenes.get(w):
+                prefixes = {s1.ORBITS.get(str(m.get("orbit_direction", "")).upper(), "")
+                            for m in s1_scenes[w]} if self.cfg["s1"]["separate_orbits"] else {""}
+                outputs.extend(comp / w / f"{prefix + '_' if prefix else ''}{pol}.tif"
+                               for prefix in sorted(prefixes) for pol in ("VV", "VH"))
+                outputs.append(comp / w / "composite_s1.json")
+        known_products = {*[f"{band}.tif" for band in s2.S2_BANDS], "valid_count.tif", "composite.json",
+                          "composite_s1.json", *[f"{prefix}{pol}.tif" for prefix in ("", "ASC_", "DESC_")
+                                                  for pol in ("VV", "VH")]}
+        expected = set(outputs)
+        conflicting = [comp / w / name for w in windows for name in sorted(known_products)
+                       if (comp / w / name).is_file() and comp / w / name not in expected]
+        if conflicting:
+            raise RuntimeError("Composite products conflict with the current sensor/orbit selection: "
+                               f"{[str(p) for p in conflicting]}. Choose a new paths.composites directory "
+                               "or deliberately clean the conflicting generated products before retrying.")
         fp = _fp(c, self.cfg["s1"], self.cfg["windows"], grid,
-                 [str(s["path"]) for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v])
+                 [s["path"] for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v])
 
         def run():
             info = {"s2": scenes.inventory(s2_scenes) if s2_scenes else [],
@@ -87,9 +179,6 @@ class Runner:
                     ref = grid or (comp / w / "B02.tif")
                     s1.composite([s["path"] for s in s1_scenes[w]], comp / w, reference=ref,
                                  separate_orbits=self.cfg["s1"]["separate_orbits"], statistic=self.cfg["s1"]["statistic"])
-            missing = [w for w in windows if not s2_scenes.get(w) and not s1_scenes.get(w)]
-            if missing:
-                raise RuntimeError(f"No scenes for windows {missing}; inspect the inventory and adjust windows")
             return info
         return self.stage("composite", fp, outputs, run)
 
@@ -98,12 +187,24 @@ class Runner:
         f = self.cfg["features"]
         periods = list(cfgmod.parse_windows(self.cfg["windows"])) or None
         comp = self.paths["composites"]
-        inputs = sorted(str(p) for p in comp.rglob("*.tif")) if comp.exists() else []
+        inputs = sorted(p for p in comp.rglob("*.tif")) if comp.exists() else []
         t = self.cfg["timeseries"]
-        fp = _fp(f, t, periods, *inputs)
+        target = self.paths["features"]
+        outputs = [target, features.manifest_path(target)]
+        ts_inputs = []
+        if t["enabled"]:
+            ts_target = target.with_name(target.stem + "_ts.tif")
+            outputs.extend([ts_target, features.manifest_path(ts_target)])
+            from .tsfeatures import quality_path
+            outputs.extend([quality_path(ts_target), quality_path(ts_target).with_suffix(".json")])
+            if periods and comp.exists():
+                win = target.with_name(target.stem + "_windows.tif")
+                outputs.extend([win, features.manifest_path(win)])
+            ts_inputs = [self.paths["s2_scenes"], self.paths["s1_scenes"], self.cfg["grid"].get("reference"),
+                         self.cfg["compositing"]["scl_invalid"], self.cfg["compositing"]["cloud_probability_max"]]
+        fp = _fp(f, t, periods, inputs, ts_inputs)
 
         def run():
-            target = self.paths["features"]
             parts = []
             if periods and comp.exists():
                 win = target.with_name(target.stem + "_windows.tif") if t["enabled"] else target
@@ -122,7 +223,8 @@ class Runner:
                     date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"])), t["s2_indices"],
                     t["s1_indices"], t["step_days"], t["output_step_days"], t["lambda"], t["envelope_iterations"],
                     t["harmonic_order"], self.cfg["compositing"]["scl_invalid"],
-                    self.cfg["compositing"]["cloud_probability_max"])
+                    self.cfg["compositing"]["cloud_probability_max"],
+                    min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"])
                 parts.append(tsp)
                 if len(parts) > 1:
                     merge_stacks(parts, target)
@@ -130,14 +232,18 @@ class Runner:
                     import shutil
                     shutil.copy(tsp, target)
                     shutil.copy(features.manifest_path(tsp), features.manifest_path(target))
+            if not parts:
+                raise cfgmod.ConfigError("Features require window composites or enabled time-series inputs")
             return {"stack": str(target), "parts": [str(p) for p in parts]}
-        return self.stage("features", fp, [self.paths["features"]], run)
+        return self.stage("features", fp, outputs, run)
 
     def samples(self):
         from .samples import extract
         target = self.out / "samples.npz"
         m, cl = self.cfg["model"], self.cfg["classes"]
-        fp = _fp(m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"], self.paths["training"])
+        from .features import manifest_path
+        fp = _fp(m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"],
+                 manifest_path(self.paths["features"]), self.paths["training"])
 
         def run():
             s = extract(self.paths["features"], self.paths["training"], label_field=cl["label_field"],
@@ -151,6 +257,11 @@ class Runner:
         from .samples import Samples
         m = self.cfg["model"]
         target = self.out / "model" / "model.joblib"
+        outputs = [target.with_name(name) for name in (
+            "model.joblib", "train_report.json", "feature_importance.csv", "cv_confusion.csv",
+            "oof_polygons.csv", "conformal.json", "suspect_labels.csv", "aoa.json")]
+        if m.get("calibration_mode") == "holdout":
+            outputs.extend(target.with_name(name) for name in ("calibration_polygons.csv", "calibration_split.json"))
         fp = _fp(m, self.cfg["seed"], self.out / "samples.npz")
 
         def run():
@@ -158,15 +269,22 @@ class Runner:
             r = model.train(Samples.load(self.out / "samples.npz"), self.out / "model", params=params,
                             n_splits=m["cv_folds"], spatial_block_m=m["spatial_block_m"], seed=self.cfg["seed"],
                             tune_grid=m.get("tune_grid"), provenance={"config_fingerprint": cfgmod.fingerprint(self.cfg)},
-                            calibrate=m["calibrate"])
+                            calibrate=m["calibrate"], spatial_buffer_m=m["spatial_buffer_m"],
+                            calibration_mode=m.get("calibration_mode", "oof"),
+                            calibration_fraction=m.get("calibration_fraction", 0.2))
             return {"cv_macro_f1": r["cross_validation"]["macro_f1"], "cv_oa": r["cross_validation"]["overall_accuracy"]}
-        return self.stage("train", fp, [target], run)
+        return self.stage("train", fp, outputs, run)
 
     def predict(self):
         from . import model
-        target = self.out / "prediction" / "classes.tif"
-        fp = _fp(self.paths["features"], self.out / "model" / "model.joblib")
-        return self.stage("predict", fp, [target], lambda: model.predict(
+        pred = self.out / "prediction"
+        outputs = [pred / name for name in ("classes.tif", "probabilities.tif", "uncertainty.tif", "class_legend.json",
+                                           "prediction_manifest.json")]
+        aoa = self.out / "model" / "aoa.json"
+        if aoa.exists():
+            outputs.append(pred / "aoa.tif")
+        fp = _fp(self.paths["features"], self.out / "model" / "model.joblib", aoa)
+        return self.stage("predict", fp, outputs, lambda: model.predict(
             self.paths["features"], self.out / "model" / "model.joblib", self.out / "prediction"))
 
     def cbm(self):
@@ -184,7 +302,8 @@ class Runner:
         start, end = date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"]))
         target = self.out / "cbm" / "markers.csv"
         ref = self.cfg["grid"].get("reference") or next(self.paths["composites"].glob("*/B02.tif"))
-        fp = _fp(c, t, self.paths["parcels"], str(self.paths["s2_scenes"]))
+        fp = _fp(c, t, self.paths["parcels"], self.paths["s2_scenes"], ref,
+                 self.cfg["parcels"]["id_field"], self.cfg["parcels"]["interior_buffer_px"])
 
         def run():
             idx = [c["index"], "BSI"] if c["index"] != "BSI" else ["BSI"]
@@ -195,7 +314,7 @@ class Runner:
             m = cbm.markers(sig, start, end, index=c["index"], min_coverage=c["min_coverage"])
             m.to_csv(target, index=False)
             return {"parcels": int(len(m))}
-        return self.stage("cbm", fp, [target], run)
+        return self.stage("cbm", fp, [target, self.out / "cbm" / "signatures.csv"], run)
 
     def parcels(self):
         from . import parcels
@@ -229,8 +348,9 @@ class Runner:
                 aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
                 markers=pd.read_csv(markers_csv) if self.cfg["cbm"]["enabled"] and markers_csv.exists() else None,
                 calendar=calendar)
-        fp = _fp(fp, conformal, aoa, markers_csv, calendar)
-        return self.stage("parcels", fp, [target], run)
+        fp = _fp(fp, mapping, conformal, aoa, markers_csv, calendar, self.cfg["cbm"]["enabled"],
+                 self.out / "prediction" / "prediction_manifest.json")
+        return self.stage("parcels", fp, [target, target.with_suffix(".csv"), target.with_suffix(".summary.json")], run)
 
     def validate(self):
         from . import validation
@@ -239,7 +359,9 @@ class Runner:
             self.log("[skip] validate (no independent observations)")
             return None
         target = self.out / "validation" / "validation_report.json"
-        fp = _fp(v, self.paths["observations"], self.paths["training"], self.out / "prediction" / "classes.tif")
+        fp = _fp(v, self.cfg["seed"], self.paths["observations"], self.paths["training"],
+                 [self.out / "prediction" / name for name in
+                  ("classes.tif", "probabilities.tif", "class_legend.json", "prediction_manifest.json")])
 
         def run():
             r = validation.evaluate_points(
@@ -250,7 +372,8 @@ class Runner:
                 bootstrap=v["bootstrap"], seed=self.cfg["seed"])
             return {"oa": r["accuracy"]["overall_accuracy"], "macro_f1": r["accuracy"]["macro_f1"],
                     "selection": r["selection"]}
-        return self.stage("validate", fp, [target], run)
+        return self.stage("validate", fp, [target, target.with_name("observations_evaluated.csv"),
+                                           target.with_name("confusion_matrix.csv")], run)
 
     def experiments(self):
         from . import experiments, features
@@ -258,16 +381,19 @@ class Runner:
         m = self.cfg["model"]
         exps = self.cfg["experiments"] or experiments.DEFAULT_EXPERIMENTS
         target = self.out / "experiments" / "ablation.csv"
-        fp = _fp(exps, m, self.out / "samples.npz")
+        fp = _fp(exps, m, self.cfg["seed"], self.cfg["classes"]["targets"], self.out / "samples.npz",
+                 features.manifest_path(self.paths["features"]))
 
         def run():
             from .model import RF_KEYS
             params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
             t = experiments.run(Samples.load(self.out / "samples.npz"), features.load_manifest(self.paths["features"]),
                                 self.out / "experiments", exps, params, m["cv_folds"], m["spatial_block_m"],
-                                self.cfg["seed"], self.cfg["classes"]["targets"])
+                                self.cfg["seed"], self.cfg["classes"]["targets"],
+                                spatial_buffer_m=m["spatial_buffer_m"], calibration_mode=m["calibration_mode"],
+                                calibration_fraction=m["calibration_fraction"])
             return {"rows": int(len(t))}
-        return self.stage("experiments", fp, [target], run)
+        return self.stage("experiments", fp, [target, target.with_suffix(".json")], run)
 
 
 def run(config_path: str | Path, stages=None, force: bool = False, log=print) -> dict:
