@@ -21,10 +21,19 @@ from pyproj import CRS
 from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
-from . import applicability, contracts, metrics, uncertainty
-from .estimators import channels_from_names, importances, make_estimator
+from . import applicability, contracts, faultinject, metrics, uncertainty
+from .estimators import channels_from_names, importances, make_estimator, predict_labels
 from .hashing import sha256
-from .raster import NODATA, blocks, gtiff_profile, valid_mask
+from .raster import (
+    NODATA,
+    RasterInputError,
+    blocks,
+    feature_names,
+    gtiff_profile,
+    open_input,
+    read_block,
+    valid_mask,
+)
 from .samples import Samples
 
 RF_KEYS = ("algorithm", "n_estimators", "max_features", "min_samples_leaf", "max_depth", "class_weight", "n_jobs",
@@ -129,7 +138,7 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
             y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
             spatial_buffer_m=spatial_buffer_m)):
         rf = make_rf(params, seed + k).fit(X[tr], y[tr])
-        oof[te] = rf.predict(X[te])
+        oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
         proba[:, np.searchsorted(classes, rf.classes_)] = rf.predict_proba(X[te])
         if oof_proba is None:
@@ -196,7 +205,7 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
         inner = tune(X[tr], y[tr], polygon[tr], groups[tr], base, grid, n_inner, seed + k,
                      coordinates=None if xy is None else xy[tr], crs=crs, spatial_buffer_m=spatial_buffer_m)
         params = {**base, **inner["best_params"]}
-        oof[te] = make_estimator(params, seed + k).fit(X[tr], y[tr]).predict(X[te])
+        oof[te] = predict_labels(make_estimator(params, seed + k).fit(X[tr], y[tr]), X[te])
         chosen.append({"fold": k, **inner["best_params"]})
     s = metrics.summary(y, oof.astype(str), labels=classes)
     s["selected_params_per_fold"] = chosen
@@ -440,6 +449,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
                "provenance": provenance or {}, "calibration_mode": calibration_mode,
                "calibration_split": split}
     dump(payload, out / "model.joblib", compress=3)
+    faultinject.point("train")
     model_sha256 = sha256(out / "model.joblib")
     conformal["model_sha256"] = model_sha256
     report["model_sha256"] = model_sha256
@@ -460,11 +470,12 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     classes = [str(c) for c in model.classes_]
     if len(classes) > 254:
         raise ValueError("At most 254 classes fit the uint8 class raster")
-    with rasterio.open(stack) as src:
-        names = list(src.descriptions)
+    with open_input(stack, "Feature stack") as src:
+        names = feature_names(src)
         missing = [f for f in wanted if f not in names]
         if missing:
-            raise ValueError(f"Stack lacks model features: {missing[:5]}")
+            raise RasterInputError(f"Feature stack {stack} lacks {len(missing)} model features: {missing[:5]}")
+        any_valid = False
         bands = [names.index(f) + 1 for f in wanted]
         base = gtiff_profile(src)
         cls_prof = {**base, "count": 1, "dtype": "uint8", "nodata": 255}
@@ -480,8 +491,9 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
             for i, n in enumerate(("max_probability", "margin", "entropy"), 1):
                 u_dst.set_band_description(i, n)
             for w in blocks(src.width, src.height, block_size):
-                cube = src.read(bands, window=w)
+                cube = read_block(src, bands, window=w)
                 ok = valid_mask(cube, src.nodata)
+                any_valid = any_valid or bool(ok.any())
                 shape = ok.shape
                 c = np.full(shape, 255, dtype="uint8")
                 p = np.full((len(classes), *shape), NODATA, dtype="float32")
@@ -499,6 +511,12 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                 c_dst.write(c, 1, window=w)
                 p_dst.write(p, window=w)
                 u_dst.write(u, window=w)
+                faultinject.point("predict")
+    if not any_valid:
+        for name in ("classes.tif", "probabilities.tif", "uncertainty.tif"):
+            (out / name).unlink(missing_ok=True)
+        raise RasterInputError(f"Feature stack {stack}: no pixel has valid values for all {len(wanted)} model "
+                               "features (all nodata/NaN); the classification would be empty")
     legend = {str(i): c for i, c in enumerate(classes)}
     aoa_json = Path(model_path).with_name("aoa.json")
     if aoa_json.exists():

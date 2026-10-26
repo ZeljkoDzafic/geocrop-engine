@@ -21,10 +21,20 @@ from scipy.ndimage import binary_dilation
 from . import clouds
 from . import scenes as scene_meta
 from .indices import S2_BANDS
-from .raster import NODATA, blocks, expand, float_profile, gtiff_profile, read_aligned
+from .raster import (
+    NODATA,
+    RasterInputError,
+    blocks,
+    expand,
+    float_profile,
+    gtiff_profile,
+    open_input,
+    read_aligned,
+)
 
 # ESA SCL: 0 no data, 1 saturated/defective, 3 cloud shadow, 8/9 cloud medium/high, 10 thin cirrus, 11 snow/ice.
 DEFAULT_SCL_INVALID = (0, 1, 3, 8, 9, 10, 11)
+SCL_MAX = 11                       # ESA L2A scene classification has classes 0..11
 _BAND_IDS = {"B02": 1, "B03": 2, "B04": 3, "B05": 4, "B06": 5, "B07": 6, "B08": 7, "B8A": 8, "B11": 11, "B12": 12}
 
 
@@ -200,11 +210,16 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
     try:
         for key, members in dates.items():
             for d in members:
-                scene = {b: rasterio.open(d / f"{b}.tif") for b in (*S2_BANDS, "SCL")}
+                scene = {}
+                handles.setdefault(key, []).append(scene)        # registered first: closed even on errors
+                for b in (*S2_BANDS, "SCL"):
+                    scene[b] = open_input(d / f"{b}.tif", "Sentinel-2 scene band")
                 for extra in ("CLDPRB", "CLOUDMASK", "SHADOW"):
                     if (d / f"{extra}.tif").exists():
-                        scene[extra] = rasterio.open(d / f"{extra}.tif")
-                handles.setdefault(key, []).append(scene)
+                        scene[extra] = open_input(d / f"{extra}.tif", "Sentinel-2 scene mask")
+                if not np.issubdtype(np.dtype(scene["SCL"].dtypes[0]), np.integer):
+                    raise RasterInputError(f"Scene classification {scene['SCL'].name} has dtype "
+                                           f"{scene['SCL'].dtypes[0]}; SCL must hold integer classes 0-{SCL_MAX}")
         with rasterio.open(ref_path) as ref:
             if ref.crs is None:
                 raise ValueError("Reference grid needs a CRS")
@@ -224,7 +239,13 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
                         day_ok = np.zeros((int(w.height), int(w.width)), dtype=bool)
                         day = {b: np.full(day_ok.shape, np.nan, dtype="float32") for b in S2_BANDS}
                         for scene in tiles:
-                            scl = read_aligned(scene["SCL"], transform, ref.crs, shape, Resampling.nearest, dtype="uint8", fill=0)
+                            scl = read_aligned(scene["SCL"], transform, ref.crs, shape, Resampling.nearest, dtype="uint16", fill=0)
+                            if scl.max(initial=0) > SCL_MAX:
+                                odd = sorted(int(v) for v in np.unique(scl[scl > SCL_MAX])[:5])
+                                raise RasterInputError(f"Scene classification {scene['SCL'].name} has values {odd} "
+                                                       f"outside the ESA SCL classes 0-{SCL_MAX}; refusing to "
+                                                       "treat unknown mask values as clear sky")
+                            scl = scl.astype("uint8")
                             # fill 255 (not 0): GDAL would rewrite valid zeros when 0 is the nodata value
                             opt = {k: read_aligned(scene[k], transform, ref.crs, shape, Resampling.nearest,
                                                    dtype="uint8", fill=255)
