@@ -381,6 +381,8 @@ def extract(source: str, reference: str | Path, out_dir: str | Path, year: int, 
         if checkpoint:
             weights = [Path(p) for p in checkpoint] if isinstance(checkpoint, (list, tuple)) else Path(checkpoint)
             extra = {"checkpoint": str(checkpoint)}
+        elif source != "presto" and not provider.weights:
+            weights, extra = None, {}          # a plugin encoder without pinned weights (it brings its own)
         else:
             weights = presto_checkpoint() if source == "presto" else fetch_weights(provider)
             extra = {"checkpoint_url": PRESTO_CHECKPOINT["url"], "checkpoint_sha256": PRESTO_CHECKPOINT["sha256"]} \

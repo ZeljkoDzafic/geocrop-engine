@@ -6,7 +6,7 @@ Markers are computed from long parcel-signature tables (see `geocrop.cbm.parcel_
 * harvest   abrupt Sentinel-2 index drop after the season peak, confirmed (or found) by a step change in
             Sentinel-1 VH / VH-VV backscatter. A gradual decline without a backscatter step is reported as
             `senescence` (maturation or drought senescence of a standing crop), not as harvest.
-* tillage   bare soil after harvest (low index) with a persistent rise of VV backscatter (surface roughness).
+* tillage   bare soil after harvest (low index) with a persistent rise of VV or VH backscatter (surface roughness).
 * mowing    index drops followed by regrowth (grassland), counted with dates; Sentinel-1 support per event.
 * homogeneity  within-parcel dispersion and bimodality of the index per acquisition; persistent bimodal
             dispersion points to a split or mixed declaration.

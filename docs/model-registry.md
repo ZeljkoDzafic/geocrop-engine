@@ -53,7 +53,7 @@ geocrop predict --features features/stack.tif --model registry:semberija-crops@p
 | `training_data` | samples, polygons, spatial blocks, counts per class, years/regions (from the samples) |
 | `validation` | spatial CV (with bootstrap CIs), nested CV, locked holdout, transfer (leave-one-region/year-out), conformal coverage check |
 | `fingerprints` | CV, holdout and transfer split fingerprints, recomputed and verified at registration |
-| `licences` | licences of pretrained components: embedding sources found in the feature manifest (AlphaEarth CC-BY-4.0, TESSERA, Presto MIT) plus `--licence` entries |
+| `licences` | licences of pretrained components: every embedding provider found in the feature manifest (AlphaEarth CC-BY-4.0, TESSERA, Presto, Galileo and AnySat MIT, plugins), with the licence, code licence and pinned weights it declares as a feature provider, plus `--licence` entries |
 | `provenance`, `created_utc`, `tags`, `description` | |
 
 ### Split fingerprints and refused comparisons
@@ -94,8 +94,10 @@ the contract [10.0, 10.0]`. The resolved reference is added to `prediction_manif
 ### Pretrained checkpoints
 
 The pinned external checkpoints are listed as entries of kind `pretrained`: every Fields of The World model
-(`ftw/<name>`, from `geocrop.ftw.MODELS`) and the Presto encoder (`presto/default`, from
-`geocrop.embedding_sources.PRESTO_CHECKPOINT`). Their URL, size, SHA-256 and licence are the existing pins. The
+(`ftw/<name>`, from `geocrop.ftw.MODELS`), the Presto encoder (`presto/default`, from
+`geocrop.embedding_sources.PRESTO_CHECKPOINT`) and the weights of every other registered feature provider
+(`anysat/default`, `galileo/<file>` for its two files, plugins likewise), taken from the `weights` and `licence`
+the provider declares. Their URL, size, SHA-256 and licence are the existing pins. The
 registry never downloads or stores them. `geocrop models verify` checks a cached copy against its pin, and an
 uncached checkpoint is reported as `not cached`. Non-commercial FTW checkpoints keep their licence label
 (`Mixed Open Licenses`, `commercial_use: false`).

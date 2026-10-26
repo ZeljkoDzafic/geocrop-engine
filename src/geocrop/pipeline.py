@@ -108,6 +108,25 @@ def _grid_identity(path) -> dict:
                 "shape": [ds.height, ds.width]}
 
 
+def _provider_identity(provider) -> dict:
+    """What a feature provider contributes to the embeddings fingerprint: name, kind, dims, licence, where it
+    is registered, its pinned weights (SHA-256) and, for plugins, their source file (engine code is hashed
+    separately)."""
+    import inspect
+
+    from . import plugins
+    identity = {"name": provider.name, "kind": provider.contract.kind, "dims": int(provider.dims),
+                "licence": provider.licence, "registered": plugins.feature_providers.source(provider.name),
+                "class": f"{type(provider).__module__}.{type(provider).__qualname__}",
+                "weights": [w.sha256 for w in getattr(provider, "weights", ()) or ()]}
+    if not type(provider).__module__.startswith("geocrop."):
+        try:
+            identity["code"] = inspect.getsourcefile(type(provider))
+        except TypeError:          # built-in or dynamically created class
+            pass
+    return identity
+
+
 def _output_identity(outputs) -> dict | None:
     result = {}
     for raw in outputs:
@@ -297,51 +316,80 @@ class Runner:
             raise cfgmod.ConfigError(f"{stage} needs the study grid: set grid.reference or run the composite stage")
         return found[0]
 
+    def _monthly_composites(self, reference, monthly: Path, start: str, months: int) -> dict:
+        """Calendar-month S2/S1 composites from the scene folders: the one input of every on-VM provider."""
+        from . import embeddings as emb
+        c = self.cfg["compositing"]
+        return emb.monthly_composites(reference, monthly, start, months, self.paths["s2_scenes"],
+                                      self.paths["s1_scenes"], statistic=c["statistic"], scl_invalid=c["scl_invalid"],
+                                      cloud_probability_max=c["cloud_probability_max"],
+                                      mask_dilation_px=c["mask_dilation_px"])
+
+    def _embedding_rasters(self, eo: dict) -> list[Path]:
+        from .embeddings import output_path
+        return [output_path(eo["dir"], src, eo["year"]) for src in cfgmod.embedding_sources(eo)]
+
     def embeddings(self):
         """Optional foundation-model embeddings on the study grid (`features.embeddings`, docs/embeddings.md).
 
-        Network access (AlphaEarth/TESSERA reads, the pinned Presto checkpoint download) happens only here
-        and only when the section is configured."""
-        from . import embeddings as emb
+        One or several feature providers (`source` may be a list); every provider that encodes monthly
+        composites (Presto, Galileo, AnySat, plugin MonthlyProviders) reads the same composites: `monthly`, or
+        `<dir>/monthly` built here once from the scene folders. Licences that need an acknowledgement are
+        checked before anything runs (`allow_license`, as on the CLI). Network access (AlphaEarth/TESSERA reads,
+        pinned weight downloads) happens only here and only when the section is configured."""
+        from . import feature_providers as fpmod
         from . import features
         eo = cfgmod.embedding_options(self.cfg)
         if not eo:
             return None
-        raster = emb.output_path(eo["dir"], eo["source"], eo["year"])
-        outputs = [raster, features.manifest_path(raster)]
-        presto = eo["source"] == "presto"
-        parcels = self.paths["parcels"] if presto and eo["parcels"] else None
-        if parcels is not None:
-            outputs.append(raster.with_name(raster.stem + "_parcels.csv"))
+        sources = cfgmod.embedding_sources(eo)
+        providers = [fpmod.get(src) for src in sources]
+        for provider in providers:          # refuse before any download or computation
+            fpmod.check_licence(provider, eo["allow_license"])
+        if eo["checkpoint"] and len(sources) > 1:
+            raise cfgmod.ConfigError("features.embeddings.checkpoint applies to one source; list one source")
+        namespace = cfgmod.embedding_namespace(eo)
+        monthly_kind = {p.name for p in providers if p.contract.kind != "precomputed"}
+        parcels = self.paths["parcels"] if eo["parcels"] else None
+        outputs = []
+        for raster in self._embedding_rasters(eo):
+            outputs += [raster, features.manifest_path(raster)]
+            if parcels is not None:
+                outputs.append(raster.with_name(raster.stem + "_parcels.csv"))
         reference = self._grid_reference("embeddings")
         monthly = Path(eo["monthly"]) if eo["monthly"] else Path(eo["dir"]) / "monthly"
         inputs = {}
-        if presto:
+        if monthly_kind:
             c = self.cfg["compositing"]
+            # the composites' content: the given folder itself, or everything it is built from
             inputs = ({"monthly": monthly} if eo["monthly"] else
                       {"s2_scenes": self.paths["s2_scenes"], "s1_scenes": self.paths["s1_scenes"],
                        "compositing": {k: c[k] for k in ("statistic", "scl_invalid", "cloud_probability_max",
                                                          "mask_dilation_px")}})
-            if parcels is not None:
-                inputs.update(parcels=parcels, id_field=self.cfg["parcels"]["id_field"])
-        # dir is where outputs go (part of their identity), not an input; monthly is hashed in `inputs`
-        fp = _fp({k: v for k, v in eo.items() if k not in ("attach", "monthly", "dir")}, _grid_identity(reference),
-                 inputs)
+        if parcels is not None:
+            inputs.update(parcels=parcels, id_field=self.cfg["parcels"]["id_field"])
+        if eo["checkpoint"]:
+            inputs["checkpoint"] = eo["checkpoint"]
+        # dir is where outputs go (part of their identity), not an input; monthly and checkpoint are hashed in
+        # `inputs`; acknowledging a licence does not change any output
+        options = {k: v for k, v in eo.items()
+                   if k not in ("attach", "monthly", "dir", "allow_license", "checkpoint", "source", "namespace")}
+        identity = {"providers": [_provider_identity(p) for p in providers], "namespace": namespace}
+        fp = _fp(options, identity, _grid_identity(reference), inputs)
 
         def run():
             from .embedding_sources import extract  # adapter: imported only when embeddings are configured
-            start = eo["start"] or f"{eo['year']}-01"
-            if presto and not eo["monthly"]:
-                c = self.cfg["compositing"]
-                emb.monthly_composites(reference, monthly, start, eo["months"], self.paths["s2_scenes"],
-                                       self.paths["s1_scenes"], statistic=c["statistic"],
-                                       scl_invalid=c["scl_invalid"], cloud_probability_max=c["cloud_probability_max"],
-                                       mask_dilation_px=c["mask_dilation_px"])
-            r = extract(eo["source"], reference, eo["dir"], eo["year"], monthly=monthly if presto else None,
-                        start=eo["start"], months=eo["months"], parcels=parcels,
-                        id_field=self.cfg["parcels"]["id_field"], checkpoint=eo["checkpoint"], mirror=eo["mirror"],
-                        index=eo["index"], resampling=eo["resampling"])
-            return {k: r[k] for k in ("source", "year", "raster", "parcels") if k in r}
+            if monthly_kind and not eo["monthly"]:
+                self._monthly_composites(reference, monthly, eo["start"] or f"{eo['year']}-01", eo["months"])
+            results = []
+            for src in sources:
+                r = extract(src, reference, eo["dir"], eo["year"], monthly=monthly if src in monthly_kind else None,
+                            start=eo["start"], months=eo["months"], parcels=parcels,
+                            id_field=self.cfg["parcels"]["id_field"], checkpoint=eo["checkpoint"],
+                            mirror=eo["mirror"], index=eo["index"], resampling=eo["resampling"],
+                            namespace=namespace, allow_license=eo["allow_license"])
+                results.append({k: r[k] for k in ("source", "year", "raster", "parcels", "feature_names") if k in r})
+            return results[0] if len(results) == 1 else {"sources": results}
         return self.stage("embeddings", fp, outputs, run)
 
     def features(self):
@@ -364,14 +412,13 @@ class Runner:
                 outputs.extend([win, features.manifest_path(win)])
             ts_inputs = [self.paths["s2_scenes"], self.paths["s1_scenes"], self.cfg["grid"].get("reference"),
                          self.cfg["compositing"]["scl_invalid"], self.cfg["compositing"]["cloud_probability_max"]]
-        attach = None
+        attach = []
         if _embeddings_attached(self.cfg):
-            from .embeddings import output_path
-            eo = cfgmod.embedding_options(self.cfg)
-            attach = output_path(eo["dir"], eo["source"], eo["year"])
-            if not attach.is_file():
-                raise FileNotFoundError(f"{attach} missing; run the embeddings stage first "
-                                        "(geocrop run --stages embeddings features)")
+            attach = self._embedding_rasters(cfgmod.embedding_options(self.cfg))
+            for raster in attach:
+                if not raster.is_file():
+                    raise FileNotFoundError(f"{raster} missing; run the embeddings stage first "
+                                            "(geocrop run --stages embeddings features)")
         # the embeddings options enter through the attached raster's identity (None = as before they existed)
         support = t["enabled"] and t["temporal_support"]
         tolerance = self.cfg["cbm"]["temporal_support"]["tolerance_days"]
@@ -379,16 +426,18 @@ class Runner:
             from .tsfeatures import support_path
             sp = support_path(target.with_name(target.stem + "_ts.tif"))
             outputs.extend([sp, sp.with_suffix(".json")])
-        extra = {"embeddings": [attach, features.manifest_path(attach)]} if attach else {}
+        extra = {"embeddings": [attach[0], features.manifest_path(attach[0])] if len(attach) == 1 else
+                 [[a, features.manifest_path(a)] for a in attach]} if attach else {}
         if support:
             extra["support_tolerance_days"] = tolerance
         fp = _fp_with(({**f, "embeddings": None}, self._section("timeseries"), periods, inputs, ts_inputs), extra)
 
         def run():
             info = build()
-            if attach is not None:
-                features.attach_embeddings(target, attach)
-                info["embeddings"] = str(attach)
+            for raster in attach:
+                features.attach_embeddings(target, raster)
+            if attach:
+                info["embeddings"] = str(attach[0]) if len(attach) == 1 else [str(a) for a in attach]
             return info
 
         def build():

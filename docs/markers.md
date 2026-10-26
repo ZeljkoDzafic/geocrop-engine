@@ -83,14 +83,14 @@ volume scattering (`harvest_s1_sign: negative`; `any` accepts both signs).
 | `harvest_s2_s1` | abrupt S2 drop and an S1 step within ± `s1_match_days` | yes | 0.6 + 0.2·s2 + 0.2·s1 |
 | `harvest_s2` | abrupt S2 drop, no S1 data around it | yes | 0.4 + 0.3·s2 |
 | `harvest_s2_unconfirmed` | abrupt S2 drop, S1 data present but no step | yes | 0.3 + 0.3·s2 |
-| `harvest_s1` | S1 step after the peak, with only a gradual S2 decline (≥ half `harvest_drop`), e.g. a harvest after maturation; or S1 only when S2 is insufficient (score × 0.7) | yes | 0.4 + 0.3·s1 + 0.1·decline |
+| `harvest_s1` | S1 step after the peak, with only a gradual S2 decline (≥ half `harvest_drop`), e.g. a harvest after maturation; or S1 only when S2 is insufficient (score × 0.7) | yes | 0.4 + 0.3·s1 + 0.1·min(1, decline / harvest_drop); S1 only: 0.7·(0.4 + 0.3·s1) |
 | `senescence` | gradual S2 decline, S1 sufficient and present after the peak, no step: maturation or drought senescence of a standing crop | no | 0.5 + 0.3·decline |
 | `senescence_or_harvest` | gradual decline without S1 (cannot be separated) | no | 0.2 |
-| `none` | no qualifying decline or step | no | 0.7 with S1, 0.5 without |
+| `none` | no qualifying decline or step | no | 0.7 with S1, 0.5 without; 0.3 when S2 is insufficient and S1 shows no step |
 | `insufficient_data` | neither sensor sufficient | no | 0 |
 
-`s2` = min(1, drop / (2·abrupt_drop)), `s1` = min(1, |z| / (2·s1_min_z)) and `decline` = min(1, decline /
-(2·harvest_drop)). **Confidences are ordinal heuristic scores, not calibrated probabilities.** They rank
+`s2` = min(1, drop / (2·abrupt_drop)), `s1` = min(1, |z| / (2·s1_min_z)) and, in the `senescence` row,
+`decline` = min(1, decline / (2·harvest_drop)). **Confidences are ordinal heuristic scores, not calibrated probabilities.** They rank
 evidence within one configuration and are comparable only under the same parameters. Calibrating them needs
 inspected reference parcels.
 

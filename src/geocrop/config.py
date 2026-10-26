@@ -237,11 +237,11 @@ EMBEDDING_DEFAULTS: dict[str, Any] = {
     "resampling": "nearest",   # pre-computed sources: nearest | bilinear
     "mirror": "source.coop",   # AlphaEarth: source.coop | gcs
     "index": None,             # AlphaEarth: local/remote aef_index.parquet override
-    "monthly": None,           # Presto: monthly composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
-    "start": None,             # Presto: first month YYYY-MM (default <year>-01)
-    "months": 12,              # Presto: number of monthly timesteps (1..24)
-    "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
-    "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
+    "monthly": None,           # monthly providers: composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
+    "start": None,             # monthly providers: first month YYYY-MM (default <year>-01)
+    "months": 12,              # monthly providers: number of monthly timesteps (1..24)
+    "checkpoint": None,        # monthly provider (one source): local weights (default: pinned official download)
+    "parcels": False,          # also write parcel-level embeddings from paths.parcels
     "attach": True,            # append the embeddings raster to the feature stack
     "namespace": None,         # feature names emb_<source>_NN (true) / legacy emb_NN (false); default: new providers
                                # and lists of sources are namespaced, alphaearth/tessera/presto alone are legacy
@@ -467,6 +467,8 @@ def _validate_embeddings(raw) -> None:
         raise ConfigError("features.embeddings.namespace must be true, false or unset")
     if len(sources) > 1 and raw.get("namespace") is False:
         raise ConfigError("Several embedding sources need namespaced feature names (features.embeddings.namespace)")
+    if len(sources) > 1 and raw.get("checkpoint"):
+        raise ConfigError("features.embeddings.checkpoint applies to one source; list one source")
     allow = raw.get("allow_license", [])
     if not isinstance(allow, list) or not all(isinstance(x, str) for x in allow):
         raise ConfigError("features.embeddings.allow_license must be a list of licence ids")

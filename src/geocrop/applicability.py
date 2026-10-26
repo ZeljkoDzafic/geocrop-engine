@@ -52,6 +52,12 @@ def fit(X, folds_index, features, importance=None, max_points: int = 20000, seed
     rng = np.random.default_rng(seed)
     X = np.asarray(X, dtype="float64")
     folds_index = np.asarray(folds_index)
+    if X.ndim != 2 or len(X) < 2 or len(folds_index) != len(X):
+        raise ValueError("AOA needs a 2-D sample matrix with at least two rows and one fold id per row")
+    if not np.isfinite(X).all():
+        raise ValueError("AOA training features must be finite (no NaN or infinity)")
+    if len(np.unique(folds_index)) < 2:
+        raise ValueError("AOA needs at least two cross-validation folds (each sample is measured against other folds)")
     if len(X) > max_points:
         keep = rng.choice(len(X), max_points, replace=False)
         X, folds_index = X[keep], folds_index[keep]
@@ -63,7 +69,9 @@ def fit(X, folds_index, features, importance=None, max_points: int = 20000, seed
     Z = (X - mean) / std * w
     pair = rng.choice(len(Z), size=(min(len(Z) * 5, 200000), 2))
     pair = pair[pair[:, 0] != pair[:, 1]]
-    mean_distance = float(np.linalg.norm(Z[pair[:, 0]] - Z[pair[:, 1]], axis=1).mean())
+    mean_distance = float(np.linalg.norm(Z[pair[:, 0]] - Z[pair[:, 1]], axis=1).mean()) if len(pair) else 0.0
+    if not mean_distance > 0:
+        raise ValueError("AOA is undefined when all training feature vectors are identical")
     di = np.empty(len(Z))
     for f in np.unique(folds_index):
         inside = folds_index == f
@@ -81,6 +89,9 @@ def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_s
     """Write a two-band raster: DI and AOA flag (1 inside, 0 outside)."""
     with rasterio.open(stack) as src:
         names = list(src.descriptions)
+        missing = [f for f in model.features if f not in names]
+        if missing:
+            raise ValueError(f"Stack {stack} lacks AOA features {missing[:5]}")
         bands = [names.index(f) + 1 for f in model.features]
         out = Path(output)
         out.parent.mkdir(parents=True, exist_ok=True)

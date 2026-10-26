@@ -29,6 +29,12 @@ core         indices, features, timeseries, tsfeatures, samples, model, estimato
              s2, s1, plugins, contracts, hashing
 ```
 
+*Update:* the listing above records the map when this ADR was accepted. Modules added since (for example
+`web_review`; `acceptance`, `preflight`, `cleanup`, `evidence`, `registry`, `public_benchmark`,
+`public_transfer`; `s1_stac`, `downloads`, `public_data`, `embedding_sources`, `ftw_weights`, `openeo_adapter`,
+`datacube`; and further core modules) are classified in `_layers.py`, which stays the single authoritative map;
+the current picture is in [architecture](../architecture.md#layers).
+
 Rules (a layer may always import itself and `geocrop.__version__`):
 1. core imports only core, the standard library and the scientific stack listed in `CORE_THIRD_PARTY`
    (numpy, scipy, pandas, scikit-learn, rasterio, geopandas, shapely, pyproj, scikit-image, torch, ...);

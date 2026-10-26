@@ -405,7 +405,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--pseudonymise", action="store_true")
 
     # segmentation
-    x = cmd("segment-obia", "SLIC superpixel segmentation (tile-bounded)")
+    x = cmd("segment-obia", "SLIC superpixel segmentation (tiled, segments merged across tile seams)")
     x.add_argument("--raster", required=True)
     x.add_argument("--out", required=True)
     x.add_argument("--bands", nargs="*")
@@ -620,7 +620,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
                                   "test in others)")
     x.add_argument("--protocol", required=True, help="versioned transfer protocol YAML (configs/benchmarks/*transfer*)")
     x.add_argument("--work", required=True, help="working directory (tiles, transfer_cv, results.json/.md)")
-    x.add_argument("--cache", help="download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public")
+    x.add_argument("--cache", help="download cache; default $GEOCROP_CACHE/public (~/.cache/geocrop/public)")
     x.add_argument("--workers", type=int, default=4, help="parallel scene imports")
     x.add_argument("--skip-transfer-cv", action="store_true", help="skip the pooled leave-one-region/year-out CV")
     x.add_argument("--publish", help="directory to copy results.md/.json to (named after the protocol)")
@@ -817,7 +817,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     cu = x.add_subparsers(dest="cube_cmd", required=True, metavar="action")
     y = cu.add_parser("load", help="Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders",
                       description="Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders "
-                                  "(same masking/radiometry as stac-import; optional odc-stac extra)")
+                                  "(same masking/radiometry as stac-import; optional cube extra)")
     y.add_argument("--config", help="defaults from data.*, grid.reference, paths.s2_scenes, compositing.scl_invalid")
     y.add_argument("--reference", help="study grid GeoTIFF (default grid.reference of --config)")
     y.add_argument("--start", required=True)

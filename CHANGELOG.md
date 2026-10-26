@@ -1,6 +1,17 @@
 # Changelog
 
 ## Unreleased
+### Tests
+- Branch-coverage tests for error and edge paths of the result-critical core modules, review/registry and the
+  data adapters (mocked HTTP, no network): every 1.0 coverage-goal module is at or above 90 % branch coverage on the
+  minimal CI install, whose total rose from 72.6 % to 78.6 % (CI `--cov-fail-under` 71 -> 76).
+
+### Fixed
+- `applicability.fit` raises a clear `ValueError` for a single CV fold, identical or non-finite training features
+  and mismatched fold ids instead of an opaque NumPy/SciPy error; `map_aoa` names AOA features missing from the stack.
+- `stac_import.cached_scene_valid` treats a `scene.json` that is valid JSON but not an object as not cached
+  (re-import) instead of crashing with `AttributeError`.
+
 ### Added
 - Domain-shift safeguards (`geocrop.shift`, docs/domain-shift.md). Training writes `model/domain_reference.npz`.
   Prediction writes `prediction/shift_report.json` with the verdict `in-domain | mild | severe` and its reasons:
@@ -14,6 +25,17 @@
   conformal after Tibshirani et al. 2019). The default `warn` leaves decisions and traffic lights unchanged, and
   the section is fingerprint-neutral at its defaults. `geocrop benchmark-transfer` reports the shift verdicts and
   coverage per threshold mode; result in docs/benchmarks/si-transfer-pomurje.v1.1.md (same protocol hash as v1).
+- Lijevče polje case study (docs/studies/lijevce-polje.md): reproducible AOI script `tools/make_study_aoi.py`
+  (geoBoundaries municipalities Gradiška, Laktaši, Srbac ∩ Copernicus DEM GLO-30 below a histogram-derived
+  threshold, cleaned; pinned sources and checksums; area in EPSG:3035), the generated
+  `configs/studies/lijevce_polje/aoi.geojson` (719.4 km², UTM zone 33 only), the 2023 study configuration
+  `configs/studies/lijevce_polje/study_2023.yaml` (EPSG:32633), the planning check `tools/study_data_check.py`
+  (Sentinel-2 dates and SCL clear-observation coverage per window) and a "Lijevče polje, Jun–Aug 2023" preset in
+  the web workspace's New-analysis sheet.
+- `tools/check_docs.py` (run by `tests/test_check_docs.py` in the default tier): every relative link and anchor in
+  the Markdown documents and `website/index.html` resolves, every `geocrop <command>`/`--option` written in the
+  living docs exists, `docs/configuration.md` lists exactly the keys of `geocrop.config.DEFAULTS`,
+  `docs/architecture.md` names every module of the layer map, and `docs/cli.md` matches the parser.
 - Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
   (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
   season that starts before the series) no longer removes polygons; sample files record the classes of the
@@ -277,6 +299,18 @@
   subprocess-running code.
 
 ### Fixed
+- Documentation matches the code (docs/limitations.md, docs/testing.md and README rewritten): OBIA seam
+  reconciliation was described as missing in limitations/segmentation; limitations now separate synthetic,
+  real-data and public-benchmark evidence (field accuracy in the study region open; conformal coverage below
+  target under shift); configuration table gained `cache.hash`, `model.holdout_fraction`, `model.inner_splits`
+  and `openeo.*`; architecture/ADR module maps, ablation ladder, embedding names, marker confidence formula,
+  contract list, deploy runbook (user/ownership/paths), Docker user and loopback-only serving, Ubuntu 26.04,
+  Python 3.10–3.12, and stale CLI help (`segment-obia`, `benchmark-transfer --cache`, `cube load`) corrected;
+  `geocrop run` embeddings limitation (single AlphaEarth/TESSERA/Presto source) documented.
+- OBIA and watershed post-processing raise a clear error naming the `segmentation` extra when scikit-image is
+  missing (previously a bare `ModuleNotFoundError`, e.g. in `geocrop acceptance --offline` on a core install).
+- The default test tier passes on a minimal install (`.[dev,stac,web]`, no torch/pyarrow/matplotlib), as in CI;
+  openEO parcel geometries are rounded to 1e-7° so process graphs are identical across platforms.
 - STAC imports (Sentinel-2 Earth Search, Sentinel-1 RTC Planetary Computer) set GDAL HTTP connect/total
   timeouts and a low-speed abort, so a stalled HTTPS connection fails that item instead of hanging the import
   (observed: > 1 h hang in a 1000 km² Sentinel-1 import).
@@ -320,6 +354,21 @@
 - `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
 - `stac-import` reuses cached scenes only for the same study grid and with all bands present.
 - Map responses of a previously selected job are discarded.
+- `geocrop run` embeddings stage: every on-VM provider (Presto, Galileo, AnySat, plugin `MonthlyProvider`s) now gets
+  the monthly composites through one shared path (`features.embeddings.monthly`, or `<dir>/monthly` built once
+  from the scene folders); before, Galileo and AnySat failed because only Presto's composites were built.
+- `features.embeddings.source` as a list no longer raises `TypeError` in the stage: each provider writes its own
+  raster (namespaced `emb_<provider>_NN`) and the features stage attaches all of them.
+- The stage honours `namespace` and `allow_license`; a provider that needs a licence acknowledgement is refused
+  before anything runs, exactly as `geocrop embeddings --allow-license`. `parcels: true` applies to every provider.
+- The embeddings stage fingerprint includes the provider set (with the SHA-256 of pinned weights and plugin
+  source files), the resolved namespace, a local checkpoint and the monthly composites' content; with embeddings
+  off, no fingerprint changes. `checkpoint` with several sources is rejected by config validation.
+- Model registry: `licences` records every embedding provider found in the feature manifest (Galileo, AnySat,
+  plugins) from the licence and weights it declares, and `pretrained` entries list every provider's pinned weights
+  (`anysat/default`, `galileo/<file>`, plugins), not only FTW and Presto.
+- `tools/check_weights.py` also reads the transfer protocols' `sources:` key (EuroCrops, KMRS 2025), so every
+  pinned download is re-checked; identical pins are checked once.
 
 ## 0.9.0 — 2026-10-26
 Hardening release: leakage-free validation for ML and DL, reliable resumable execution, seam-free

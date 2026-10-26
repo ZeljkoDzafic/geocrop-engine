@@ -89,6 +89,7 @@ geocrop evidence --parcels routed.gpkg --out ev --signatures demo/signatures.csv
   light is recomputed with the supplied rule settings. When the stored table was produced with other
   settings, the package says so (`consistent_with_table: false` and a note) instead of hiding the
   difference.
-* Image chips per date are not part of the package (that is the analyst-review interface, gap G7).
+* Image chips per date are not part of the package; the analyst review view of the web workspace shows them
+  ([review](web-interface.md#review-analyst-parcel-decisions)).
 * Packages reference inputs by path and hash. They do not copy the parcel layer or imagery. Treat
   them as personal data where parcel ids or declarations identify farmers.
