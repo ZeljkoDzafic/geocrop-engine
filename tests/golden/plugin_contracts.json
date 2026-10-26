@@ -14,10 +14,12 @@
     "file_contracts": {
       "key": "schema_version",
       "versions": {
+        "evidence": 1,
         "feature_manifest": 1,
         "model": 1,
         "run_manifest": 1,
-        "scene": 1
+        "scene": 1,
+        "temporal_support": 1
       }
     },
     "index_record": {
@@ -64,6 +66,17 @@
         "group": "geocrop.exporters",
         "kind": "exporter"
       },
+      "feature_providers": {
+        "builtins": [
+          "alphaearth",
+          "anysat",
+          "galileo",
+          "presto",
+          "tessera"
+        ],
+        "group": "geocrop.feature_providers",
+        "kind": "feature provider"
+      },
       "indices": {
         "builtins": [
           "BSI",
@@ -104,6 +117,7 @@
       }
     },
     "registry_api": {
+      "declared_names": "(self) -> 'list[str]'",
       "discover": "(self, force: 'bool' = False) -> 'None'",
       "get": "(self, name: 'str') -> 'Any'",
       "names": "(self) -> 'list[str]'",
@@ -121,6 +135,6 @@
     }
   },
   "schema": "geocrop-plugin-contracts/1",
-  "sha256": "df8c33fc793530f5ecead9e21502e4211350126d62cf228ea73c4059226e18b4",
-  "version": 1
+  "sha256": "66664e1a44aab95042ed3f23957f6f62a5014bd1c35f1cb9602667746fbcc56f",
+  "version": 2
 }

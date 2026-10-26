@@ -2,6 +2,8 @@
 
 ## Unreleased
 ### Added
+- `plugin-contracts/2`: adds the `feature_providers` registry (entry-point group `geocrop.feature_providers`) and the
+  `evidence`/feature-manifest file-contract versions; existing plugin groups are unchanged (no migration needed).
 - `tools/deploy_website.sh`: manual deployment of the presentation site to Cloudflare static assets, with security headers in `website/_headers`.
 - Analyst parcel review in the web workspace (gap G7, docs/web-interface.md#review-analyst-parcel-decisions): a
   Review view with a filterable, sortable queue (traffic light, declared class, model decision, reason code,
