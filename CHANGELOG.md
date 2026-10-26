@@ -2,6 +2,16 @@
 
 ## Unreleased
 ### Added
+- Analyst parcel review in the web workspace (gap G7, docs/web-interface.md#review-analyst-parcel-decisions): a
+  Review view with a filterable, sortable queue (traffic light, declared class, model decision, reason code,
+  uncertainty, review state; J/K to move), a parcel card with declared vs predicted class, probabilities, conformal
+  set, reason pills, markers, the parcel outlined on the map, an inline-SVG time series (S2 indices, S1 dB from
+  signature tables, or parcel means from the job's imagery) and true-colour/NDVI chips per date; A/D/U record
+  agree / disagree with corrected class / can't tell with an explicit training or validation purpose into an
+  append-only `review/decisions.csv` (analyst, UTC time, model SHA-256), exported as an `active-learning ingest`
+  label table. Core logic in `geocrop.review`, routes in `geocrop.web_review` (authenticated, `/api/v1` aliases,
+  workspace-confined, no client-supplied paths). Parcels with a `geocrop evidence` package get its triggered rules
+  as reason pills, a download of the package page and, without signatures, its observed/interpolated series.
 - Feature-provider adapter interface for foundation-model embeddings (`geocrop.feature_providers`, plugin
   registry `geocrop.plugins.feature_providers`, entry-point group `geocrop.feature_providers`): name, licence,
   pinned weights (URL + SHA-256), input contract, `embed_pixels` / `embed_parcels`. AlphaEarth, TESSERA and

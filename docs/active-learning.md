@@ -61,6 +61,8 @@ One row per observation or analyst decision (CSV, GeoPackage or Parquet):
 
 Analyst decisions from a review interface (agree / disagree / can't tell) fit the same table: write the class the
 analyst confirmed or corrected into `label`, `can't tell` leaves it empty, `source=analyst`.
+The **Review** view of the web workspace records such decisions and exports this table directly
+([web interface](web-interface.md#review-analyst-parcel-decisions)).
 
 ## 3. Ingest: `geocrop active-learning ingest`
 
