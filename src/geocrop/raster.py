@@ -1,4 +1,9 @@
-"""Small raster helpers shared by all stages: grids, block iteration and aligned reads."""
+"""Small raster helpers shared by all stages: grids, block iteration, aligned reads and checked input access.
+
+`open_input`, `read_block`, `check_grid` and `feature_names` are used at stage boundaries (features, samples,
+predict) so that a truncated, mis-gridded or unlabelled input raster fails with a `RasterInputError` that
+names the file and the problem, instead of an anonymous GDAL error or a silently wrong product.
+"""
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -6,10 +11,69 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from rasterio.errors import RasterioIOError
 from rasterio.warp import Resampling, reproject
 from rasterio.windows import Window
 
 NODATA = -9999.0
+
+
+class RasterInputError(ValueError):
+    """An input raster is unreadable or violates the data contract; the message names the file."""
+
+
+def open_input(path: str | Path, role: str = "input raster"):
+    """`rasterio.open` for reading, with an actionable error for missing, truncated or non-raster files."""
+    path = Path(path)
+    if not path.is_file():
+        raise RasterInputError(f"{role} {path} does not exist")
+    try:
+        return rasterio.open(path)
+    except RasterioIOError as exc:
+        raise RasterInputError(f"{role} {path} cannot be opened as a raster (truncated, corrupt or not a "
+                               f"GeoTIFF): {exc}. Regenerate or re-download it.") from exc
+
+
+def read_block(ds, indexes=None, window: Window | None = None) -> np.ndarray:
+    """`ds.read` that names the file and window when the data are truncated or corrupt."""
+    try:
+        return ds.read(indexes, window=window)
+    except RasterioIOError as exc:
+        cause = exc.__cause__ or exc.__context__
+        where = (f"rows {int(window.row_off)}-{int(window.row_off + window.height)}, cols "
+                 f"{int(window.col_off)}-{int(window.col_off + window.width)}") if window is not None else "full raster"
+        raise RasterInputError(f"Raster {ds.name} is truncated or corrupt: reading {where} failed ({exc}"
+                               f"{f'; {cause}' if cause else ''}). Regenerate or re-download it.") from exc
+
+
+def check_grid(ds, reference, what: str = "") -> None:
+    """Require `ds` to share CRS, shape and transform with `reference`; the error names both files."""
+    label = f" ({what})" if what else ""
+    if ds.crs is None:
+        raise RasterInputError(f"Raster {ds.name}{label} has no CRS")
+    problems = []
+    if ds.crs != reference.crs:
+        problems.append(f"CRS {ds.crs} != {reference.crs}")
+    if ds.shape != reference.shape:
+        problems.append(f"shape {ds.shape} != {reference.shape}")
+    if not ds.transform.almost_equals(reference.transform):
+        problems.append(f"transform {tuple(ds.transform)[:6]} != {tuple(reference.transform)[:6]}")
+    if problems:
+        raise RasterInputError(f"Grid mismatch: {ds.name}{label} differs from {reference.name}: "
+                               f"{'; '.join(problems)}. Composite every input on one reference grid.")
+
+
+def feature_names(ds) -> list[str]:
+    """Band descriptions of a feature stack; every band must be named, names must be unique."""
+    names = list(ds.descriptions)
+    unnamed = [i for i, n in enumerate(names, 1) if not n or not str(n).strip()]
+    if unnamed:
+        raise RasterInputError(f"Feature stack {ds.name}: bands {unnamed[:10]} of {len(names)} have no description "
+                               "(feature name). Build stacks with geocrop features, which names every band.")
+    duplicated = sorted({n for n in names if names.count(n) > 1})
+    if duplicated:
+        raise RasterInputError(f"Feature stack {ds.name}: duplicate band descriptions {duplicated[:10]}")
+    return names
 
 
 def blocks(width: int, height: int, size: int) -> Iterator[Window]:

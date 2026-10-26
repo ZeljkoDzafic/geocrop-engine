@@ -15,7 +15,7 @@ import rasterio
 from rasterio.features import geometry_mask
 from rasterio.windows import Window, from_bounds
 
-from .raster import valid_mask
+from .raster import feature_names, open_input, read_block, valid_mask
 
 
 @dataclass
@@ -73,22 +73,30 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
     (e.g. 10-20 m) removes mixed boundary pixels from training.
     """
     rng = np.random.default_rng(seed)
+    source = "reference polygons" if isinstance(polygons, gpd.GeoDataFrame) else f"reference polygons {polygons}"
     gdf = gpd.read_file(polygons) if not isinstance(polygons, gpd.GeoDataFrame) else polygons.copy()
     for col in (label_field, id_field):
         if col not in gdf:
-            raise ValueError(f"Reference polygons need a {col!r} column")
+            raise ValueError(f"{source}: missing column {col!r} (columns: {[c for c in gdf.columns][:20]})")
     if gdf.crs is None:
-        raise ValueError("Reference polygons need a CRS")
-    if gdf[id_field].duplicated().any():
-        raise ValueError(f"{id_field} must be unique")
+        raise ValueError(f"{source}: no CRS defined; assign the layer's CRS before training")
+    if gdf.empty or (gdf.geometry.isna() | gdf.geometry.is_empty).all():
+        raise ValueError(f"{source}: contains no (non-empty) polygons")
+    for col in (label_field, id_field):
+        blank = gdf[col].isna() | (gdf[col].astype(str).str.strip() == "")
+        if blank.any():
+            raise ValueError(f"{source}: {int(blank.sum())} rows have an empty {col!r} "
+                             f"(row positions {list(np.flatnonzero(blank.to_numpy())[:5])}); every polygon needs one")
+    duplicated = gdf[id_field][gdf[id_field].duplicated()].astype(str)
+    if len(duplicated):
+        raise ValueError(f"{source}: {id_field} must be unique; duplicated ids {sorted(set(duplicated))[:5]}")
     X, y, pid, xs, ys = [], [], [], [], []
-    with rasterio.open(stack) as ds:
+    intersecting = 0
+    with open_input(stack, "Feature stack") as ds:
         gdf = gdf.to_crs(ds.crs)
         if inner_buffer_m:
             gdf["geometry"] = gdf.geometry.buffer(-abs(inner_buffer_m))
-        names = list(ds.descriptions)
-        if not all(names):
-            raise ValueError("Feature stack bands need descriptions")
+        names = feature_names(ds)
         for row in gdf.itertuples():
             geom = row.geometry
             if geom is None or geom.is_empty:
@@ -96,7 +104,8 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             win = polygon_window(geom, ds)
             if win is None:
                 continue
-            cube = ds.read(window=win)
+            intersecting += 1
+            cube = read_block(ds, window=win)
             transform = ds.window_transform(win)
             inside = geometry_mask([geom], out_shape=cube.shape[1:], transform=transform, invert=True)
             rr, cc = np.nonzero(inside & valid_mask(cube, ds.nodata))
@@ -113,7 +122,12 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             xs.append(np.asarray(px))
             ys.append(np.asarray(py))
         crs = ds.crs.to_string()
+        stack_name, bounds = ds.name, tuple(round(b, 1) for b in ds.bounds)
     if not X:
-        raise ValueError("No reference pixels intersect the feature stack")
+        if not intersecting:
+            raise ValueError(f"No {source} intersect feature stack {stack_name} (bounds {bounds}, {crs}); "
+                             "check the polygons' CRS and location")
+        raise ValueError(f"{intersecting} {source} intersect feature stack {stack_name}, but none contains a pixel "
+                         "with valid values for every feature (nodata/NaN); check the composites")
     return Samples(np.concatenate(X).astype("float32"), np.array(y), np.array(pid),
                    np.concatenate(xs), np.concatenate(ys), names, crs)

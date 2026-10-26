@@ -141,7 +141,15 @@ class Runner:
         self._save_state()
 
     def stage(self, name, fp, outputs, fn):
-        upstream = {d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(name, ())}
+        # Never consume the possibly partial outputs of an upstream stage whose last run failed or was killed.
+        incomplete = {d: self.state[d].get("status") for d in DEPENDS.get(name, ())
+                      if self.state.get(d, {}).get("status") not in (None, "success")
+                      and not (d == "cbm" and not self.cfg["cbm"]["enabled"])}
+        if incomplete:
+            raise RuntimeError(f"Stage {name} depends on {incomplete} whose last run did not complete, so their "
+                               f"outputs may be partial; rerun them first (geocrop run --stages "
+                               f"{' '.join(sorted(incomplete))} {name})")
+        upstream ={d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(name, ())}
         fp = _fp(CACHE_SCHEMA, self.code_fp, upstream, fp)
         if self._done(name, fp, outputs):
             self._note(f"[skip] {name} (unchanged)")
