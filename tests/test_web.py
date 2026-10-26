@@ -3,7 +3,9 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +13,7 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from geocrop import web_jobs  # noqa: E402
 from geocrop.web import create_app  # noqa: E402
 from geocrop.web_jobs import JobManager, command_catalogue, validated_command  # noqa: E402
 
@@ -153,15 +156,15 @@ def test_second_worker_cannot_recover_an_active_workers_jobs(tmp_path):
 
 def test_server_token_is_not_inherited_by_child_job(client, monkeypatch):
     monkeypatch.setenv("GEOCROP_WEB_TOKEN", TOKEN)
-    original = subprocess.Popen
+    original = web_jobs.spawn
     observations = []
 
-    def launch(*args, **kwargs):
-        observations.append("GEOCROP_WEB_TOKEN" in kwargs["env"])
-        assert kwargs.get("shell", False) is False
-        return original(*args, **kwargs)
+    def launch(args, cwd, env, stdout):
+        observations.append("GEOCROP_WEB_TOKEN" in env)
+        assert isinstance(args, list)
+        return original(args, cwd, env, stdout)
 
-    monkeypatch.setattr(subprocess, "Popen", launch)
+    monkeypatch.setattr(web_jobs, "spawn", launch)
     job = client.post("/api/jobs", json={"argv": ["indices"]}, headers=AUTH).json()
     assert wait_for(client, job["id"], {"succeeded", "failed"})["status"] == "succeeded"
     assert observations == [False]
@@ -186,3 +189,62 @@ def test_incremental_logs_preserve_multibyte_text(tmp_path, monkeypatch):
         assert offset == len(expected.encode())
     finally:
         worker.close()
+
+
+PROJ_FORK_SCRIPT = """
+import os, shutil, sys, tempfile, time
+from pathlib import Path
+import pyproj
+data = Path(tempfile.mkdtemp()) / "proj"
+shutil.copytree(pyproj.datadir.get_data_dir(), data)
+pyproj.datadir.set_data_dir(str(data))
+# a map preview uses PROJ: its proj.db handle is cached in this process
+pyproj.Transformer.from_crs("EPSG:32634", "EPSG:4326", always_xy=True).transform(500000, 4970000)
+db = data / "proj.db"                      # proj.db replaced on disk (e.g. pyproj reinstalled)
+shutil.copy(db, db.with_suffix(".tmp"))
+os.replace(db.with_suffix(".tmp"), db)
+from geocrop.web_jobs import JobManager
+manager = JobManager(Path(sys.argv[1]))
+codes = []
+for _ in range(2):
+    job = manager.submit(argv=["indices"])
+    while manager.get(job["id"])["status"] not in ("succeeded", "failed"):
+        time.sleep(0.05)
+    codes.append(manager.get(job["id"])["returncode"])
+manager.close()
+print(codes)
+"""
+
+
+def test_jobs_survive_proj_state_from_map_previews(tmp_path):
+    """Regression: after a map preview had used PROJ, every job child crashed with -11 (SIGSEGV) on macOS.
+
+    PROJ's pthread_atfork child handler closed its cached proj.db handle inside the forked child and SQLite
+    logged (proj.db had changed on disk) before exec. Jobs are now started with posix_spawn, which runs no
+    fork handlers. The scenario runs in a separate interpreter so this test process keeps a clean PROJ state.
+    """
+    pytest.importorskip("pyproj")
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(
+        [str(Path(web_jobs.__file__).resolve().parents[1]), *filter(None, [os.environ.get("PYTHONPATH")])])}
+    proc = subprocess.run([sys.executable, "-c", PROJ_FORK_SCRIPT, str(tmp_path)], capture_output=True, text=True,
+                          env=env, timeout=120)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    assert proc.stdout.strip().splitlines()[-1] == "[0, 0]"
+
+
+@pytest.mark.skipif(not hasattr(os, "posix_spawn"), reason="POSIX only")
+def test_jobs_are_spawned_without_fork(tmp_path, monkeypatch):
+    def no_fork(*args, **kwargs):
+        raise AssertionError("job children must not be started with fork()")
+
+    monkeypatch.setattr(subprocess, "Popen", no_fork)
+    monkeypatch.setattr(os, "fork", no_fork)
+    log = tmp_path / "job.log"
+    with log.open("ab") as out:
+        child = web_jobs.spawn([sys.executable, "-m", "geocrop.cli", "manifest", "--out", "relative"], tmp_path,
+                               {**os.environ, "PYTHONPATH": str(Path(web_jobs.__file__).resolve().parents[1])}, out)
+    assert child.wait(timeout=60) == 0, log.read_text()
+    assert (tmp_path / "relative" / "run_manifest.json").exists()      # ran in the job's working directory
+    assert child.poll() == 0                                           # reaped once, status kept
+    with log.open("ab") as out, pytest.raises(ValueError):
+        web_jobs.spawn([sys.executable, "-c", "print(1)"], tmp_path, dict(os.environ), out)

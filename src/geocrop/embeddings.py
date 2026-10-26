@@ -34,6 +34,7 @@ from affine import Affine
 from rasterio.warp import Resampling, reproject
 
 from .features import Feature, manifest_path
+from .features import write_manifest as write_feature_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned, same_grid
 
 SOURCES = ("alphaearth", "tessera", "presto")
@@ -233,13 +234,11 @@ def write_manifest(output: str | Path, source: str, year: int, dims: int, extra:
     info = source_info(source)
     feats = [Feature(n, "emb", info["sensor"], None, (), f"{info['product']} {year}, dimension {i}")
              for i, n in enumerate(names or band_names(dims))]
-    path = manifest_path(output)
-    path.write_text(json.dumps({
+    return write_feature_manifest(output, {
         "stack": Path(output).name, "nodata": NODATA,
         "embedding": {"source": source, "year": int(year), "dims": dims,
                       **{k: v for k, v in info.items() if k != "dims"}, **(extra or {})},
-        "features": [asdict(f) for f in feats]}, indent=2, default=str), encoding="utf8")
-    return path
+        "features": [asdict(f) for f in feats]})
 
 
 def namespaced_copy(raster: str | Path, output: str | Path) -> Path:
@@ -267,7 +266,7 @@ def namespaced_copy(raster: str | Path, output: str | Path) -> Path:
     body = body or {"stack": output.name, "nodata": NODATA, "features": [asdict(f) for f in feats]}
     body["stack"] = output.name
     body["features"] = [{**f, "name": rename.get(f["name"], f["name"])} for f in body["features"]]
-    manifest_path(output).write_text(json.dumps(body, indent=2, default=str), encoding="utf8")
+    write_feature_manifest(output, body)
     return output
 
 

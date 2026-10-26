@@ -100,14 +100,13 @@ are enabled in `--config`.
 
 ### Pipeline wiring
 
-`pipeline.py` is not changed by this feature. To wire it in, add the following calls:
+`geocrop run` uses both settings; both are off by default and then change no output or fingerprint:
 
-* time-series stage: `build_timeseries_stack(..., temporal_support=t["temporal_support"],
-  support_tolerance_days=self.cfg["cbm"]["temporal_support"]["tolerance_days"])`
-* cbm stage, after `cbm.markers(...)`: `temporal_quality.parcel_support(sig, start, end,
-  self.cfg["cbm"]["temporal_support"], markers=m).to_csv(self.out / "cbm" / "temporal_support.csv", index=False)`
-* parcels stage: `parcels.aggregate(..., temporal_support=pd.read_csv(<that csv>, dtype={"parcel_id": str}),
-  temporal_rules=self.cfg["cbm"]["temporal_support"])`
+* `timeseries.temporal_support: true`: the features stage writes `<stack>_ts_temporal_support.tif` (+ `.json`)
+  with `cbm.temporal_support.tolerance_days`.
+* `cbm.temporal_support.enabled: true` (with `cbm.enabled`): the cbm stage writes `cbm/temporal_support.csv`
+  (`temporal_quality.parcel_support` on the cbm signatures and markers), and the parcels stage (and the optional
+  `parcel_classify` stage) copy the `tq_*` columns and route weakly supported parcels to review.
 
 ## Synthetic check (software verification, not accuracy)
 

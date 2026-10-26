@@ -93,6 +93,23 @@ grid ─────────────────────────
 segment-obia │ segment-unet-train ─► segment-unet-infer ─► boundaries-to-parcels ─► evaluate-segments
 ```
 
+### `geocrop run` (resumable pipeline)
+
+```
+composite ─► [embeddings] ─► features ─► samples ─► train ─► predict ──────────────┐
+                                                                                   ▼
+             [cbm: signatures, markers, (S1 signatures, event markers)] ─► [parcel_classify] ─► parcels ─► validate
+                                                          samples + features ─► experiments
+```
+
+`pipeline.DEPENDS` lists the upstream stages whose fingerprints enter a stage's fingerprint;
+`pipeline.OPTIONAL_DEPENDS` marks the edges that exist only while an option is on (`features ← embeddings`
+with `features.embeddings.attach`, `parcels ← parcel_classify` with `parcel_classify.decision: replace`).
+Options inside a stage (`cv.strategy`, `predict.smoothing`, `cbm.event_markers`, `cbm.rules`, `model.params`)
+are added to that stage's fingerprint only when they differ from their default, and keys added to the
+configuration later are omitted from `config.fingerprint` while at their default
+(`config.FINGERPRINT_NEUTRAL`). Enabling an option therefore re-runs exactly the stages that depend on it.
+
 ## Extending
 Extensions never require changes to the core ([ADR 0002](adr/0002-plugin-entry-points.md);
 complete example: [`examples/plugin_example`](../examples/plugin_example)):

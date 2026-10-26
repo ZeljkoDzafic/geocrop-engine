@@ -44,6 +44,65 @@ from .samples import Samples
 
 RF_KEYS = ("algorithm", "n_estimators", "max_features", "min_samples_leaf", "max_depth", "class_weight", "n_jobs",
            "max_samples", "learning_rate", "num_leaves", "epochs", "n_channels")
+_MISSING = object()
+
+
+def config_params(model_cfg: dict, keep_none: bool = False) -> dict:
+    """Estimator parameters of a `model:` config section: the shared `RF_KEYS` plus `model.params`.
+
+    `model.params` holds estimator-specific hyperparameters (for example of a plugin estimator); they
+    override the shared keys and are checked with `check_params`. Without `model.params` the result is
+    exactly the historical RF_KEYS subset (`keep_none` keeps shared keys set to null, as the train stage of
+    `geocrop run` always did), so existing configurations train identical models.
+    """
+    params = {k: model_cfg[k] for k in RF_KEYS if k in model_cfg and (keep_none or model_cfg[k] is not None)}
+    extra = dict(model_cfg.get("params") or {})
+    if extra:
+        params.update(extra)
+        check_params(params, extra)
+    return params
+
+
+def _same(a, b) -> bool:
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+    try:
+        return bool(a == b)
+    except Exception:  # array-like or exotic values: identity is the only safe comparison
+        return a is b
+
+
+def check_params(params: dict, extra: dict, where: str = "model.params") -> None:
+    """Fail unless every key of `extra` is a constructor parameter of the estimator that `params` selects
+    (built-in or plugin) and actually reaches it with the configured value.
+
+    The estimator is constructed (not fitted) through its registered factory. A key the estimator does not
+    accept, or one its factory silently drops (the CatBoost factory, for example, maps only the shared keys),
+    raises ValueError naming the accepted parameters.
+    """
+    import inspect
+
+    algo = params.get("algorithm", "rf")
+    est = make_estimator(dict(params), 0)
+    current = None
+    if callable(getattr(est, "get_params", None)):
+        try:
+            current = dict(est.get_params(deep=False))
+        except Exception:  # an estimator whose get_params needs fitted state
+            current = None
+    signature = {name for name, p in inspect.signature(type(est).__init__).parameters.items()
+                 if name != "self" and p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)}
+    accepted = signature | set(current or ())
+    for key, value in extra.items():
+        if key not in accepted:
+            raise ValueError(f"{where}.{key} is not a parameter of the {algo!r} estimator "
+                             f"({type(est).__name__}); accepted: {', '.join(sorted(accepted))}")
+        actual = current[key] if current is not None and key in current else getattr(est, key, _MISSING)
+        if actual is _MISSING or not _same(actual, value):
+            raise ValueError(f"The {algo!r} estimator factory does not pass {where}.{key} on to "
+                             f"{type(est).__name__} (configured {value!r}, estimator has "
+                             f"{None if actual is _MISSING else actual!r}); use a supported key or a plugin "
+                             "factory that forwards its parameters")
 
 
 def spatial_blocks(samples: Samples, block_m: float | None) -> np.ndarray:

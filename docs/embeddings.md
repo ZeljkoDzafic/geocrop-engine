@@ -104,9 +104,13 @@ the default design E0–E4:
 McNemar's test compares each row with the first experiment, as before. To compare against another baseline,
 define your own `experiments:` with that baseline listed first, for example `{groups: [emb]}`.
 
-`geocrop run` (the resumable pipeline) does not attach embeddings yet, because this change does not modify
-`pipeline.py`. Use `geocrop embeddings` followed by `geocrop features --config`, or `merge-stacks`, as shown
-above.
+`geocrop run` has an `embeddings` stage between `composite` and `features`. It runs only when
+`features.embeddings` is configured; only then are the network adapters (AlphaEarth/TESSERA reads, the pinned
+Presto checkpoint download) imported. For Presto without `monthly`, the stage first builds the monthly
+composites from `paths.s2_scenes`/`paths.s1_scenes` into `<dir>/monthly`. With `attach: true` (default) the
+features stage appends the raster to the stack, and the raster's content becomes part of the features
+fingerprint, so a re-extracted embedding re-runs features and everything after it. Without
+`features.embeddings`, neither the stage nor any fingerprint changes.
 
 ## Sources in detail
 
@@ -390,7 +394,8 @@ been run yet.
 * **Version drift.** AlphaEarth, the TESSERA v1 `.npy` tiles (deprecated upstream in favour of Zarr and
   Icechunk) and the model checkpoints can change upstream. GeoCrop pins the Presto, Galileo and AnySat weights
   by commit/revision URL and SHA-256 and records tile URLs and checkpoint hashes in the output tags. Re-extract when you change versions.
-* **Pipeline.** `geocrop run` does not yet attach embeddings (see [Commands](#commands)).
+* **Pipeline.** `geocrop run` extracts and attaches embeddings when `features.embeddings` is set (see
+  [Commands](#commands)).
 * **Licences.** You are responsible for attribution when publishing maps derived from AlphaEarth (CC-BY-4.0)
   and TESSERA (see the licence notes above). The MIT licences of the Galileo and AnySat weights cover the
   weights; they do not re-license the pre-training datasets, which GeoCrop never downloads or redistributes.

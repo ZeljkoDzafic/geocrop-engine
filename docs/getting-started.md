@@ -77,7 +77,9 @@ geocrop run --config configs/my_study.yaml
 `geocrop folds` shows (and maps) which classes would be missing from a test fold — adjust `spatial_block_m`
 or `cv_folds` before training if rare classes disappear.
 
-`geocrop run` executes `composite → features → samples → train → predict → parcels → validate → experiments`.
+`geocrop run` executes `composite → [embeddings] → features → samples → train → predict → cbm →
+[parcel_classify] → parcels → validate → experiments`; stages in brackets, and `cbm`, run only when enabled
+in the configuration (see [configuration](configuration.md#optional-parts-of-geocrop-run)).
 Re-running skips unchanged stages; `--stages train predict` runs a subset; `--force` recomputes.
 
 ### 3.6 Read the results

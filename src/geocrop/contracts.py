@@ -17,7 +17,7 @@ SCHEMA_VERSIONS: dict[str, int] = {
     "scene": 1,             # scene.json written by s2-import, s1-import, stac-import
     "run_manifest": 1,      # run_manifest.json (geocrop manifest)
     "model": 1,             # model.joblib payload metadata
-    "feature_manifest": 1,  # <stack>.features.json (stamping pending; see ADR 0003)
+    "feature_manifest": 1,  # <stack>.features.json (features.write_manifest / read_manifest)
     "temporal_support": 1,  # <stack>_temporal_support.json (per-pixel observed vs interpolated support)
     "evidence": 1,          # parcel evidence package <id>/evidence.json (geocrop evidence)
 }
