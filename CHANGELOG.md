@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- Feature-provider adapter interface for foundation-model embeddings (`geocrop.feature_providers`, plugin
+  registry `geocrop.plugins.feature_providers`, entry-point group `geocrop.feature_providers`): name, licence,
+  pinned weights (URL + SHA-256), input contract, `embed_pixels` / `embed_parcels`. AlphaEarth, TESSERA and
+  Presto now implement it (unchanged output); new providers `galileo` (Galileo-nano, MIT, encoder port verified
+  against the official code, max abs diff 1.2e-7) and `anysat` (AnySat base, MIT, s2 inference port, max abs
+  diff 0.0 per tile). Features are namespaced `emb_<provider>_NN` so several providers fit in one stack
+  (`features.embeddings.source` accepts a list; `namespace`, `allow_license` keys; `geocrop embeddings
+  --source a b`, `--namespace`, `--allow-license`, `--list`); legacy `emb_NN` stacks stay readable and a second
+  legacy source is attached under namespaced names. Parcel tables for pre-computed sources (parcel means).
 - Temporal quality (`geocrop.temporal_quality`, docs/temporal-quality.md): observed vs interpolated support per
   pixel (`ts-features --temporal-support` writes `<stack>_temporal_support.tif` + versioned manifest: clear
   observations, longest gap, season coverage, distance of SOS/peak/EOS to the nearest clear acquisition, gap at the

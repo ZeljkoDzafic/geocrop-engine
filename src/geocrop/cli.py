@@ -462,9 +462,12 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--stacks", nargs="+", required=True)
     x.add_argument("--out", required=True)
 
-    x = cmd("embeddings", "Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid")
+    x = cmd("embeddings", "Foundation-model embeddings (feature providers: AlphaEarth, TESSERA, on-VM Presto, "
+                          "Galileo, AnySat, plugins) on the study grid")
     x.add_argument("--config", help="features.embeddings, grid.reference and paths sections")
-    x.add_argument("--source", choices=["alphaearth", "tessera", "presto"], help="override features.embeddings.source")
+    x.add_argument("--source", nargs="+", metavar="PROVIDER",
+                   help="override features.embeddings.source: one or more feature providers "
+                        "(alphaearth, tessera, presto, galileo, anysat or a plugin; see --list)")
     x.add_argument("--year", type=int, help="override features.embeddings.year")
     x.add_argument("--reference", help="study grid GeoTIFF (default grid.reference)")
     x.add_argument("--out", help="output directory (default <features dir>/embeddings)")
@@ -476,6 +479,12 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--checkpoint", help="Presto: local checkpoint instead of the pinned download")
     x.add_argument("--make-monthly", action="store_true",
                    help="Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes")
+    x.add_argument("--namespace", action=argparse.BooleanOptionalAction, default=None,
+                   help="feature names emb_<provider>_NN (default for new providers and several sources) "
+                        "or legacy emb_NN")
+    x.add_argument("--allow-license", action="append", default=None, metavar="ID",
+                   help="acknowledge a licence id of a provider whose weights/data are not permissive (repeatable)")
+    x.add_argument("--list", action="store_true", help="list the registered feature providers and exit")
 
     x = cmd("signatures", "Parcel-mean time series (CbM signatures) from S2 scene folders")
     x.add_argument("--scenes", required=True)
@@ -1088,12 +1097,14 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             from .config import embedding_options
             eo = embedding_options(cfg)
             if eo and eo["attach"]:
+                from .config import embedding_sources
                 from .embeddings import output_path
                 from .features import attach_embeddings
-                raster = output_path(eo["dir"], eo["source"], eo["year"])
-                if not raster.exists():
-                    raise FileNotFoundError(f"{raster} missing; run geocrop embeddings --config {a.config} first")
-                attach_embeddings(out, raster)
+                for src in embedding_sources(eo):
+                    raster = output_path(eo["dir"], src, eo["year"])
+                    if not raster.exists():
+                        raise FileNotFoundError(f"{raster} missing; run geocrop embeddings --config {a.config} first")
+                    attach_embeddings(out, raster)
         print(out)
     elif c == "check":
         from .provenance import check_raster, check_vector
@@ -1317,21 +1328,27 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "merge-stacks":
         from .tsfeatures import merge_stacks
         print(merge_stacks(a.stacks, a.out))
+    elif c == "embeddings" and a.list:
+        from .feature_providers import table
+        _print(table())
     elif c == "embeddings":
-        from .config import ConfigError, embedding_options, load
+        from .config import ConfigError, embedding_namespace, embedding_options, embedding_sources, load
         from .embedding_sources import extract
         cfg = load(a.config)
         eo = embedding_options(cfg, always=True)
         eo.update({k: v for k, v in (("source", a.source), ("year", a.year), ("dir", a.out), ("monthly", a.monthly),
-                                     ("start", a.start), ("months", a.months), ("checkpoint", a.checkpoint))
+                                     ("start", a.start), ("months", a.months), ("checkpoint", a.checkpoint),
+                                     ("namespace", a.namespace))
                    if v is not None})
+        eo["allow_license"] = [*eo["allow_license"], *(a.allow_license or [])]
         if not eo["source"] or not eo["year"]:
             raise ConfigError("Set features.embeddings.source/year in the config or pass --source and --year")
         reference = a.reference or cfg["grid"].get("reference")
         if not reference:
             raise ConfigError("A study grid is needed: grid.reference in the config or --reference")
         monthly = eo["monthly"] or str(Path(eo["dir"]) / "monthly")
-        if eo["source"] == "presto" and a.make_monthly:
+        sources = embedding_sources(eo)
+        if any(src not in ("alphaearth", "tessera") for src in sources) and a.make_monthly:
             from .embeddings import monthly_composites
             comp = cfg["compositing"]
             monthly_composites(reference, monthly, eo["start"] or f"{eo['year']}-01", eo["months"],
@@ -1339,10 +1356,14 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                scl_invalid=comp["scl_invalid"], cloud_probability_max=comp["cloud_probability_max"],
                                mask_dilation_px=comp["mask_dilation_px"])
         parcels = a.parcels or (cfg["paths"]["parcels"] if eo["parcels"] else None)
-        _print(extract(eo["source"], reference, eo["dir"], eo["year"], monthly=monthly, start=eo["start"],
-                       months=eo["months"], parcels=parcels, id_field=a.id_field or cfg["parcels"]["id_field"],
-                       checkpoint=eo["checkpoint"], mirror=eo["mirror"], index=eo["index"],
-                       resampling=eo["resampling"]))
+        if len(sources) > 1 and eo["checkpoint"]:
+            raise ConfigError("--checkpoint applies to one source; run the sources one at a time")
+        results = [extract(src, reference, eo["dir"], eo["year"], monthly=monthly, start=eo["start"],
+                           months=eo["months"], parcels=parcels, id_field=a.id_field or cfg["parcels"]["id_field"],
+                           checkpoint=eo["checkpoint"], mirror=eo["mirror"], index=eo["index"],
+                           resampling=eo["resampling"], namespace=embedding_namespace(eo),
+                           allow_license=eo["allow_license"]) for src in sources]
+        _print(results[0] if len(results) == 1 else results)
     elif c == "signatures":
         from datetime import date
 

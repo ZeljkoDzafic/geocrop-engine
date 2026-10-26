@@ -36,6 +36,9 @@ LAYERS: dict[str, frozenset[str]] = {
         "calendars",     # data-driven crop calendars and phenological windows
         "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
+        "feature_providers",  # foundation-model feature-provider protocol + built-in providers (no network)
+        "galileo_encoder",    # Galileo encoder port (torch, optional)
+        "anysat_encoder",     # AnySat encoder port (torch, optional)
         "temporal_quality",  # observed vs interpolated support, temporal-support routing rules
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
