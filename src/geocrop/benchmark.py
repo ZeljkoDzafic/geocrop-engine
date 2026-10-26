@@ -20,7 +20,12 @@ import pandas as pd
 import sklearn
 
 from . import metrics
-from .estimators import available_algorithms, channels_from_names, make_estimator, predict_labels
+from .estimators import (
+    available_algorithms,
+    make_estimator,
+    predict_labels,
+    sequence_params,
+)
 from .model import _fold_plan, cross_validate, selection_samples, spatial_blocks
 from .samples import Samples
 
@@ -95,8 +100,7 @@ def run(samples: Samples, output_dir: str | Path,
         params = dict(raw)
         started = time.perf_counter()
         try:
-            if params.get("algorithm") == "tempcnn" and "n_channels" not in params:
-                params["n_channels"] = channels_from_names(samples.features)
+            params = sequence_params(params, samples.features)
             cv = cross_validate(samples.X, samples.y, samples.polygon, groups, params, n_splits, seed,
                                 coordinates=spatial["coordinates"], crs=samples.crs,
                                 spatial_buffer_m=spatial_buffer_m)
@@ -148,8 +152,30 @@ DEFAULT_MODELS = {
     "catboost": {"algorithm": "catboost", "n_estimators": 500, "max_depth": 6, "class_weight": "balanced"},
 }
 
+#: Temporal deep models (need `ts` features only; torch). Not in the default comparison; select by name.
+SEQUENCE_MODELS = {
+    "tempcnn": {"algorithm": "tempcnn", "epochs": 60, "patience": 10},
+    "ltae": {"algorithm": "ltae", "epochs": 100, "patience": 10},
+}
+
+
+def candidate(name: str) -> dict:
+    """Default settings for a model name: built-in defaults, temporal models, else any registered algorithm."""
+    if name in DEFAULT_MODELS:
+        return dict(DEFAULT_MODELS[name])
+    if name in SEQUENCE_MODELS:
+        return dict(SEQUENCE_MODELS[name])
+    if name in available_algorithms():
+        return {"algorithm": name}
+    raise ValueError(f"Unknown model {name!r}; choose from {available_algorithms()}")
+
 
 def _available(params: dict) -> str | None:
+    import importlib.util
+
+    from .estimators import SEQUENCE_ALGORITHMS
+    if params.get("algorithm") in SEQUENCE_ALGORITHMS and importlib.util.find_spec("torch") is None:
+        return "pip install torch"
     try:
         make_estimator(params, 0)
         return None
@@ -180,7 +206,13 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                "spatial_buffer_m": spatial_buffer_m}
     hold = test is not None
     rows, details, reference = [], {}, {}
+    names = features or samples.features
     for name, params in candidates.items():
+        try:
+            params = sequence_params(params, names)
+        except ValueError as exc:      # e.g. a temporal model on non-`ts` features
+            rows.append({"model": name, "status": f"skipped: {exc}"})
+            continue
         missing = _available(params)
         if missing:
             rows.append({"model": name, "status": f"skipped: {missing}"})

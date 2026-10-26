@@ -33,6 +33,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "indices", "metrics", "model", "parcels", "plugins", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
+        "parcel_classify", "temporal_models",
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
     ADAPTERS: frozenset({
