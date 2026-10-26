@@ -120,6 +120,36 @@ DEFAULTS: dict[str, Any] = {
         "window_px": 1,
         "bootstrap": 1000,
     },
+    # Optional openEO back-end (geocrop openeo-extract / openeo-graph); local processing stays the default.
+    "openeo": {
+        "url": "https://openeo.dataspace.copernicus.eu",
+        "products": ["s2_composites"],
+        "s2_collection": "SENTINEL2_L2A",
+        "s1_collection": "SENTINEL1_GRD",
+        "s1_coefficient": "sigma0-ellipsoid",
+        "s1_card4l": False,
+        "max_cloud_cover": None,
+        "signature_indices": ["NDVI", "BSI"],
+        "start": None,
+        "end": None,
+        "job_options": None,
+        "work_dir": "data/openeo",
+    },
+    # Machine protection: free-space guard before heavy stages (see docs/preflight.md).
+    "resources": {
+        "disk_guard": True,
+        "min_free_gb": 5.0,
+        "safety_factor": 1.25,
+        "compression_ratio": 0.8,
+    },
+    # Thresholds for `geocrop preflight` (warnings only; hard blockers are fixed by the pipeline's own rules).
+    "preflight": {
+        "min_s2_scenes_per_window": 3,
+        "min_s1_scenes_per_window": 2,
+        "max_unobserved_fraction": 0.05,
+        "coverage_max_px": 512,
+        "inventories": [],
+    },
 }
 
 
@@ -210,10 +240,40 @@ def validate(cfg: dict) -> dict:
     k = sm["smoothness"]
     if isinstance(k, bool) or not isinstance(k, (int, float)) or not math.isfinite(k) or k <= 0:
         raise ConfigError("predict.smoothing.smoothness must be a positive number")
+    o = cfg["openeo"]
+    unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
+    if unknown:
+        raise ConfigError(f"Unknown openeo.products {unknown}")
+    if o["s1_coefficient"] not in ("sigma0-ellipsoid", "gamma0-terrain"):
+        raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
+    _validate_resources(cfg["resources"], cfg["preflight"])
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
     return cfg
+
+
+def _number(value) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _validate_resources(r: dict, p: dict) -> None:
+    if not isinstance(r["disk_guard"], bool):
+        raise ConfigError("resources.disk_guard must be true or false")
+    if not _number(r["min_free_gb"]) or r["min_free_gb"] < 0:
+        raise ConfigError("resources.min_free_gb must be a finite nonnegative number of gigabytes")
+    if not _number(r["safety_factor"]) or r["safety_factor"] < 1:
+        raise ConfigError("resources.safety_factor must be a finite number >= 1")
+    if not _number(r["compression_ratio"]) or not 0 < r["compression_ratio"] <= 1:
+        raise ConfigError("resources.compression_ratio must be in (0, 1]")
+    for key in ("min_s2_scenes_per_window", "min_s1_scenes_per_window", "coverage_max_px"):
+        if isinstance(p[key], bool) or not isinstance(p[key], int) or p[key] < (16 if key == "coverage_max_px" else 0):
+            raise ConfigError(f"preflight.{key} must be a nonnegative integer" +
+                              (" of at least 16" if key == "coverage_max_px" else ""))
+    if not _number(p["max_unobserved_fraction"]) or not 0 <= p["max_unobserved_fraction"] <= 1:
+        raise ConfigError("preflight.max_unobserved_fraction must be in [0, 1]")
+    if not isinstance(p["inventories"], list) or not all(isinstance(x, str) for x in p["inventories"]):
+        raise ConfigError("preflight.inventories must be a list of CSV paths")
 
 
 def load(path: str | Path | None = None, overrides: dict | None = None) -> dict:

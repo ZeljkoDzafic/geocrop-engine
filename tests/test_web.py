@@ -39,6 +39,9 @@ def test_authentication_static_ui_origin_and_schema(client):
     assert page.status_code == 200 and "CLI console" in page.text and "id=\"map\"" in page.text
     assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
     assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/theme.js").status_code == 200
+    # strict CSP: no inline scripts or handlers; the terminal component mounts into an empty root
+    assert '<div id="terminal-root"></div>' in page.text and "<script>" not in page.text and " onclick=" not in page.text
     assert client.get("/api/health").status_code == 401
     assert client.post("/api/jobs", json={"argv": ["indices"]}).status_code == 401
     assert client.get("/api/health", headers=AUTH).json()["workers"] == 1
