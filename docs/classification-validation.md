@@ -86,14 +86,17 @@ runner does not establish accuracy or speed superiority over other software. See
 
 ## Prediction
 Block-wise (`512 × 512` default). Outputs: class index (`uint8`), per-class probabilities, and an
-uncertainty raster with maximum probability, top-2 margin and normalised entropy (`H / ln K`). Random Forest
-probabilities are vote fractions, **not calibrated** confidences; check the reliability bins reported in
-training and validation before interpreting them as probabilities.
+uncertainty raster with maximum probability, top-2 margin and normalised entropy (`H / ln K`). Raw Random Forest
+probabilities are vote fractions, not calibrated confidences. With `model.calibrate: true` (default) `predict`
+writes temperature-scaled probabilities ([uncertainty](uncertainty.md)); the scaling is fitted on the training
+domain only, so check the reliability bins reported in training and validation before interpreting them as
+probabilities.
 
 ## Experiments
 `geocrop ablation` evaluates each feature subset on the *same* samples and folds and adds a McNemar test
 against the first experiment (out-of-fold predictions; pixels are autocorrelated, so treat p-values as
-indicative and confirm with point- or parcel-level comparisons). Default ladder:
+indicative and confirm with point- or parcel-level comparisons). Default ladder (`experiments.DEFAULT_EXPERIMENTS`,
+used when the configuration has no `experiments:` section):
 
 | ID | Features |
 |---|---|
@@ -101,8 +104,11 @@ indicative and confirm with point- or parcel-level comparisons). Default ladder:
 | E1 | + spectral indices |
 | E2 | + temporal deltas and seasonal statistics |
 | E3 | Sentinel-1 only |
-| E4 | Sentinel-1 + Sentinel-2 (all groups) |
-| E5/E6 | fusion restricted to early windows (P1–P2, P1–P3) — earliest reliable identification |
+| E4 | Sentinel-1 + Sentinel-2 (all window groups) |
+| E5–E7 | only when the stack has an `emb` group: handcrafted only, embeddings only, both ([embeddings](embeddings.md)) |
+
+Study-specific rows go in the YAML `experiments:` section; for example [`configs/rs_north_2023.yaml`](../configs/rs_north_2023.yaml)
+adds fusion restricted to early windows (P1–P2, P1–P3) for the earliest reliable identification.
 
 `geocrop reduce-features` produces an accuracy-vs-number-of-features curve (recursive elimination by
 impurity importance), and `geocrop.experiments.group_importance` gives permute-and-retrain importance per

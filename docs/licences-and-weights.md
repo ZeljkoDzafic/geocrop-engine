@@ -26,7 +26,7 @@ same day (`--only galileo`, `--only anysat`, `--only omnicloudmask`): all match.
 
 | Model | Pin (engine) | URL | Bytes | SHA-256 matches | Licence (source consulted) | Attribution recorded |
 |---|---|---|---|---|---|---|
-| FTW `FTW_PRUE_EFNET_B3_CCBY` (default) | `geocrop.ftw.MODELS` | `github.com/fieldsoftheworld/ftw-baselines/releases/download/v3.1/prue_efnetb3_ccby_checkpoint.ckpt` | 53,242,827 | yes | CC-BY-4.0 checkpoint (trained on CC-BY/CC0 data only); code MIT ([repo](https://github.com/fieldsoftheworld/ftw-baselines), README "CC-BY vs. the full model") | `ftw_summary.json` (`licence`, `citation`) written by `ftw.predict`; CLI prints licence + citation to stderr (`cli.py`, FTW block) |
+| FTW `FTW_PRUE_EFNET_B3_CCBY` (default) | `geocrop.ftw.MODELS` | `github.com/fieldsoftheworld/ftw-baselines/releases/download/v3.1/prue_efnetb3_ccby_checkpoint.ckpt` | 53,242,827 | yes | CC-BY-4.0 checkpoint (trained on CC-BY/CC0 data only); code MIT ([repo](https://github.com/fieldsoftheworld/ftw-baselines), README "CC-BY vs. the full model") | `ftw_summary.json` (`licence`, `citation`) written by `ftw.segment`; CLI prints licence + citation to stderr (`cli.py`, FTW block) |
 | FTW `FTW_PRUE_EFNET_B5_CCBY` | same | `.../v3.1/prue_efnetb5_ccby_checkpoint.ckpt` | 125,921,939 | yes | CC-BY-4.0 | same |
 | FTW `FTW_PRUE_EFNET_B7_CCBY` | same | `.../v3.1/prue_efnetb7_ccby_checkpoint.ckpt` | 270,127,109 | yes | CC-BY-4.0 | same |
 | FTW `FTW_v1_3_Class_CCBY` | same | `.../v1/3_Class_CCBY_FTW_Pretrained.ckpt` | 204,471,122 | yes | CC-BY-4.0 | same |
@@ -47,6 +47,7 @@ HTTP status = cheap request (STAC landing page, 1 KiB range request or one tile)
 | Item | Engine reference | Pin | Status 2026-10-26 | Licence (source consulted) | Attribution requirement | Where the engine records it |
 |---|---|---|---|---|---|---|
 | EuroCrops `SI_2021.zip` (Zenodo 14094196) | `public_data.eurocrops_*`, `configs/benchmarks/eurocrops_si_2021_pomurje.v1.yaml` | md5 in protocol | 200; downloaded 213,298,853 B, **md5 matches** | CC-BY-SA-4.0 (Zenodo API `metadata.license`) | cite Schneider et al. 2023; ShareAlike for derived labels | benchmark results JSON/Markdown `dataset.licence` + `citation` (`public_benchmark.py`); `public_data.EUROCROPS_CITATION` |
+| MKGP KMRS 2025 crop declarations (`KMRS_2025.zip`, Slovenia) | `public_data.url_layer`, `configs/benchmarks/si_transfer_pomurje.v1.yaml` (`sources:`) | SHA-256 in protocol | downloaded and checksum-verified in the transfer run of 2026-10-26 ([result](benchmarks/si-transfer-pomurje.v1.md)); only the current campaign file is online, so the pin breaks when the Ministry replaces it | open data, "citation of the source mandatory" (MKGP metadata record) | cite MKGP KMRS 2025 | transfer results JSON/Markdown label sources (`public_transfer.py`) |
 | HCAT3 mapping tables (`configs/hcat/*.csv`) | `hcat.py` | - | (vendored) | CC-BY-SA-4.0, derived from EuroCrops `HCAT3.csv` | attribution + ShareAlike | `configs/hcat/LICENSE-HCAT.md` (vendored data, see findings) |
 | WorldCereal crop calendars (PANGAEA 946550, 4 GeoTIFFs) | `public_data.WORLDCEREAL_*`, `calendars.py` | SHA-256 | 200 (no tape staging needed); all 4 downloaded (826 KB each), **SHA-256 match** | CC-BY-SA-4.0 (PANGAEA JSON-LD `license`) | cite Cintas/Franch et al. 2022; ShareAlike | `source` field of `geocrop calendar worldcereal` output (`cli._calendar`, `WORLDCEREAL_CITATION`) |
 | AlphaEarth Satellite Embedding V1 (Source Cooperative `tge-labs/aef`, mirror GCS) | `embedding_sources.AEF_MIRRORS` | **unpinned by design**: the index `aef_index.parquet` (77,829,744 B) is a mutable file that the provider extends with every new year, and tiles are read as COG windows (range requests), so no whole-file checksum applies; the download itself uses retry/resume | 206 both mirrors | CC-BY-4.0 (`data.source.coop/tge-labs/aef/README.md`) | fixed text "The AlphaEarth Foundations Satellite Embedding dataset is produced by Google and Google DeepMind." | GeoTIFF tags `licence`, `attribution` (`embeddings.SOURCE_INFO`, sink `update_tags`) |
@@ -107,7 +108,9 @@ Raw output: `pip_licenses.json` (path in [How to reproduce](#how-to-reproduce)).
 Status after the gate-findings fixes (2026-10-26):
 
 1. **No checksum mismatches and no unreachable pinned URLs** (20 pinned files: 9 FTW, 1 Presto, 2 Galileo,
-   1 AnySat, 2 OmniCloudMask, 4 WorldCereal, 1 EuroCrops).
+   1 AnySat, 2 OmniCloudMask, 4 WorldCereal, 1 EuroCrops). The KMRS 2025 file of the transfer protocol is pinned
+   by SHA-256 too but is listed under the protocol's `sources:` key, which `tools/check_weights.py` does not read
+   yet; it was verified by the transfer run itself.
 2. Fixed: **Copernicus attribution** is now written where Sentinel data enter (Earth Search, CDSE SAFE, SNAP,
    Planetary Computer, openEO) and carried through composites, stacks and predictions into COG exports and STAC
    items (see the table). Synthetic demo data carry no such tag. Not covered: external cubes loaded through

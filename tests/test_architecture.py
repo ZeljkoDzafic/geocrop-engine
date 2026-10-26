@@ -5,6 +5,7 @@ The layer map lives in `geocrop._layers`; see docs/adr/0001-layered-architecture
 from __future__ import annotations
 
 import ast
+import importlib.util
 import os
 import subprocess
 import sys
@@ -132,7 +133,10 @@ def test_exceptions_are_lazy_and_still_needed():
 
 def test_core_import_pulls_in_no_network_library():
     """Transitive check at runtime: importing all of core loads no network or web framework."""
-    core = sorted(_layers.LAYERS[_layers.CORE] - {"unet"})  # unet needs torch (optional extra)
+    # unet and the encoder ports import torch at module level (optional `deep` extra)
+    needs_torch = {"unet", "presto_encoder", "galileo_encoder", "anysat_encoder"}
+    skip = {"unet"} if importlib.util.find_spec("torch") else needs_torch
+    core = sorted(_layers.LAYERS[_layers.CORE] - skip)
     code = ("import sys\n" + "".join(f"import geocrop.{m}\n" for m in core) +
             f"bad = sorted(m for m in {sorted(_layers.NETWORK_LIBRARIES)!r} if m in sys.modules)\n"
             "print(','.join(bad))\n")
