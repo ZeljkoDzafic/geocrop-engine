@@ -415,6 +415,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--out", required=True, help=".csv or .parquet")
     x.add_argument("--indices", nargs="*", default=["NDVI", "BSI"])
     x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--moments", action="store_true", help="add skewness and bimodality (homogeneity marker)")
 
     x = cmd("markers", "Phenology, harvest and bare-soil markers from parcel signatures")
     x.add_argument("--signatures", required=True)
@@ -502,6 +503,31 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--config")
     x.add_argument("--inputs", nargs="*", default=[])
     x.add_argument("--snap-gpt")
+
+    # --- CbM event markers (Sentinel-1 + Sentinel-2) --------------------------------------------------
+    x = cmd("s1-signatures", "Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry")
+    x.add_argument("--scenes", required=True, help="root of S1 scene folders (VV.tif, VH.tif, scene.json)")
+    x.add_argument("--parcels", required=True)
+    x.add_argument("--reference", required=True)
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help=".csv or .parquet")
+    x.add_argument("--id-field", default="parcel_id")
+    x = cmd("event-markers", "Harvest, tillage, mowing, homogeneity and data-sufficiency markers (S2 + S1)")
+    x.add_argument("--signatures", help="S2 signatures (geocrop signatures, ideally with --moments)")
+    x.add_argument("--s1-signatures", help="S1 signatures (geocrop s1-signatures)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--config", help="use the cbm.events section of a config")
+    x = cmd("traffic-light", "Re-evaluate the traffic light of a parcels layer with marker rules and reason codes")
+    x.add_argument("--parcels", required=True, help="parcels.gpkg from geocrop parcels")
+    x.add_argument("--markers", required=True, help="event markers CSV from geocrop event-markers")
+    x.add_argument("--config", help="cbm.rules section (applied even when rules.enabled is false)")
+    x.add_argument("--rules", type=_json_arg, help="JSON rules overriding the config, e.g. "
+                   "'{\"harvest_expected_classes\": [\"maize\"]}'")
+    x.add_argument("--out", required=True, help=".gpkg (a .csv is written alongside)")
+    x.add_argument("--id-field", default="parcel_id")
 
     # --- transfer validation and probability smoothing (G8, G15) ---
     x = cmd("samples-merge", "Combine per-season sample files into one multi-year sample store")
@@ -917,7 +943,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
 
         from .cbm import parcel_signatures
         t = parcel_signatures(a.scenes, a.parcels, a.reference, a.out, date.fromisoformat(a.start),
-                              date.fromisoformat(a.end), a.indices, a.id_field)
+                              date.fromisoformat(a.end), a.indices, a.id_field, moments=a.moments)
         _print({"rows": len(t), "parcels": int(t.parcel_id.nunique()), "out": a.out})
     elif c == "markers":
         from datetime import date
@@ -987,6 +1013,69 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             from .config import load
             cfg = load(a.config)
         print(run_manifest(a.out, cfg, a.inputs, a.snap_gpt))
+    elif c == "s1-signatures":
+        from datetime import date
+
+        from .cbm import s1_signatures
+        t = s1_signatures(a.scenes, a.parcels, a.reference, a.out, date.fromisoformat(a.start),
+                          date.fromisoformat(a.end), a.id_field)
+        _print({"rows": len(t), "parcels": int(t.parcel_id.nunique()), "acquisitions": int(t.date.nunique()),
+                "out": a.out})
+    elif c == "event-markers":
+        from datetime import date
+
+        import pandas as pd
+
+        from .cbm_markers import event_markers
+
+        def _table(path):
+            return None if not path else pd.read_parquet(path) if path.endswith(".parquet") else pd.read_csv(path)
+        if not (a.signatures or a.s1_signatures):
+            raise SystemExit("event-markers needs --signatures and/or --s1-signatures")
+        params = None
+        if a.config:
+            from .config import load
+            params = load(a.config)["cbm"]["events"]
+        m = event_markers(_table(a.signatures), date.fromisoformat(a.start), date.fromisoformat(a.end),
+                          _table(a.s1_signatures), params)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        m.to_csv(a.out, index=False)
+        _print({"parcels": len(m), "harvest_detected": int(m.harvest_detected.sum()),
+                "tillage_detected": int(m.tillage_detected.sum()), "mowing_events": int(m.mowing_events.sum()),
+                "heterogeneous": int((m.homogeneity == "heterogeneous").sum()),
+                "data_sufficiency": m.data_sufficiency.value_counts().to_dict(), "out": a.out})
+    elif c == "traffic-light":
+        from collections import Counter
+
+        import geopandas as gpd
+        import pandas as pd
+
+        from .cbm import traffic_light_details
+        from .cbm_markers import EVENT_COLUMNS
+        rules = {}
+        if a.config:
+            from .config import load
+            rules = load(a.config)["cbm"]["rules"]
+        rules = {**rules, **(a.rules or {}), "enabled": True}
+        gdf = gpd.read_file(a.parcels)
+        mk = pd.read_csv(a.markers, dtype={"parcel_id": str}).set_index("parcel_id")
+        mk = mk.reindex(gdf[a.id_field].astype(str))
+        for col in EVENT_COLUMNS:
+            if col in mk:
+                gdf[col] = mk[col].to_numpy()
+        details = traffic_light_details(gdf, rules)
+        gdf["traffic_light"] = details["traffic_light"].to_numpy()
+        gdf["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
+        out = Path(a.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.unlink(missing_ok=True)
+        gdf.to_file(out, driver="GPKG" if out.suffix.lower() == ".gpkg" else "GeoJSON")
+        gdf.drop(columns=gdf.geometry.name).to_csv(out.with_suffix(".csv"), index=False)
+        _print({"traffic_light_counts": gdf.traffic_light.value_counts().to_dict(),
+                "reason_counts": dict(sorted(Counter(code for codes in gdf.traffic_light_reasons
+                                                     for code in codes.split(";") if code).items())),
+                "out": str(out)})
+
     elif c == "samples-merge":
         from .samples import Samples, combine
         manifests = None

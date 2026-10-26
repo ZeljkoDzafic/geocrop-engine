@@ -606,6 +606,7 @@ Parcel-mean time series (CbM signatures) from S2 scene folders
 | `--out` | yes |  | .csv or .parquet |
 | `--indices` |  | `['NDVI', 'BSI']` |  |
 | `--id-field` |  | `parcel_id` |  |
+| `--moments` |  |  | add skewness and bimodality (homogeneity marker) |
 
 ## `geocrop markers`
 
@@ -736,6 +737,46 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--config` |  |  |  |
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
+
+## `geocrop s1-signatures`
+
+Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  | root of S1 scene folders (VV.tif, VH.tif, scene.json) |
+| `--parcels` | yes |  |  |
+| `--reference` | yes |  |  |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | .csv or .parquet |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop event-markers`
+
+Harvest, tillage, mowing, homogeneity and data-sufficiency markers (S2 + S1)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` |  |  | S2 signatures (geocrop signatures, ideally with --moments) |
+| `--s1-signatures` |  |  | S1 signatures (geocrop s1-signatures) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--config` |  |  | use the cbm.events section of a config |
+
+## `geocrop traffic-light`
+
+Re-evaluate the traffic light of a parcels layer with marker rules and reason codes
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | parcels.gpkg from geocrop parcels |
+| `--markers` | yes |  | event markers CSV from geocrop event-markers |
+| `--config` |  |  | cbm.rules section (applied even when rules.enabled is false) |
+| `--rules` |  |  | JSON rules overriding the config, e.g. '{"harvest_expected_classes": ["maize"]}' |
+| `--out` | yes |  | .gpkg (a .csv is written alongside) |
+| `--id-field` |  | `parcel_id` |  |
 
 ## `geocrop samples-merge`
 
