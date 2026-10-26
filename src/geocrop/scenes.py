@@ -1,7 +1,7 @@
 """Scene metadata (`scene.json`) and assignment of scenes to phenological windows.
 
 Every imported scene folder carries a small `scene.json` sidecar:
-    {"sensor": "S2"|"S1", "datetime": ISO-8601, ...optional tile/orbit fields}
+    {"schema_version": 1, "sensor": "S2"|"S1", "datetime": ISO-8601, ...optional tile/orbit fields}
 so that compositing never has to guess acquisition dates from file names.
 """
 from __future__ import annotations
@@ -10,6 +10,8 @@ import json
 import re
 from datetime import date, datetime
 from pathlib import Path
+
+from . import contracts
 
 SIDE_CAR = "scene.json"
 _S2_NAME = re.compile(r"MSIL2A_(\d{8}T\d{6})_N\d{4}_R(\d{3})_T(\w{5})")
@@ -36,7 +38,7 @@ def write(folder: str | Path, **meta) -> Path:
     if "datetime" not in meta or "sensor" not in meta:
         raise ValueError("scene metadata needs sensor and datetime")
     path = Path(folder) / SIDE_CAR
-    path.write_text(json.dumps(meta, indent=2, default=str), encoding="utf8")
+    path.write_text(json.dumps(contracts.stamp("scene", meta), indent=2, default=str), encoding="utf8")
     return path
 
 
@@ -44,7 +46,7 @@ def read(folder: str | Path) -> dict:
     path = Path(folder) / SIDE_CAR
     if not path.is_file():
         raise FileNotFoundError(f"{folder} has no {SIDE_CAR}; import scenes with geocrop s2-import / s1-import")
-    meta = json.loads(path.read_text(encoding="utf8"))
+    meta = contracts.check("scene", json.loads(path.read_text(encoding="utf8")), path)
     meta["date"] = datetime.fromisoformat(str(meta["datetime"]).replace("Z", "+00:00")).date()
     meta["path"] = Path(folder)
     return meta

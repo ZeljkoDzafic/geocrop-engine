@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geocrop-plugin-example"
+version = "0.1.0"
+description = "Example GeoCrop Engine plugin: a classifier, a spectral index and a segmenter"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = ["geocrop-engine>=0.9"]
+
+# The entry-point name is what users write in configuration, e.g. `model: {algorithm: nearest_centroid}`.
+[project.entry-points."geocrop.estimators"]
+nearest_centroid = "geocrop_plugin_example:make_nearest_centroid"
+
+[project.entry-points."geocrop.indices"]
+NDTI = "geocrop_plugin_example:NDTI"
+
+[project.entry-points."geocrop.segmenters"]
+grid = "geocrop_plugin_example:GridSegmenter"
+
+[tool.setuptools.packages.find]
+where = ["src"]

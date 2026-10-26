@@ -20,7 +20,7 @@ import pandas as pd
 import sklearn
 
 from . import metrics
-from .estimators import ALGORITHMS, channels_from_names, make_estimator
+from .estimators import available_algorithms, channels_from_names, make_estimator
 from .model import _fold_plan, cross_validate, selection_samples, spatial_blocks
 from .samples import Samples
 
@@ -70,7 +70,7 @@ def run(samples: Samples, output_dir: str | Path,
     for name, params in candidates.items():
         if not isinstance(name, str) or not name.strip() or not isinstance(params, dict):
             raise ValueError("Candidates must map nonempty names to estimator parameter dictionaries")
-        if params.get("algorithm", "rf") not in ALGORITHMS:
+        if params.get("algorithm", "rf") not in available_algorithms():
             raise ValueError(f"Unknown algorithm in candidate {name!r}")
     from .model import split_final_holdout
 
@@ -271,23 +271,32 @@ def rasterize_boundaries(parcels: gpd.GeoDataFrame, like: str | Path) -> np.ndar
 
 def segmentation(raster: str | Path, reference: str | Path, output_dir: str | Path, bands=None,
                  unet_model: str | Path | None = None, unet_bands=None, tile_size: int = 1024,
-                 segments_per_km2: float = 50, tolerance_px: int = 1, iou_threshold: float = 0.5) -> pd.DataFrame:
-    from .segmentation import boundaries_to_parcels, obia, unet_infer
+                 segments_per_km2: float = 50, tolerance_px: int = 1, iou_threshold: float = 0.5,
+                 methods: dict[str, dict] | None = None) -> pd.DataFrame:
+    """Score segmenters from the registry (`geocrop.segmenters`) against reference parcels.
+
+    Default methods: OBIA with and without seam merging, plus U-Net + watershed when `unet_model` is given.
+    `methods` adds (or overrides) entries ``{label: {"segmenter": <registered name>, **params}}``, e.g. a
+    plugin segmenter, so new algorithms are benchmarked on identical metrics without code changes.
+    """
+    from . import segmenters
     from .segmentation_metrics import boundary_scores, object_scores
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     ref = gpd.read_file(reference)
     ref_mask = rasterize_boundaries(ref, raster)
-    methods = {
-        "obia_tiles": lambda p: obia(raster, p, bands, tile_size, segments_per_km2, merge_seams=False),
-        "obia_seam_merged": lambda p: obia(raster, p, bands, tile_size, segments_per_km2, merge_seams=True),
-    }
+    obia = {"segmenter": "obia", "bands": bands, "tile_size": tile_size, "segments_per_km2": segments_per_km2}
+    specs = {"obia_tiles": {**obia, "merge_seams": False}, "obia_seam_merged": {**obia, "merge_seams": True}}
     if unet_model:
-        def unet(p):
-            prob = unet_infer(raster, unet_model, out / "unet_boundary.tif", bands=unet_bands)
-            return boundaries_to_parcels(prob, p)
-        methods["unet_watershed"] = unet
+        specs["unet_watershed"] = {"segmenter": "unet_watershed", "model": unet_model, "bands": unet_bands,
+                                   "boundary_output": out / "unet_boundary.tif"}
+    specs.update(methods or {})
+    methods = {}
+    for label, spec in specs.items():
+        params = dict(spec)
+        segmenter = segmenters.get(params.pop("segmenter"))
+        methods[label] = lambda p, s=segmenter, kw=params: s.segment(raster, p, **kw)
     rows = []
     for name, run in methods.items():
         path = out / f"{name}.gpkg"
