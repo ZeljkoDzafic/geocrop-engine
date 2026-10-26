@@ -2,6 +2,9 @@
 
 ## Unreleased
 ### Added
+- Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
+  fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
+  real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
 - `geocrop active-learning select|ingest|simulate` (`geocrop.active_learning`, gap G9): batch selection among
   top-uncertain parcels with k-center diversity in standardised feature space, per-predicted-class quotas,
   minimum spacing and trip grouping; ingestion of field/analyst labels with per-round provenance, conflict
