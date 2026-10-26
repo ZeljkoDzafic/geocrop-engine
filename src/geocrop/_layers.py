@@ -39,6 +39,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "feature_providers",  # foundation-model feature-provider protocol + built-in providers (no network)
         "galileo_encoder",    # Galileo encoder port (torch, optional)
         "anysat_encoder",     # AnySat encoder port (torch, optional)
+        "temporal_quality",  # observed vs interpolated support, temporal-support routing rules
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
     ADAPTERS: frozenset({
@@ -61,6 +62,7 @@ LAYERS: dict[str, frozenset[str]] = {
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
+        "evidence",      # per-parcel evidence packages (JSON + HTML + PNG) and batch index
         "registry",      # local file-based model and benchmark registry
     }),
     # Entry points. Nothing below this layer may import it.

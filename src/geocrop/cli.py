@@ -453,6 +453,10 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--envelope", type=int, default=0, help="upper-envelope iterations")
     x.add_argument("--min-observed-fraction", type=float, default=0, help="minimum occupied temporal-bin fraction")
     x.add_argument("--max-gap-days", type=float, help="maximum consecutive empty-bin duration, including edges")
+    x.add_argument("--temporal-support", action="store_true",
+                   help="also write <out>_temporal_support.tif: observed vs interpolated support per pixel")
+    x.add_argument("--support-tolerance-days", type=float, default=10,
+                   help="a value farther than this from a clear acquisition counts as interpolated")
 
     x = cmd("merge-stacks", "Concatenate feature stacks on one grid")
     x.add_argument("--stacks", nargs="+", required=True)
@@ -735,6 +739,41 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
     x.add_argument("--out", help="output directory; default <openeo.work_dir>/graphs")
     x.add_argument("--stdout", action="store_true", help="print the openEO process objects as one JSON document")
+
+    # --- temporal quality and parcel evidence packages (observed vs interpolated, audit trail) ---
+    x = cmd("temporal-support", "Per-parcel temporal support (observed vs interpolated) from signatures; "
+                                "optionally route a parcels layer with cbm.temporal_support rules")
+    x.add_argument("--signatures", required=True, help="S2 signatures CSV/Parquet (geocrop signatures)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help="per-parcel support CSV (tq_* columns)")
+    x.add_argument("--markers", help="markers CSV (adds the harvest-date distance)")
+    x.add_argument("--config", help="use the cbm.temporal_support (and cbm.rules) sections of a config")
+    x.add_argument("--params", type=_json_arg, help='JSON overrides of cbm.temporal_support, e.g. '
+                   '\'{"tolerance_days": 8, "max_gap_at_peak_days": 25}\'')
+    x.add_argument("--parcels", help="parcels.gpkg to re-evaluate (rules applied even when enabled is false)")
+    x.add_argument("--routed", help="output .gpkg of the re-evaluated parcels layer (with --parcels)")
+    x.add_argument("--id-field", default="parcel_id")
+    x = cmd("evidence", "Per-parcel evidence packages (JSON + HTML + PNG) with every rule, data source and "
+                        "model reference, plus a batch index")
+    x.add_argument("--parcels", required=True, help="parcel decision table (.gpkg/.csv from parcels or "
+                                                    "parcel-classify)")
+    x.add_argument("--out", required=True, help="output directory")
+    x.add_argument("--ids", nargs="*", help="parcel ids to package (default: all)")
+    x.add_argument("--signatures", help="S2 signatures CSV/Parquet: series, observed/rejected acquisitions")
+    x.add_argument("--start", help="season start (default: timeseries.start of --config)")
+    x.add_argument("--end", help="season end (default: timeseries.end of --config)")
+    x.add_argument("--markers", help="markers or event-markers CSV")
+    x.add_argument("--temporal-support", help="per-parcel support CSV (default: computed from --signatures)")
+    x.add_argument("--config", help="cbm.rules and cbm.temporal_support settings (applied when enabled)")
+    x.add_argument("--marker-rules", type=_json_arg, help="JSON cbm.rules overrides")
+    x.add_argument("--temporal-rules", type=_json_arg, help="JSON cbm.temporal_support overrides")
+    x.add_argument("--model", help="model directory or model.joblib (sha256 recorded)")
+    x.add_argument("--run-manifest", help="run_manifest.json to reference (geocrop manifest)")
+    x.add_argument("--scenes", help="scene root: resolve acquisition dates to scene ids")
+    x.add_argument("--summary", help="parcels summary JSON (default <parcels>.summary.json)")
+    x.add_argument("--id-field", help="parcel id column (default parcels.id_field of --config or parcel_id)")
+    x.add_argument("--no-png", action="store_true", help="skip the PNG chart (HTML keeps an inline SVG chart)")
 
     # --- external data cubes (xarray / Zarr / NetCDF, optional odc-stac): load | import | export ---
     x = cmd("cube", "External data cubes: load S2 via odc-stac, import xarray/Zarr/NetCDF cubes into scene or "
@@ -1283,7 +1322,9 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .tsfeatures import build_timeseries_stack
         print(build_timeseries_stack(a.scenes, a.reference, a.out, date.fromisoformat(a.start), date.fromisoformat(a.end),
                                      a.s2_indices, a.s1_indices, a.step_days, a.output_step_days, a.lam, a.envelope,
-                                     min_observed_fraction=a.min_observed_fraction, max_gap_days=a.max_gap_days))
+                                     min_observed_fraction=a.min_observed_fraction, max_gap_days=a.max_gap_days,
+                                     temporal_support=a.temporal_support,
+                                     support_tolerance_days=a.support_tolerance_days))
     elif c == "merge-stacks":
         from .tsfeatures import merge_stacks
         print(merge_stacks(a.stacks, a.out))
@@ -1545,6 +1586,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .experiments import smoothing_comparison
         r = smoothing_comparison(a.out, seed=a.seed, alpha=a.alpha)
         print(pd.DataFrame(r["rows"]).to_string(index=False))
+    elif c in ("temporal-support", "evidence"):
+        _evidence_cli(a)
     elif c in ("models", "benchmarks"):
         _registry_command(a)
     elif c in ("openeo-extract", "openeo-graph"):
@@ -1635,6 +1678,65 @@ def _cube(a):
             _print({"kind": a.kind, "out": str(path), "dims": dict(ds.sizes), "variables": list(ds.data_vars)})
     except (dc.CubeError, FileExistsError) as exc:
         raise SystemExit(str(exc)) from None
+
+
+def _evidence_cli(a):
+    """Dispatch of `temporal-support` and `evidence` (temporal quality, parcel audit trail)."""
+    from datetime import date
+
+    import pandas as pd
+
+    cfg = None
+    if a.config:
+        from .config import load
+        cfg = load(a.config)
+    if a.cmd == "temporal-support":
+        from collections import Counter
+
+        from . import temporal_quality as tq
+        params = {**(cfg["cbm"]["temporal_support"] if cfg else {}), **(a.params or {})}
+        sig = pd.read_parquet(a.signatures) if a.signatures.endswith(".parquet") else \
+            pd.read_csv(a.signatures, dtype={"parcel_id": str})
+        markers = pd.read_csv(a.markers, dtype={"parcel_id": str}) if a.markers else None
+        sup = tq.parcel_support(sig, date.fromisoformat(a.start), date.fromisoformat(a.end), params, markers)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        sup.to_csv(a.out, index=False)
+        result = {"parcels": len(sup), "out": a.out,
+                  "median_clear_observations": float(sup.tq_clear_observations.median()) if len(sup) else None,
+                  "parcels_with_interpolated_phenology": int((sup.tq_interpolated_phenology > 0).sum())}
+        if a.parcels:
+            import geopandas as gpd
+
+            from .cbm import traffic_light_details
+            if not a.routed:
+                raise SystemExit("--parcels needs --routed (output layer)")
+            gdf = gpd.read_file(a.parcels)
+            gdf = tq.attach(gdf, sup, a.id_field)
+            mrules = cfg["cbm"]["rules"] if cfg and cfg["cbm"]["rules"]["enabled"] else None
+            details = traffic_light_details(gdf, mrules, {**params, "enabled": True})
+            gdf["traffic_light"] = details["traffic_light"].to_numpy()
+            gdf["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
+            out = Path(a.routed)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.unlink(missing_ok=True)
+            gdf.to_file(out, driver="GPKG" if out.suffix.lower() == ".gpkg" else "GeoJSON")
+            gdf.drop(columns=gdf.geometry.name).to_csv(out.with_suffix(".csv"), index=False)
+            result.update({"routed": str(out), "traffic_light_counts": gdf.traffic_light.value_counts().to_dict(),
+                           "reason_counts": dict(sorted(Counter(code for codes in gdf.traffic_light_reasons
+                                                                for code in codes.split(";") if code).items()))})
+        _print(result)
+        return
+    from . import evidence
+    t = cfg["timeseries"] if cfg else {}
+    start = a.start or (str(t["start"]) if t.get("start") else None)
+    end = a.end or (str(t["end"]) if t.get("end") else None)
+    mrules = {**(cfg["cbm"]["rules"] if cfg else {}), **(a.marker_rules or {})}
+    trules = {**(cfg["cbm"]["temporal_support"] if cfg else {}), **(a.temporal_rules or {})}
+    id_field = a.id_field or (cfg["parcels"]["id_field"] if cfg else "parcel_id")
+    _print(evidence.build(
+        a.parcels, a.out, a.ids, a.signatures, date.fromisoformat(start) if start else None,
+        date.fromisoformat(end) if end else None, id_field, a.markers, a.temporal_support, mrules or None,
+        trules or None, a.model, a.run_manifest, a.scenes, a.summary, png=not a.no_png))
 
 
 def _parcel_classify(a):

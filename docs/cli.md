@@ -639,6 +639,8 @@ Time-series features (Whittaker, phenology, harmonics) from scene folders
 | `--envelope` |  |  | upper-envelope iterations |
 | `--min-observed-fraction` |  |  | minimum occupied temporal-bin fraction |
 | `--max-gap-days` |  |  | maximum consecutive empty-bin duration, including edges |
+| `--temporal-support` |  |  | also write <out>_temporal_support.tif: observed vs interpolated support per pixel |
+| `--support-tolerance-days` |  | `10` | a value farther than this from a clear acquisition counts as interpolated |
 
 ## `geocrop merge-stacks`
 
@@ -1032,6 +1034,47 @@ Export the configured GeoCrop recipe as openEO process graphs (no credentials ne
 | `--products` |  |  | default: openeo.products of the config |
 | `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
 | `--stdout` |  |  | print the openEO process objects as one JSON document |
+
+## `geocrop temporal-support`
+
+Per-parcel temporal support (observed vs interpolated) from signatures; optionally route a parcels layer with cbm.temporal_support rules
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` | yes |  | S2 signatures CSV/Parquet (geocrop signatures) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | per-parcel support CSV (tq_* columns) |
+| `--markers` |  |  | markers CSV (adds the harvest-date distance) |
+| `--config` |  |  | use the cbm.temporal_support (and cbm.rules) sections of a config |
+| `--params` |  |  | JSON overrides of cbm.temporal_support, e.g. '{"tolerance_days": 8, "max_gap_at_peak_days": 25}' |
+| `--parcels` |  |  | parcels.gpkg to re-evaluate (rules applied even when enabled is false) |
+| `--routed` |  |  | output .gpkg of the re-evaluated parcels layer (with --parcels) |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop evidence`
+
+Per-parcel evidence packages (JSON + HTML + PNG) with every rule, data source and model reference, plus a batch index
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | parcel decision table (.gpkg/.csv from parcels or parcel-classify) |
+| `--out` | yes |  | output directory |
+| `--ids` |  |  | parcel ids to package (default: all) |
+| `--signatures` |  |  | S2 signatures CSV/Parquet: series, observed/rejected acquisitions |
+| `--start` |  |  | season start (default: timeseries.start of --config) |
+| `--end` |  |  | season end (default: timeseries.end of --config) |
+| `--markers` |  |  | markers or event-markers CSV |
+| `--temporal-support` |  |  | per-parcel support CSV (default: computed from --signatures) |
+| `--config` |  |  | cbm.rules and cbm.temporal_support settings (applied when enabled) |
+| `--marker-rules` |  |  | JSON cbm.rules overrides |
+| `--temporal-rules` |  |  | JSON cbm.temporal_support overrides |
+| `--model` |  |  | model directory or model.joblib (sha256 recorded) |
+| `--run-manifest` |  |  | run_manifest.json to reference (geocrop manifest) |
+| `--scenes` |  |  | scene root: resolve acquisition dates to scene ids |
+| `--summary` |  |  | parcels summary JSON (default <parcels>.summary.json) |
+| `--id-field` |  |  | parcel id column (default parcels.id_field of --config or parcel_id) |
+| `--no-png` |  |  | skip the PNG chart (HTML keeps an inline SVG chart) |
 
 ## `geocrop cube`
 
