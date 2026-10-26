@@ -43,7 +43,10 @@ configuration) and the **calendar-consistency check** of Checks-by-Monitoring ma
 Limitations. A derived calendar summarises *these* parcels, *this* season and *this* marker definition: label
 errors,
 NDVI-only markers (harvest vs. drought senescence), cloud gaps and the Whittaker smoothing all propagate into it.
-Review it against agronomic knowledge and the scene inventory before freezing it into a study configuration,
+A check on one EuroCrops tile of the public benchmark (Pomurje, 2021, ~17 Sentinel-2 acquisitions,
+338 parcels) gave plausible maize and oil-pumpkin ranges (median peak DOY 220 and 210) but a p90 peak of
+DOY 300 for winter cereals: with sparse series the global NDVI maximum of some parcels falls on autumn
+regrowth or cover crops after harvest. Review the derived calendar against agronomic knowledge and the scene inventory before freezing it into a study configuration,
 and record the command in the study's provenance. A calendar derived from parcels of a CC-BY-SA dataset
 (e.g. EuroCrops) is an adaptation of that dataset and inherits its ShareAlike terms.
 

@@ -395,6 +395,10 @@ def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | Non
 
     log = log or _log
     started = datetime.now(timezone.utc)
+    here = Path(__file__).parent
+    engine = {"version": __version__, "git_commit": _run(["git", "rev-parse", "HEAD"], cwd=here),
+              # tracked source/config changes at start; untracked run artefacts (e.g. catboost_info/) do not count
+              "git_dirty": bool(_run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=here))}
     p, digest = load_protocol(protocol_path)
     work = Path(work_dir)
     work.mkdir(parents=True, exist_ok=True)
@@ -467,8 +471,7 @@ def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | Non
                              *(["--models", *models] if models else [])]),
         "started_utc": started.isoformat(timespec="seconds"),
         "finished_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "engine": {"version": __version__, "git_commit": _run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent),
-                   "git_dirty": bool(_run(["git", "status", "--porcelain"], cwd=Path(__file__).parent))},
+        "engine": engine,
         "runtime": {"python": platform.python_version(), "platform": platform.platform(),
                     "cpu_count": os.cpu_count(), **_versions()},
         "dataset": {k: p["dataset"][k] for k in ("name", "zenodo_record", "archive", "checksum", "licence", "citation")},
