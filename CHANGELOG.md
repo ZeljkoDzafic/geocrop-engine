@@ -2,17 +2,30 @@
 
 ## Unreleased
 ### Added
+- Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
+  enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
+  `docs/adr/`.
+- Plugin registries (`geocrop.plugins`) with lazy entry-point discovery for classifiers (`geocrop.estimators`),
+  indices (`geocrop.indices`), segmenters (`geocrop.segmenters`), exporters and validators; `model.algorithm`
+  and index names accept plugins; broken plugins only warn. Example package in `examples/plugin_example`.
+- `geocrop.segmenters.Segmenter` protocol with registered OBIA and U-Net + watershed segmenters;
+  `benchmark.segmentation(..., methods=...)` benchmarks any registered segmenter.
+- `schema_version` in `scene.json`, the `model.joblib` payload and `run_manifest.json`, validated on read
+  (`geocrop.contracts`): unversioned files still load, files from a newer version fail with an upgrade hint.
 - `geocrop quicklook`: real Sentinel-2 imagery for a bounding box and period (windowed COG reads, monthly
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
-
 - Reliability gate `tests/test_reliability.py`: SIGKILL inside features/train/predict of a real `geocrop run`
   with recovery checked against an uninterrupted reference; corrupt-input matrix; reproducibility of two
   independent runs; (`slow`) memory bounded by the block size at 2048² and roughly linear runtime.
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+### Changed
+- SNAP `gpt` execution moved to the adapter `geocrop.snap` (`geocrop.s1.run_snap` remains); `sha256` moved
+  to `geocrop.hashing` (`geocrop.provenance.sha256` remains), so core modules no longer depend on
+  subprocess-running code.
 
 ### Fixed
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
