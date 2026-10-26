@@ -1,0 +1,691 @@
+{
+  "description": "GeoCrop Engine recipe exported as an openEO process graph; see docs/openeo.md for differences from local processing.",
+  "id": "geocrop_signatures",
+  "process_graph": {
+    "aggregatespatial1": {
+      "arguments": {
+        "data": {
+          "from_node": "renamelabels1"
+        },
+        "geometries": {
+          "features": [
+            {
+              "geometry": {
+                "coordinates": [
+                  [
+                    [
+                      21.000381657654643,
+                      45.15356719955927
+                    ],
+                    [
+                      21.000127219218207,
+                      45.153567200126105
+                    ],
+                    [
+                      21.00012722001932,
+                      45.153927267475616
+                    ],
+                    [
+                      21.00038166005798,
+                      45.15392726690877
+                    ],
+                    [
+                      21.000381657654643,
+                      45.15356719955927
+                    ]
+                  ]
+                ],
+                "type": "Polygon"
+              },
+              "properties": {
+                "parcel_id": "P1"
+              },
+              "type": "Feature"
+            },
+            {
+              "geometry": {
+                "coordinates": [
+                  [
+                    [
+                      21.000890534527468,
+                      45.15356719672507
+                    ],
+                    [
+                      21.000636096091064,
+                      45.153567198425584
+                    ],
+                    [
+                      21.00063610009662,
+                      45.153927265775074
+                    ],
+                    [
+                      21.000890540135245,
+                      45.15392726407454
+                    ],
+                    [
+                      21.000890534527468,
+                      45.15356719672507
+                    ]
+                  ]
+                ],
+                "type": "Polygon"
+              },
+              "properties": {
+                "parcel_id": "P2"
+              },
+              "type": "Feature"
+            }
+          ],
+          "type": "FeatureCollection"
+        },
+        "reducer": {
+          "process_graph": {
+            "sum1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "ignore_nodata": true
+              },
+              "process_id": "sum",
+              "result": true
+            }
+          }
+        }
+      },
+      "process_id": "aggregate_spatial"
+    },
+    "applydimension1": {
+      "arguments": {
+        "data": {
+          "from_node": "resamplespatial1"
+        },
+        "dimension": "bands",
+        "process": {
+          "process_graph": {
+            "add1": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply1"
+                },
+                "y": {
+                  "from_node": "multiply2"
+                }
+              },
+              "process_id": "add"
+            },
+            "add2": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply4"
+                },
+                "y": {
+                  "from_node": "multiply2"
+                }
+              },
+              "process_id": "add"
+            },
+            "add3": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply1"
+                },
+                "y": {
+                  "from_node": "multiply5"
+                }
+              },
+              "process_id": "add"
+            },
+            "add4": {
+              "arguments": {
+                "x": {
+                  "from_node": "add2"
+                },
+                "y": {
+                  "from_node": "add3"
+                }
+              },
+              "process_id": "add"
+            },
+            "add5": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply1"
+                },
+                "y": {
+                  "from_node": "multiply7"
+                }
+              },
+              "process_id": "add"
+            },
+            "add6": {
+              "arguments": {
+                "x": {
+                  "from_node": "subtract3"
+                },
+                "y": 1
+              },
+              "process_id": "add"
+            },
+            "arraycreate1": {
+              "arguments": {
+                "data": [
+                  {
+                    "from_node": "if1"
+                  },
+                  {
+                    "from_node": "if2"
+                  },
+                  {
+                    "from_node": "if3"
+                  },
+                  {
+                    "from_node": "if4"
+                  },
+                  {
+                    "from_node": "if5"
+                  },
+                  {
+                    "from_node": "if6"
+                  },
+                  {
+                    "from_node": "if7"
+                  },
+                  1
+                ]
+              },
+              "process_id": "array_create",
+              "result": true
+            },
+            "arrayelement1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "SCL"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement2": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B08"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement3": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B04"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement4": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B11"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement5": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B02"
+              },
+              "process_id": "array_element"
+            },
+            "divide1": {
+              "arguments": {
+                "x": {
+                  "from_node": "subtract1"
+                },
+                "y": {
+                  "from_node": "add1"
+                }
+              },
+              "process_id": "divide"
+            },
+            "divide2": {
+              "arguments": {
+                "x": {
+                  "from_node": "subtract2"
+                },
+                "y": {
+                  "from_node": "add4"
+                }
+              },
+              "process_id": "divide"
+            },
+            "divide3": {
+              "arguments": {
+                "x": {
+                  "from_node": "subtract1"
+                },
+                "y": {
+                  "from_node": "add6"
+                }
+              },
+              "process_id": "divide"
+            },
+            "eq1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 0
+              },
+              "process_id": "eq"
+            },
+            "eq2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 1
+              },
+              "process_id": "eq"
+            },
+            "eq3": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 3
+              },
+              "process_id": "eq"
+            },
+            "eq4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 8
+              },
+              "process_id": "eq"
+            },
+            "eq5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 9
+              },
+              "process_id": "eq"
+            },
+            "eq6": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 10
+              },
+              "process_id": "eq"
+            },
+            "eq7": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 11
+              },
+              "process_id": "eq"
+            },
+            "if1": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "divide1"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if2": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "multiply3"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if3": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "divide2"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if4": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "multiply6"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if5": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "multiply9"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if6": {
+              "arguments": {
+                "accept": 0,
+                "reject": {
+                  "from_node": "multiply10"
+                },
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "if7": {
+              "arguments": {
+                "accept": 0,
+                "reject": 1,
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if"
+            },
+            "multiply1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement2"
+                },
+                "y": 0.0001
+              },
+              "process_id": "multiply"
+            },
+            "multiply10": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply9"
+                },
+                "y": {
+                  "from_node": "multiply9"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "multiply2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement3"
+                },
+                "y": 0.0001
+              },
+              "process_id": "multiply"
+            },
+            "multiply3": {
+              "arguments": {
+                "x": {
+                  "from_node": "divide1"
+                },
+                "y": {
+                  "from_node": "divide1"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "multiply4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement4"
+                },
+                "y": 0.0001
+              },
+              "process_id": "multiply"
+            },
+            "multiply5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement5"
+                },
+                "y": 0.0001
+              },
+              "process_id": "multiply"
+            },
+            "multiply6": {
+              "arguments": {
+                "x": {
+                  "from_node": "divide2"
+                },
+                "y": {
+                  "from_node": "divide2"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "multiply7": {
+              "arguments": {
+                "x": 6,
+                "y": {
+                  "from_node": "multiply2"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "multiply8": {
+              "arguments": {
+                "x": 7.5,
+                "y": {
+                  "from_node": "multiply5"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "multiply9": {
+              "arguments": {
+                "x": 2.5,
+                "y": {
+                  "from_node": "divide3"
+                }
+              },
+              "process_id": "multiply"
+            },
+            "or1": {
+              "arguments": {
+                "x": {
+                  "from_node": "eq1"
+                },
+                "y": {
+                  "from_node": "eq2"
+                }
+              },
+              "process_id": "or"
+            },
+            "or2": {
+              "arguments": {
+                "x": {
+                  "from_node": "or1"
+                },
+                "y": {
+                  "from_node": "eq3"
+                }
+              },
+              "process_id": "or"
+            },
+            "or3": {
+              "arguments": {
+                "x": {
+                  "from_node": "or2"
+                },
+                "y": {
+                  "from_node": "eq4"
+                }
+              },
+              "process_id": "or"
+            },
+            "or4": {
+              "arguments": {
+                "x": {
+                  "from_node": "or3"
+                },
+                "y": {
+                  "from_node": "eq5"
+                }
+              },
+              "process_id": "or"
+            },
+            "or5": {
+              "arguments": {
+                "x": {
+                  "from_node": "or4"
+                },
+                "y": {
+                  "from_node": "eq6"
+                }
+              },
+              "process_id": "or"
+            },
+            "or6": {
+              "arguments": {
+                "x": {
+                  "from_node": "or5"
+                },
+                "y": {
+                  "from_node": "eq7"
+                }
+              },
+              "process_id": "or"
+            },
+            "subtract1": {
+              "arguments": {
+                "x": {
+                  "from_node": "multiply1"
+                },
+                "y": {
+                  "from_node": "multiply2"
+                }
+              },
+              "process_id": "subtract"
+            },
+            "subtract2": {
+              "arguments": {
+                "x": {
+                  "from_node": "add2"
+                },
+                "y": {
+                  "from_node": "add3"
+                }
+              },
+              "process_id": "subtract"
+            },
+            "subtract3": {
+              "arguments": {
+                "x": {
+                  "from_node": "add5"
+                },
+                "y": {
+                  "from_node": "multiply8"
+                }
+              },
+              "process_id": "subtract"
+            }
+          }
+        }
+      },
+      "process_id": "apply_dimension"
+    },
+    "loadcollection1": {
+      "arguments": {
+        "bands": [
+          "B02",
+          "B04",
+          "B08",
+          "B11",
+          "SCL"
+        ],
+        "id": "SENTINEL2_L2A",
+        "spatial_extent": {
+          "crs": 32634,
+          "east": 500100.0,
+          "north": 5000080.0,
+          "south": 4999980.0,
+          "west": 499980.0
+        },
+        "temporal_extent": [
+          "2023-04-01",
+          "2023-08-01"
+        ]
+      },
+      "process_id": "load_collection"
+    },
+    "renamelabels1": {
+      "arguments": {
+        "data": {
+          "from_node": "applydimension1"
+        },
+        "dimension": "bands",
+        "target": [
+          "NDVI_sum",
+          "NDVI_sumsq",
+          "BSI_sum",
+          "BSI_sumsq",
+          "EVI_sum",
+          "EVI_sumsq",
+          "n_valid",
+          "n_pixels"
+        ]
+      },
+      "process_id": "rename_labels"
+    },
+    "resamplespatial1": {
+      "arguments": {
+        "align": "upper-left",
+        "data": {
+          "from_node": "loadcollection1"
+        },
+        "method": "near",
+        "projection": 32634,
+        "resolution": 10.0
+      },
+      "process_id": "resample_spatial"
+    },
+    "saveresult1": {
+      "arguments": {
+        "data": {
+          "from_node": "aggregatespatial1"
+        },
+        "format": "JSON",
+        "options": {}
+      },
+      "process_id": "save_result",
+      "result": true
+    }
+  },
+  "summary": "Parcel signatures (aggregate_spatial)"
+}

@@ -25,6 +25,9 @@ Observations covering < 50 % of a parcel are ignored; the remaining parcel serie
 | `bare_soil_days` | days (April–September) with smoothed NDVI < 0.25 |
 | `clear_observations` | number of usable acquisitions (markers are NaN below 4) |
 
+Harvest confirmed by Sentinel-1, separated from drought senescence, together with tillage, mowing events,
+within-parcel homogeneity, marker confidence and data sufficiency: see [markers.md](markers.md).
+
 ## Crop calendar
 A YAML calendar (`configs/crop_calendar.example.yaml`) gives expected day-of-year ranges of peak and harvest per
 class. `calendar_consistent` is false when a parcel's markers contradict the calendar of the *declared* crop,

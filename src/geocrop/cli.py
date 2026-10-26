@@ -45,6 +45,21 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("config-check", "Validate a configuration file and print the resolved config")
     x.add_argument("--config", required=True)
 
+    x = cmd("preflight", "Check whether a configured run can succeed and estimate its cost (no data changed)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--inventory", nargs="*", default=[], help="catalog/stac-search CSVs to count planned scenes")
+    x.add_argument("--out", help="save the JSON report")
+    x.add_argument("--markdown", help="save a Markdown report")
+    x.add_argument("--strict", action="store_true", help="exit 2 also on warnings (default: only when blocked)")
+
+    x = cmd("clean", "Remove temporary files, quarantined partial outputs and (optionally) regenerable intermediates")
+    x.add_argument("--config", required=True)
+    x.add_argument("--dry-run", action="store_true", help="list paths and sizes without removing anything")
+    x.add_argument("--all-intermediates", action="store_true",
+                   help="also composites, feature stacks, samples and hash cache (regenerated on the next run)")
+    x.add_argument("--include-results", action="store_true",
+                   help="also model/prediction/parcels/cbm/validation/experiments outputs of the run directory")
+
     x = cmd("indices", "Print the spectral/radar index table (name, formula, reference)")
     x.add_argument("--format", choices=["json", "markdown"], default="markdown")
 
@@ -106,6 +121,19 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--max-cloud", type=float, default=60)
     x.add_argument("--min-clear", type=float, default=0.3)
     x.add_argument("--max-items", type=int, default=60)
+
+    x = cmd("acceptance", "End-to-end acceptance run on real Sentinel-1/2 data (or --offline synthetic) with a "
+                          "pass/fail report")
+    x.add_argument("--out", required=True, help="output directory (acceptance_report.json/.md)")
+    x.add_argument("--bbox", nargs=4, type=float, metavar=("W", "S", "E", "N"),
+                   default=[19.120, 44.730, 19.145, 44.748], help="degrees; default ~2 x 2 km in Semberija")
+    x.add_argument("--start", default="2023-06-01")
+    x.add_argument("--end", default="2023-09-30", help="monthly windows between start and end")
+    x.add_argument("--offline", action="store_true", help="synthetic scenes, no network (CI)")
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--k", type=int, default=4, help="number of pseudo-classes (k-means)")
+    x.add_argument("--no-s1-coregistration", action="store_true",
+                   help="keep Sentinel-1 geolocation as delivered (no offset correction to Sentinel-2)")
 
     x = cmd("s2-composite", "Cloud-masked temporal composite of S2 scene folders")
     x.add_argument("--scenes", nargs="+", required=True)
@@ -189,6 +217,9 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--id-field", default="polygon_id")
     x.add_argument("--max-per-polygon", type=int, default=250)
     x.add_argument("--inner-buffer-m", type=float, default=0)
+    x.add_argument("--region-field", help="polygon attribute stored as sample region id (leave-one-region-out)")
+    x.add_argument("--year-field", help="polygon attribute stored as sample year id (leave-one-year-out)")
+    x.add_argument("--year", help="constant year id for all samples of this single-season stack")
 
     x = cmd("train", "Spatial CV + final Random Forest")
     x.add_argument("--samples", required=True)
@@ -206,6 +237,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--calibration-mode", choices=["oof", "holdout"], default="oof",
                    help="holdout freezes a predictor without fitting on calibration polygons")
     x.add_argument("--calibration-fraction", type=float, default=0.2, help="fraction of spatial groups held out")
+    x.add_argument("--cv-strategy", choices=["spatial_blocks", "region", "year", "region_year"],
+                   default="spatial_blocks", help="add leave-one-region/year-out transfer validation to the report")
 
     x = cmd("benchmark", "Compare classifiers on identical spatial folds; internal model selection only")
     x.add_argument("--samples", required=True)
@@ -223,6 +256,10 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--features", required=True)
     x.add_argument("--model", required=True)
     x.add_argument("--out", required=True)
+    x.add_argument("--config", help="use the predict.smoothing section")
+    x.add_argument("--smooth", action="store_true", help="edge-aware smoothing of probabilities before argmax")
+    x.add_argument("--smooth-window", type=int, help="odd neighbourhood size in pixels (default 7)")
+    x.add_argument("--smoothness", type=float, help="smoothing strength; larger smooths more (default 10)")
 
     x = cmd("ablation", "Feature-group ablation experiments on identical folds")
     x.add_argument("--samples", required=True)
@@ -234,6 +271,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--folds", type=int, help="override config model.cv_folds (default 5)")
     x.add_argument("--buffer-m", type=float, help="override config model.spatial_buffer_m (default 0)")
     x.add_argument("--seed", type=int, help="override config seed (default 42)")
+    x.add_argument("--cv-strategy", choices=["spatial_blocks", "region", "year", "region_year"],
+                   help="override config cv.strategy: add leave-one-group-out transfer columns")
 
     x = cmd("reduce-features", "Recursive feature elimination curve under spatial CV")
     x.add_argument("--samples", required=True)
@@ -376,6 +415,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--out", required=True, help=".csv or .parquet")
     x.add_argument("--indices", nargs="*", default=["NDVI", "BSI"])
     x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--moments", action="store_true", help="add skewness and bimodality (homogeneity marker)")
 
     x = cmd("markers", "Phenology, harvest and bare-soil markers from parcel signatures")
     x.add_argument("--signatures", required=True)
@@ -430,6 +470,33 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--unet-bands", nargs="*")
     x.add_argument("--tile-size", type=int, default=1024)
     x.add_argument("--segments-per-km2", type=float, default=50)
+    x.add_argument("--methods", type=_json_arg, help='extra registry segmenters as JSON, e.g. '
+                   '\'{"ftw": {"segmenter": "ftw", "model": "FTW_PRUE_EFNET_B3_CCBY"}}\'')
+
+    x = cmd("ftw-boundaries", "Pretrained Fields of The World field boundaries (CC-BY checkpoints) -> parcels")
+    x.add_argument("--window-a", help="early-season composite/scene folder (B02..B08 reflectance)")
+    x.add_argument("--window-b", help="late-season composite/scene folder")
+    x.add_argument("--stack", help="existing 8-band FTW stack instead of --window-a/--window-b")
+    x.add_argument("--units", choices=["reflectance", "dn"], help="scaling of --stack if it has no GeoCrop tag")
+    x.add_argument("--grid", help="study grid raster (default: window A B04 grid)")
+    x.add_argument("--out", help="output folder")
+    x.add_argument("--model", default="FTW_PRUE_EFNET_B3_CCBY", help="FTW registry name (see --list-models)")
+    x.add_argument("--checkpoint", help="local checkpoint file instead of a registry download")
+    x.add_argument("--allow-noncommercial", action="store_true",
+                   help="permit FULL (non-commercial training data) checkpoints; prints a licence warning")
+    x.add_argument("--cache-dir", help="checkpoint cache (default $GEOCROP_FTW_CACHE or ~/.cache/geocrop/ftw)")
+    x.add_argument("--no-download", action="store_true", help="fail if the checkpoint is not cached")
+    x.add_argument("--download-only", action="store_true")
+    x.add_argument("--list-models", action="store_true")
+    x.add_argument("--patch", type=int, default=256)
+    x.add_argument("--overlap", type=int, default=32)
+    x.add_argument("--threads", type=int)
+    x.add_argument("--threshold", type=float, default=0.5, help="not-field probability below = field interior")
+    x.add_argument("--min-area-pixels", type=int, default=16)
+    x.add_argument("--seed-percentile", type=float, default=0)
+    x.add_argument("--min-seed-distance", type=float, default=1.0, help="watershed seed distance from boundary (px)")
+    x.add_argument("--reference", help="reference parcels: also write object-level segment metrics")
+    x.add_argument("--iou", type=float, default=0.5)
 
     x = cmd("manifest", "Write a reproducibility manifest (versions, git, hashes)")
     x.add_argument("--out", required=True)
@@ -496,7 +563,111 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     y.add_argument("--synthetic-side", type=int, default=24, help="SYNTHETIC pool: parcels per side")
     y.add_argument("--synthetic-noise", type=float, default=0.10)
     y.add_argument("--no-figure", action="store_true")
+
+    # --- CbM event markers (Sentinel-1 + Sentinel-2) --------------------------------------------------
+    x = cmd("s1-signatures", "Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry")
+    x.add_argument("--scenes", required=True, help="root of S1 scene folders (VV.tif, VH.tif, scene.json)")
+    x.add_argument("--parcels", required=True)
+    x.add_argument("--reference", required=True)
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help=".csv or .parquet")
+    x.add_argument("--id-field", default="parcel_id")
+    x = cmd("event-markers", "Harvest, tillage, mowing, homogeneity and data-sufficiency markers (S2 + S1)")
+    x.add_argument("--signatures", help="S2 signatures (geocrop signatures, ideally with --moments)")
+    x.add_argument("--s1-signatures", help="S1 signatures (geocrop s1-signatures)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--config", help="use the cbm.events section of a config")
+    x = cmd("traffic-light", "Re-evaluate the traffic light of a parcels layer with marker rules and reason codes")
+    x.add_argument("--parcels", required=True, help="parcels.gpkg from geocrop parcels")
+    x.add_argument("--markers", required=True, help="event markers CSV from geocrop event-markers")
+    x.add_argument("--config", help="cbm.rules section (applied even when rules.enabled is false)")
+    x.add_argument("--rules", type=_json_arg, help="JSON rules overriding the config, e.g. "
+                   "'{\"harvest_expected_classes\": [\"maize\"]}'")
+    x.add_argument("--out", required=True, help=".gpkg (a .csv is written alongside)")
+    x.add_argument("--id-field", default="parcel_id")
+
+    # --- transfer validation and probability smoothing (G8, G15) ---
+    x = cmd("samples-merge", "Combine per-season sample files into one multi-year sample store")
+    x.add_argument("--inputs", nargs="+", required=True, help="samples .npz files, one per season")
+    x.add_argument("--years", nargs="*", help="year id per input (default: year metadata stored in each file)")
+    x.add_argument("--stacks", nargs="*", help="feature stack per input; their feature manifests must match")
+    x.add_argument("--out", required=True)
+
+    x = cmd("transfer", "Leave-one-region-out / leave-one-year-out validation vs spatial CV")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--strategies", nargs="+", choices=["region", "year", "region_year"], default=["region", "year"])
+    x.add_argument("--config", help="inherit model settings")
+    x.add_argument("--params", type=_json_arg, help="JSON estimator settings")
+    x.add_argument("--block-m", type=float)
+    x.add_argument("--buffer-m", type=float)
+    x.add_argument("--folds", type=int)
+    x.add_argument("--seed", type=int)
+
+    x = cmd("smoothing-experiment", "SYNTHETIC comparison of accuracy and conformal coverage with/without smoothing")
+    x.add_argument("--out", required=True)
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--alpha", type=float, default=0.1)
+
+    # optional openEO back-end (CDSE); local processing stays the default
+    openeo_products = ["s2_composites", "s1_composites", "s2_scenes", "signatures"]
+    x = cmd("openeo-extract", "Run composites, scenes or parcel signatures on an openEO back-end (CDSE) and write "
+                              "them in GeoCrop's file contracts (optional openeo extra)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
+    x.add_argument("--dry-run", action="store_true", help="only write the process graphs; needs no credentials")
+    x.add_argument("--graphs", help="directory for the process graph JSON; default <openeo.work_dir>/graphs")
+    x.add_argument("--auth", choices=["auto", "client-credentials", "device"], default="auto",
+                   help="auto: CDSE_OPENEO_CLIENT_ID/SECRET if set, else the OIDC device flow")
+    x = cmd("openeo-graph", "Export the configured GeoCrop recipe as openEO process graphs (no credentials needed)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
+    x.add_argument("--out", help="output directory; default <openeo.work_dir>/graphs")
+    x.add_argument("--stdout", action="store_true", help="print the openEO process objects as one JSON document")
     return p
+
+
+def _ftw_boundaries(a):
+    from . import ftw
+    if a.list_models:
+        _print(ftw.model_table())
+        return
+    try:
+        checkpoint = a.checkpoint
+        if checkpoint is None:
+            model = ftw.check_licence(a.model, a.allow_noncommercial)
+            if a.no_download:
+                checkpoint = ftw.cached_checkpoint(a.model, a.cache_dir, a.allow_noncommercial)
+            else:
+                from .ftw_weights import download
+                checkpoint = download(a.model, a.cache_dir, a.allow_noncommercial)   # prints the NC warning
+            print(f"FTW model {model.name} ({model.licence}); cite: {ftw.CITATION}", file=sys.stderr)
+        if a.download_only:
+            _print({"model": a.model, "checkpoint": str(checkpoint)})
+            return
+        if not a.out or not (a.stack or (a.window_a and a.window_b)):
+            raise SystemExit("ftw-boundaries needs --out and either --stack or both --window-a and --window-b")
+        out = Path(a.out)
+        raster = a.stack or a.grid or str(Path(a.window_a) / "B04.tif")
+        info = ftw.segment(raster, out / "ftw_parcels.gpkg", checkpoint=checkpoint,
+                           window_a=None if a.stack else a.window_a, window_b=None if a.stack else a.window_b,
+                           allow_noncommercial=a.allow_noncommercial, patch=a.patch, overlap=a.overlap,
+                           units=a.units, threads=a.threads, threshold=a.threshold,
+                           min_area_pixels=a.min_area_pixels, seed_percentile=a.seed_percentile,
+                           min_seed_distance=a.min_seed_distance, work_dir=out)
+    except ftw.LicenceError as exc:
+        raise SystemExit(str(exc)) from None
+    if info["licence"] != ftw.CC_BY:
+        print(ftw.NONCOMMERCIAL_WARNING.format(name=info["model"]) if info["licence"] in
+              {m.licence for m in ftw.MODELS.values()} else f"Licence of checkpoint {info['model']} is unknown; "
+              "you are responsible for checking its terms.", file=sys.stderr)
+    if a.reference:
+        from .segmentation_metrics import object_scores
+        info["segment_metrics"] = object_scores(info["path"], a.reference, a.iou, out / "segment_metrics.json")
+    _print(info)
 
 
 def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
@@ -527,6 +698,24 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .config import fingerprint, load
         cfg = load(a.config)
         _print({"fingerprint": fingerprint(cfg), "config": cfg})
+    elif c == "preflight":
+        from .config import load
+        from .preflight import run as preflight_run
+        from .preflight import to_markdown
+        report = preflight_run(load(a.config), a.config, a.inventory)
+        for target, text in ((a.out, lambda: json.dumps(report, indent=2, ensure_ascii=False, default=str)),
+                             (a.markdown, lambda: to_markdown(report))):
+            if target:
+                Path(target).parent.mkdir(parents=True, exist_ok=True)
+                Path(target).write_text(text(), encoding="utf8")
+        print(to_markdown(report))
+        if report["verdict"] == "blocked" or (a.strict and report["verdict"] != "ready"):
+            sys.exit(2)
+    elif c == "clean":
+        from .cleanup import clean
+        from .config import load
+        _print(clean(load(a.config), dry_run=a.dry_run, all_intermediates=a.all_intermediates,
+                     include_results=a.include_results, config_path=a.config))
     elif c == "indices":
         from .indices import table
         rows = table()
@@ -566,6 +755,14 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         r = quicklook(a.bbox, a.start, a.end, a.out, max_cloud=a.max_cloud, min_clear=a.min_clear,
                       max_items=a.max_items)
         _print({k: r[k] for k in ("crs", "area_km2", "acquisitions_found", "acquisitions_used", "composites")})
+    elif c == "acceptance":
+        from .acceptance import run as acceptance_run
+        report = acceptance_run(a.out, a.bbox, a.start, a.end, offline=a.offline, seed=a.seed, k=a.k,
+                                coregister_s1=not a.no_s1_coregistration, log=lambda m: print(m, file=sys.stderr))
+        _print({"verdict": report["verdict"], "checks": report["summary"], "runtime_s": report["runtime_s"],
+                "error": report.get("error"), "report": str(Path(a.out) / "acceptance_report.md")})
+        if report["verdict"] != "PASS":
+            sys.exit(1)
     elif c == "s2-composite":
         from .s2 import composite
         print(composite(a.scenes, a.out, a.reference, a.statistic, cloud_probability_max=a.cloud_prob_max,
@@ -629,7 +826,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             sys.exit(2)
     elif c == "samples":
         from .samples import extract
-        s = extract(a.features, a.polygons, a.label_field, a.id_field, a.max_per_polygon, a.inner_buffer_m)
+        s = extract(a.features, a.polygons, a.label_field, a.id_field, a.max_per_polygon, a.inner_buffer_m,
+                    region_field=a.region_field, year_field=a.year_field, year=a.year)
         print(s.save(a.out))
     elif c == "train":
         from .features import load_manifest, select
@@ -643,8 +841,12 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             params["algorithm"] = a.algorithm
         r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate,
                   holdout_fraction=a.holdout, spatial_buffer_m=a.buffer_m, calibration_mode=a.calibration_mode,
-                  calibration_fraction=a.calibration_fraction)
+                  calibration_fraction=a.calibration_fraction, cv_strategy=a.cv_strategy)
         _print({k: r["cross_validation"][k] for k in ("overall_accuracy", "kappa", "macro_f1", "fold_macro_f1_std")})
+        if "transfer_validation" in r:
+            _print({"transfer_gap": r["transfer_validation"]["transfer_gap"],
+                    "out_of_domain": {k: r["transfer_validation"]["out_of_domain"][k]
+                                      for k in ("overall_accuracy", "kappa", "macro_f1")}})
     elif c == "benchmark":
         from .benchmark import run
         from .config import load
@@ -669,7 +871,17 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             sys.exit(2)
     elif c == "predict":
         from .model import predict
-        _print(predict(a.features, a.model, a.out))
+        smoothing = None
+        if a.config:
+            from .config import load
+            smoothing = dict(load(a.config)["predict"]["smoothing"])
+        if a.smooth or a.smooth_window is not None or a.smoothness is not None:
+            smoothing = {**(smoothing or {}), "enabled": True}
+            if a.smooth_window is not None:
+                smoothing["window"] = a.smooth_window
+            if a.smoothness is not None:
+                smoothing["smoothness"] = a.smoothness
+        _print(predict(a.features, a.model, a.out, smoothing=smoothing))
     elif c == "ablation":
         from . import experiments
         from .config import load
@@ -687,7 +899,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         t = experiments.run(Samples.load(a.samples), load_manifest(a.features), a.out, exps, params, n_splits,
                             block_m, seed=seed, targets=a.targets or cfg["classes"]["targets"],
                             spatial_buffer_m=buffer_m, calibration_mode=m["calibration_mode"],
-                            calibration_fraction=m["calibration_fraction"])
+                            calibration_fraction=m["calibration_fraction"],
+                            cv_strategy=a.cv_strategy or cfg["cv"]["strategy"])
         print(t.to_string(index=False))
     elif c == "reduce-features":
         from .config import load
@@ -790,7 +1003,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
 
         from .cbm import parcel_signatures
         t = parcel_signatures(a.scenes, a.parcels, a.reference, a.out, date.fromisoformat(a.start),
-                              date.fromisoformat(a.end), a.indices, a.id_field)
+                              date.fromisoformat(a.end), a.indices, a.id_field, moments=a.moments)
         _print({"rows": len(t), "parcels": int(t.parcel_id.nunique()), "out": a.out})
     elif c == "markers":
         from datetime import date
@@ -849,8 +1062,10 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "benchmark-segmentation":
         from . import benchmark
         t = benchmark.segmentation(a.raster, a.reference, a.out, a.bands, a.unet_model, a.unet_bands, a.tile_size,
-                                   a.segments_per_km2)
+                                   a.segments_per_km2, methods=a.methods)
         print(t.to_string(index=False))
+    elif c == "ftw-boundaries":
+        _ftw_boundaries(a)
     elif c == "manifest":
         from .provenance import run_manifest
         cfg = None
@@ -895,6 +1110,116 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                             candidate_factor=a.candidate_factor, uncertainty_weight=a.uncertainty_weight,
                             min_spacing_m=a.min_spacing_m, stratify=a.stratify, figure=not a.no_figure)
             _print({k: r[k] for k in ("mode", "test_units", "pool_units", "comparison", "outputs")})
+
+    elif c == "s1-signatures":
+        from datetime import date
+
+        from .cbm import s1_signatures
+        t = s1_signatures(a.scenes, a.parcels, a.reference, a.out, date.fromisoformat(a.start),
+                          date.fromisoformat(a.end), a.id_field)
+        _print({"rows": len(t), "parcels": int(t.parcel_id.nunique()), "acquisitions": int(t.date.nunique()),
+                "out": a.out})
+    elif c == "event-markers":
+        from datetime import date
+
+        import pandas as pd
+
+        from .cbm_markers import event_markers
+
+        def _table(path):
+            return None if not path else pd.read_parquet(path) if path.endswith(".parquet") else pd.read_csv(path)
+        if not (a.signatures or a.s1_signatures):
+            raise SystemExit("event-markers needs --signatures and/or --s1-signatures")
+        params = None
+        if a.config:
+            from .config import load
+            params = load(a.config)["cbm"]["events"]
+        m = event_markers(_table(a.signatures), date.fromisoformat(a.start), date.fromisoformat(a.end),
+                          _table(a.s1_signatures), params)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        m.to_csv(a.out, index=False)
+        _print({"parcels": len(m), "harvest_detected": int(m.harvest_detected.sum()),
+                "tillage_detected": int(m.tillage_detected.sum()), "mowing_events": int(m.mowing_events.sum()),
+                "heterogeneous": int((m.homogeneity == "heterogeneous").sum()),
+                "data_sufficiency": m.data_sufficiency.value_counts().to_dict(), "out": a.out})
+    elif c == "traffic-light":
+        from collections import Counter
+
+        import geopandas as gpd
+        import pandas as pd
+
+        from .cbm import traffic_light_details
+        from .cbm_markers import EVENT_COLUMNS
+        rules = {}
+        if a.config:
+            from .config import load
+            rules = load(a.config)["cbm"]["rules"]
+        rules = {**rules, **(a.rules or {}), "enabled": True}
+        gdf = gpd.read_file(a.parcels)
+        mk = pd.read_csv(a.markers, dtype={"parcel_id": str}).set_index("parcel_id")
+        mk = mk.reindex(gdf[a.id_field].astype(str))
+        for col in EVENT_COLUMNS:
+            if col in mk:
+                gdf[col] = mk[col].to_numpy()
+        details = traffic_light_details(gdf, rules)
+        gdf["traffic_light"] = details["traffic_light"].to_numpy()
+        gdf["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
+        out = Path(a.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.unlink(missing_ok=True)
+        gdf.to_file(out, driver="GPKG" if out.suffix.lower() == ".gpkg" else "GeoJSON")
+        gdf.drop(columns=gdf.geometry.name).to_csv(out.with_suffix(".csv"), index=False)
+        _print({"traffic_light_counts": gdf.traffic_light.value_counts().to_dict(),
+                "reason_counts": dict(sorted(Counter(code for codes in gdf.traffic_light_reasons
+                                                     for code in codes.split(";") if code).items())),
+                "out": str(out)})
+
+    elif c == "samples-merge":
+        from .samples import Samples, combine
+        manifests = None
+        if a.stacks:
+            from .features import load_manifest
+            manifests = [load_manifest(st) for st in a.stacks]
+        merged = combine([Samples.load(f) for f in a.inputs], years=a.years or None, manifests=manifests)
+        merged.save(a.out)
+        _print({"out": a.out, "samples": int(len(merged.y)), "years": sorted(set(merged.year)),
+                "regions": None if merged.region is None else sorted(set(merged.region))})
+    elif c == "transfer":
+        from . import experiments
+        from .config import load
+        from .model import RF_KEYS
+        from .samples import Samples
+        cfg = load(a.config)
+        m = cfg["model"]
+        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        params.update(a.params or {})
+        t = experiments.transfer(Samples.load(a.samples), a.out, params=params, strategies=a.strategies,
+                                 n_splits=a.folds if a.folds is not None else m["cv_folds"],
+                                 spatial_block_m=a.block_m if a.block_m is not None else m["spatial_block_m"],
+                                 seed=a.seed if a.seed is not None else cfg["seed"],
+                                 spatial_buffer_m=a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"])
+        print(t.to_string(index=False))
+    elif c == "smoothing-experiment":
+        import pandas as pd
+
+        from .experiments import smoothing_comparison
+        r = smoothing_comparison(a.out, seed=a.seed, alpha=a.alpha)
+        print(pd.DataFrame(r["rows"]).to_string(index=False))
+    elif c in ("openeo-extract", "openeo-graph"):
+        from . import openeo_adapter
+        from .config import load
+        cfg = load(a.config)
+        recipe = openeo_adapter.build_recipe(cfg, a.products)
+        graphs = (a.graphs if c == "openeo-extract" else a.out) or Path(cfg["openeo"]["work_dir"]) / "graphs"
+        written = openeo_adapter.write_recipe(recipe, graphs)
+        if c == "openeo-graph" and a.stdout:
+            _print({i["name"]: i["process"] for i in recipe["graphs"]})
+        elif c == "openeo-graph" or a.dry_run:
+            _print({**written, "dry_run": c == "openeo-extract", "differences": recipe["differences"]})
+        else:
+            conn = openeo_adapter.connect(cfg["openeo"]["url"], a.auth)
+            _print({**written, "results": openeo_adapter.execute(recipe, conn, cfg["openeo"]["work_dir"],
+                                                                 cfg["openeo"]["job_options"])})
 
 
 if __name__ == "__main__":
