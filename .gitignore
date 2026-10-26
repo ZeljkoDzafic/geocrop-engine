@@ -34,3 +34,4 @@ venv/
 coverage.xml
 htmlcov/
 catboost_info/
+/registry/
