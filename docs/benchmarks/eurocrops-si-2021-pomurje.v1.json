@@ -1,0 +1,1770 @@
+{
+  "schema": "geocrop-public-benchmark/1",
+  "protocol": {
+    "id": "eurocrops-si-2021-pomurje",
+    "version": 1,
+    "file": "eurocrops_si_2021_pomurje.v1.yaml",
+    "sha256": "16106e5ec040a5e30facc23c518ffe2752f29988521493d93e29f774b72b6403"
+  },
+  "command": "geocrop benchmark-public --protocol configs/benchmarks/eurocrops_si_2021_pomurje.v1.yaml --work outputs/benchmarks/eurocrops-si-2021-pomurje-v1",
+  "started_utc": "2026-10-26T01:39:25+00:00",
+  "finished_utc": "2026-10-26T01:47:35+00:00",
+  "engine": {
+    "version": "0.9.0",
+    "git_commit": "b040c6e3d28d9b4fdb440d02aeec9b5a69b6d97a",
+    "git_dirty": false
+  },
+  "runtime": {
+    "python": "3.12.15",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "cpu_count": 15,
+    "geocrop-engine": "0.9.0",
+    "numpy": "2.5.4",
+    "pandas": "2.3.3",
+    "scikit-learn": "1.9.1",
+    "rasterio": "1.5.2",
+    "geopandas": "1.2.0",
+    "shapely": "2.2.0",
+    "pyproj": "3.8.0",
+    "scipy": "1.18.1",
+    "scikit-image": "0.26.0",
+    "torch": "2.14.1",
+    "pystac-client": "0.9.1",
+    "gdal (rasterio)": "3.12.2"
+  },
+  "dataset": {
+    "name": "EuroCrops",
+    "zenodo_record": "14094196",
+    "archive": "SI_2021.zip",
+    "checksum": "md5:b2acea403d8372ccb9c5f5276130f23b",
+    "licence": "CC-BY-SA-4.0",
+    "citation": "Schneider, M., Schelte, T., Schmitz, F., Koerner, M. (2023). EuroCrops: The Largest Harmonized Open Crop Dataset Across the European Union. Scientific Data 10, 612. Data: doi:10.5281/zenodo.14094196."
+  },
+  "labels": {
+    "population_per_class": {
+      "grassland": 907,
+      "maize": 4052,
+      "oil_pumpkin": 483,
+      "soybean": 96,
+      "vegetables": 221,
+      "winter_cereals": 4442,
+      "winter_rapeseed": 354
+    },
+    "sampled_per_class": {
+      "grassland": 150,
+      "maize": 150,
+      "oil_pumpkin": 150,
+      "soybean": 96,
+      "vegetables": 150,
+      "winter_cereals": 150,
+      "winter_rapeseed": 150
+    },
+    "with_pixels_per_class": {
+      "grassland": 150,
+      "maize": 139,
+      "oil_pumpkin": 138,
+      "soybean": 89,
+      "vegetables": 140,
+      "winter_cereals": 138,
+      "winter_rapeseed": 135
+    },
+    "per_tile": {
+      "SI-LE-W": 154,
+      "SI-LJ": 249,
+      "SI-MS-S": 338,
+      "SI-PT-E": 255
+    }
+  },
+  "split": {
+    "parcels_per_class_and_role": {
+      "grassland": {
+        "buffer_excluded": 2,
+        "calibration": 27,
+        "fit": 71,
+        "test": 50
+      },
+      "maize": {
+        "buffer_excluded": 2,
+        "calibration": 22,
+        "fit": 68,
+        "test": 47
+      },
+      "oil_pumpkin": {
+        "buffer_excluded": 0,
+        "calibration": 19,
+        "fit": 72,
+        "test": 47
+      },
+      "soybean": {
+        "buffer_excluded": 1,
+        "calibration": 16,
+        "fit": 43,
+        "test": 29
+      },
+      "vegetables": {
+        "buffer_excluded": 4,
+        "calibration": 12,
+        "fit": 78,
+        "test": 46
+      },
+      "winter_cereals": {
+        "buffer_excluded": 1,
+        "calibration": 23,
+        "fit": 68,
+        "test": 46
+      },
+      "winter_rapeseed": {
+        "buffer_excluded": 1,
+        "calibration": 17,
+        "fit": 70,
+        "test": 47
+      }
+    },
+    "blocks_per_role": {
+      "buffer_excluded": 7,
+      "calibration": 16,
+      "fit": 44,
+      "test": 34
+    },
+    "pixels_per_role": {
+      "buffer_excluded": 346,
+      "calibration": 5324,
+      "fit": 19407,
+      "test": 12325
+    }
+  },
+  "samples": {
+    "pixels": 37402,
+    "features": 127,
+    "crs": "EPSG:32633",
+    "fingerprint": "8a8a1569e9ab174b36edd3b8330242237e099e76963fd3c090b103ca2915b565"
+  },
+  "imagery": {
+    "SI-MS-S": {
+      "tile": "SI-MS-S",
+      "bbox_wgs84": [
+        16.175585,
+        46.622105,
+        16.308342,
+        46.713496
+      ],
+      "items_found": 190,
+      "windows": {
+        "P1": {
+          "start": "2021-03-15",
+          "end": "2021-04-30",
+          "candidates": 8,
+          "used": [
+            "S2A_33TWM_20210331_1_L2A",
+            "S2B_33TWM_20210326_1_L2A",
+            "S2B_33TWM_20210405_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210331_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999996
+            },
+            {
+              "item": "S2B_33TWM_20210326_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.99992
+            },
+            {
+              "item": "S2B_33TWM_20210405_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.995512
+            }
+          ]
+        },
+        "P2": {
+          "start": "2021-05-01",
+          "end": "2021-05-31",
+          "candidates": 4,
+          "used": [
+            "S2B_33TWM_20210505_1_L2A",
+            "S2B_33TWM_20210515_0_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210510_1_L2A",
+              "status": "skipped: clear fraction 0.15",
+              "clear_fraction": null
+            },
+            {
+              "item": "S2B_33TWM_20210505_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210527_1_L2A",
+              "status": "skipped: clear fraction 0.39",
+              "clear_fraction": null
+            },
+            {
+              "item": "S2B_33TWM_20210515_0_L2A",
+              "status": "imported",
+              "clear_fraction": 0.637092
+            }
+          ]
+        },
+        "P3": {
+          "start": "2021-06-01",
+          "end": "2021-06-30",
+          "candidates": 11,
+          "used": [
+            "S2B_33TWM_20210621_1_L2A",
+            "S2A_33TWM_20210629_1_L2A",
+            "S2B_33TWM_20210624_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210621_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210629_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210624_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P4": {
+          "start": "2021-07-01",
+          "end": "2021-07-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210706_1_L2A",
+            "S2B_33TWM_20210724_1_L2A",
+            "S2A_33TWM_20210709_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210706_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210724_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210709_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P5": {
+          "start": "2021-08-01",
+          "end": "2021-08-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210815_1_L2A",
+            "S2B_33TWM_20210810_1_L2A",
+            "S2B_33TWM_20210820_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210815_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.709888
+            },
+            {
+              "item": "S2B_33TWM_20210810_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210820_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.981332
+            }
+          ]
+        },
+        "P6": {
+          "start": "2021-09-01",
+          "end": "2021-10-15",
+          "candidates": 9,
+          "used": [
+            "S2B_33TWM_20210912_1_L2A",
+            "S2A_33TWM_20210904_1_L2A",
+            "S2A_33TWM_20211014_2_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210912_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.99758
+            },
+            {
+              "item": "S2A_33TWM_20210904_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20211014_2_L2A",
+              "status": "imported",
+              "clear_fraction": 0.762984
+            }
+          ]
+        }
+      }
+    },
+    "SI-LE-W": {
+      "tile": "SI-LE-W",
+      "bbox_wgs84": [
+        16.305308,
+        46.584554,
+        16.43818,
+        46.676087
+      ],
+      "items_found": 190,
+      "windows": {
+        "P1": {
+          "start": "2021-03-15",
+          "end": "2021-04-30",
+          "candidates": 7,
+          "used": [
+            "S2A_33TXM_20210331_1_L2A",
+            "S2A_33TXM_20210321_1_L2A",
+            "S2B_33TXM_20210405_2_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TXM_20210331_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210321_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.99978
+            },
+            {
+              "item": "S2B_33TXM_20210405_2_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999952
+            }
+          ]
+        },
+        "P2": {
+          "start": "2021-05-01",
+          "end": "2021-05-31",
+          "candidates": 2,
+          "used": [
+            "S2B_33TXM_20210505_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TXM_20210505_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210527_1_L2A",
+              "status": "skipped: clear fraction 0.44",
+              "clear_fraction": null
+            }
+          ]
+        },
+        "P3": {
+          "start": "2021-06-01",
+          "end": "2021-06-30",
+          "candidates": 11,
+          "used": [
+            "S2B_33TXM_20210624_1_L2A",
+            "S2A_33TXM_20210616_1_L2A",
+            "S2A_33TXM_20210619_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TXM_20210624_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210616_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210619_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.9992
+            }
+          ]
+        },
+        "P4": {
+          "start": "2021-07-01",
+          "end": "2021-07-31",
+          "candidates": 10,
+          "used": [
+            "S2B_33TXM_20210724_1_L2A",
+            "S2A_33TXM_20210729_1_L2A",
+            "S2A_33TXM_20210706_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TXM_20210724_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210729_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210706_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P5": {
+          "start": "2021-08-01",
+          "end": "2021-08-31",
+          "candidates": 8,
+          "used": [
+            "S2A_33TXM_20210815_1_L2A",
+            "S2B_33TXM_20210810_1_L2A",
+            "S2A_33TXM_20210808_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TXM_20210815_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.955284
+            },
+            {
+              "item": "S2B_33TXM_20210810_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20210808_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.996884
+            }
+          ]
+        },
+        "P6": {
+          "start": "2021-09-01",
+          "end": "2021-10-15",
+          "candidates": 10,
+          "used": [
+            "S2B_33TXM_20210912_1_L2A",
+            "S2A_33TXM_20211004_1_L2A",
+            "S2A_33TXM_20211014_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TXM_20210912_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20211004_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TXM_20211014_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.516256
+            }
+          ]
+        }
+      }
+    },
+    "SI-LJ": {
+      "tile": "SI-LJ",
+      "bbox_wgs84": [
+        16.017856,
+        46.569802,
+        16.150229,
+        46.661017
+      ],
+      "items_found": 94,
+      "windows": {
+        "P1": {
+          "start": "2021-03-15",
+          "end": "2021-04-30",
+          "candidates": 8,
+          "used": [
+            "S2A_33TWM_20210331_1_L2A",
+            "S2B_33TWM_20210326_1_L2A",
+            "S2B_33TWM_20210405_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210331_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999992
+            },
+            {
+              "item": "S2B_33TWM_20210326_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210405_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.99224
+            }
+          ]
+        },
+        "P2": {
+          "start": "2021-05-01",
+          "end": "2021-05-31",
+          "candidates": 4,
+          "used": [
+            "S2A_33TWM_20210510_1_L2A",
+            "S2B_33TWM_20210505_1_L2A",
+            "S2A_33TWM_20210527_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210510_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.948436
+            },
+            {
+              "item": "S2B_33TWM_20210505_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.982976
+            },
+            {
+              "item": "S2A_33TWM_20210527_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.65144
+            }
+          ]
+        },
+        "P3": {
+          "start": "2021-06-01",
+          "end": "2021-06-30",
+          "candidates": 11,
+          "used": [
+            "S2B_33TWM_20210621_1_L2A",
+            "S2A_33TWM_20210629_1_L2A",
+            "S2B_33TWM_20210624_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210621_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210629_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210624_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P4": {
+          "start": "2021-07-01",
+          "end": "2021-07-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210706_1_L2A",
+            "S2B_33TWM_20210724_1_L2A",
+            "S2A_33TWM_20210709_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210706_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210724_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999844
+            },
+            {
+              "item": "S2A_33TWM_20210709_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P5": {
+          "start": "2021-08-01",
+          "end": "2021-08-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210815_1_L2A",
+            "S2B_33TWM_20210810_1_L2A",
+            "S2B_33TWM_20210820_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210815_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.766164
+            },
+            {
+              "item": "S2B_33TWM_20210810_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210820_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P6": {
+          "start": "2021-09-01",
+          "end": "2021-10-15",
+          "candidates": 9,
+          "used": [
+            "S2B_33TWM_20210912_1_L2A",
+            "S2A_33TWM_20210904_1_L2A",
+            "S2A_33TWM_20211014_2_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210912_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210904_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20211014_2_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999772
+            }
+          ]
+        }
+      }
+    },
+    "SI-PT-E": {
+      "tile": "SI-PT-E",
+      "bbox_wgs84": [
+        15.910168,
+        46.372844,
+        16.041884,
+        46.463938
+      ],
+      "items_found": 94,
+      "windows": {
+        "P1": {
+          "start": "2021-03-15",
+          "end": "2021-04-30",
+          "candidates": 8,
+          "used": [
+            "S2A_33TWM_20210331_1_L2A",
+            "S2B_33TWM_20210326_1_L2A",
+            "S2B_33TWM_20210405_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210331_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210326_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210405_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P2": {
+          "start": "2021-05-01",
+          "end": "2021-05-31",
+          "candidates": 4,
+          "used": [
+            "S2A_33TWM_20210510_1_L2A",
+            "S2B_33TWM_20210505_1_L2A",
+            "S2A_33TWM_20210527_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210510_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.952552
+            },
+            {
+              "item": "S2B_33TWM_20210505_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.617948
+            },
+            {
+              "item": "S2A_33TWM_20210527_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.549652
+            }
+          ]
+        },
+        "P3": {
+          "start": "2021-06-01",
+          "end": "2021-06-30",
+          "candidates": 11,
+          "used": [
+            "S2B_33TWM_20210621_1_L2A",
+            "S2A_33TWM_20210629_1_L2A",
+            "S2B_33TWM_20210624_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210621_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210629_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210624_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.9986
+            }
+          ]
+        },
+        "P4": {
+          "start": "2021-07-01",
+          "end": "2021-07-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210706_1_L2A",
+            "S2B_33TWM_20210724_1_L2A",
+            "S2A_33TWM_20210709_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210706_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2B_33TWM_20210724_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210709_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.99842
+            }
+          ]
+        },
+        "P5": {
+          "start": "2021-08-01",
+          "end": "2021-08-31",
+          "candidates": 7,
+          "used": [
+            "S2A_33TWM_20210815_1_L2A",
+            "S2B_33TWM_20210810_1_L2A",
+            "S2B_33TWM_20210820_1_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2A_33TWM_20210815_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.999864
+            },
+            {
+              "item": "S2B_33TWM_20210810_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.844968
+            },
+            {
+              "item": "S2B_33TWM_20210820_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            }
+          ]
+        },
+        "P6": {
+          "start": "2021-09-01",
+          "end": "2021-10-15",
+          "candidates": 9,
+          "used": [
+            "S2B_33TWM_20210912_1_L2A",
+            "S2A_33TWM_20210904_1_L2A",
+            "S2A_33TWM_20211014_2_L2A"
+          ],
+          "tried": [
+            {
+              "item": "S2B_33TWM_20210912_1_L2A",
+              "status": "imported",
+              "clear_fraction": 1.0
+            },
+            {
+              "item": "S2A_33TWM_20210904_1_L2A",
+              "status": "imported",
+              "clear_fraction": 0.993448
+            },
+            {
+              "item": "S2A_33TWM_20211014_2_L2A",
+              "status": "imported",
+              "clear_fraction": 0.9989
+            }
+          ]
+        }
+      }
+    }
+  },
+  "classes": [
+    "grassland",
+    "maize",
+    "oil_pumpkin",
+    "soybean",
+    "vegetables",
+    "winter_cereals",
+    "winter_rapeseed"
+  ],
+  "models": {
+    "rf": {
+      "status": "ok",
+      "params": {
+        "algorithm": "rf",
+        "n_estimators": 300,
+        "max_features": "sqrt",
+        "class_weight": "balanced_subsample",
+        "n_jobs": -1
+      },
+      "parcel": {
+        "n": 312,
+        "overall_accuracy": 0.8685897435897436,
+        "kappa": 0.8456898839537745,
+        "macro_f1": 0.8550305544881841,
+        "weighted_f1": 0.8671250910467267,
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "soybean",
+          "vegetables",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "confusion_matrix": [
+          [
+            50,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            45,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            45,
+            0,
+            2,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            15,
+            12,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            3,
+            0,
+            35,
+            6,
+            1
+          ],
+          [
+            0,
+            1,
+            0,
+            0,
+            9,
+            35,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            46
+          ]
+        ],
+        "per_class": {
+          "grassland": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.9803921568627451,
+            "f1": 0.99009900990099,
+            "reference_count": 50,
+            "map_count": 51
+          },
+          "maize": {
+            "producers_accuracy": 0.9574468085106383,
+            "users_accuracy": 0.9574468085106383,
+            "f1": 0.9574468085106385,
+            "reference_count": 47,
+            "map_count": 47
+          },
+          "oil_pumpkin": {
+            "producers_accuracy": 0.9574468085106383,
+            "users_accuracy": 0.9,
+            "f1": 0.9278350515463918,
+            "reference_count": 47,
+            "map_count": 50
+          },
+          "soybean": {
+            "producers_accuracy": 0.5172413793103449,
+            "users_accuracy": 1.0,
+            "f1": 0.6818181818181819,
+            "reference_count": 29,
+            "map_count": 15
+          },
+          "vegetables": {
+            "producers_accuracy": 0.7608695652173914,
+            "users_accuracy": 0.603448275862069,
+            "f1": 0.673076923076923,
+            "reference_count": 46,
+            "map_count": 58
+          },
+          "winter_cereals": {
+            "producers_accuracy": 0.7608695652173914,
+            "users_accuracy": 0.813953488372093,
+            "f1": 0.7865168539325844,
+            "reference_count": 46,
+            "map_count": 43
+          },
+          "winter_rapeseed": {
+            "producers_accuracy": 0.9787234042553191,
+            "users_accuracy": 0.9583333333333334,
+            "f1": 0.968421052631579,
+            "reference_count": 47,
+            "map_count": 48
+          }
+        }
+      },
+      "pixel": {
+        "n": 12325,
+        "overall_accuracy": 0.8406490872210953,
+        "macro_f1": 0.8219890379420516,
+        "kappa": 0.812907743374747
+      },
+      "bootstrap": {
+        "n_boot": 1000,
+        "units": "spatial blocks",
+        "n_units": 34,
+        "confidence": 0.95,
+        "overall_accuracy_ci": [
+          0.8113650206749824,
+          0.9217886193656397
+        ],
+        "macro_f1_ci": [
+          0.7818291347013238,
+          0.9169807925500869
+        ],
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9666666666666666,
+            1.0
+          ],
+          "maize": [
+            0.8910341034103411,
+            1.0
+          ],
+          "oil_pumpkin": [
+            0.8656514723678902,
+            0.9719626168224299
+          ],
+          "soybean": [
+            0.33333333333333337,
+            0.9500000000000001
+          ],
+          "vegetables": [
+            0.5238095238095238,
+            0.8248133665126198
+          ],
+          "winter_cereals": [
+            0.5969544171036708,
+            0.9056751179245283
+          ],
+          "winter_rapeseed": [
+            0.918918918918919,
+            1.0
+          ]
+        }
+      },
+      "conformal": {
+        "coverage": 0.9166666666666666,
+        "mean_set_size": 1.266025641025641,
+        "singleton_rate": 0.7339743589743589,
+        "empty_rate": 0.003205128205128205,
+        "per_class_coverage": {
+          "grassland": 0.94,
+          "maize": 0.9361702127659575,
+          "oil_pumpkin": 0.9574468085106383,
+          "soybean": 0.5862068965517241,
+          "vegetables": 0.9347826086956522,
+          "winter_cereals": 0.9565217391304348,
+          "winter_rapeseed": 0.9787234042553191
+        },
+        "target": 0.9,
+        "always_include_classes": []
+      },
+      "review": {
+        "target_accuracy": 0.95,
+        "threshold_from_calibration": 0.48379629629629634,
+        "review_share": 0.16025641025641024,
+        "accepted_accuracy": 0.9198473282442748,
+        "accepted_parcels": 262
+      },
+      "time": {
+        "fit_s": 2.026,
+        "predict_s": 0.152,
+        "predict_pixels_per_s": 116045.2,
+        "fit_pixels": 19407
+      },
+      "peak_rss_mb_after": 1647.8,
+      "wall_s": 2.99
+    },
+    "extra_trees": {
+      "status": "ok",
+      "params": {
+        "algorithm": "extra_trees",
+        "n_estimators": 300,
+        "max_features": "sqrt",
+        "class_weight": "balanced_subsample",
+        "n_jobs": -1
+      },
+      "parcel": {
+        "n": 312,
+        "overall_accuracy": 0.8814102564102564,
+        "kappa": 0.8607058823529412,
+        "macro_f1": 0.8626910797392032,
+        "weighted_f1": 0.8767109709629282,
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "soybean",
+          "vegetables",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "confusion_matrix": [
+          [
+            50,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            45,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            47,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            3,
+            14,
+            12,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            3,
+            0,
+            35,
+            4,
+            1
+          ],
+          [
+            0,
+            1,
+            0,
+            0,
+            7,
+            37,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            47
+          ]
+        ],
+        "per_class": {
+          "grassland": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.9803921568627451,
+            "f1": 0.99009900990099,
+            "reference_count": 50,
+            "map_count": 51
+          },
+          "maize": {
+            "producers_accuracy": 0.9574468085106383,
+            "users_accuracy": 0.9183673469387755,
+            "f1": 0.9375000000000001,
+            "reference_count": 47,
+            "map_count": 49
+          },
+          "oil_pumpkin": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.8867924528301887,
+            "f1": 0.9400000000000001,
+            "reference_count": 47,
+            "map_count": 53
+          },
+          "soybean": {
+            "producers_accuracy": 0.4827586206896552,
+            "users_accuracy": 1.0,
+            "f1": 0.6511627906976745,
+            "reference_count": 29,
+            "map_count": 14
+          },
+          "vegetables": {
+            "producers_accuracy": 0.7608695652173914,
+            "users_accuracy": 0.6481481481481481,
+            "f1": 0.7000000000000001,
+            "reference_count": 46,
+            "map_count": 54
+          },
+          "winter_cereals": {
+            "producers_accuracy": 0.8043478260869565,
+            "users_accuracy": 0.8809523809523809,
+            "f1": 0.8409090909090908,
+            "reference_count": 46,
+            "map_count": 42
+          },
+          "winter_rapeseed": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.9591836734693877,
+            "f1": 0.9791666666666666,
+            "reference_count": 47,
+            "map_count": 49
+          }
+        }
+      },
+      "pixel": {
+        "n": 12325,
+        "overall_accuracy": 0.8377281947261663,
+        "macro_f1": 0.8180430336989886,
+        "kappa": 0.8094620820847399
+      },
+      "bootstrap": {
+        "n_boot": 1000,
+        "units": "spatial blocks",
+        "n_units": 34,
+        "confidence": 0.95,
+        "overall_accuracy_ci": [
+          0.828123880730659,
+          0.9314199573046015
+        ],
+        "macro_f1_ci": [
+          0.7862239615682018,
+          0.9264494709995136
+        ],
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9666666666666666,
+            1.0
+          ],
+          "maize": [
+            0.8571428571428572,
+            0.9904849279161206
+          ],
+          "oil_pumpkin": [
+            0.8790606653620354,
+            0.9827586206896551
+          ],
+          "soybean": [
+            0.2962418300653596,
+            0.9232142857142855
+          ],
+          "vegetables": [
+            0.5405405405405406,
+            0.8493321917808218
+          ],
+          "winter_cereals": [
+            0.6904556650246306,
+            0.9333695652173913
+          ],
+          "winter_rapeseed": [
+            0.945933660933661,
+            1.0
+          ]
+        }
+      },
+      "conformal": {
+        "coverage": 0.9294871794871795,
+        "mean_set_size": 1.3685897435897436,
+        "singleton_rate": 0.6538461538461539,
+        "empty_rate": 0.003205128205128205,
+        "per_class_coverage": {
+          "grassland": 0.94,
+          "maize": 0.9361702127659575,
+          "oil_pumpkin": 1.0,
+          "soybean": 0.5862068965517241,
+          "vegetables": 0.9347826086956522,
+          "winter_cereals": 0.9782608695652174,
+          "winter_rapeseed": 1.0
+        },
+        "target": 0.9,
+        "always_include_classes": []
+      },
+      "review": {
+        "target_accuracy": 0.95,
+        "threshold_from_calibration": 0.5197777777777778,
+        "review_share": 0.19871794871794868,
+        "accepted_accuracy": 0.94,
+        "accepted_parcels": 250
+      },
+      "time": {
+        "fit_s": 0.501,
+        "predict_s": 0.158,
+        "predict_pixels_per_s": 111972.7,
+        "fit_pixels": 19407
+      },
+      "peak_rss_mb_after": 1648.6,
+      "wall_s": 1.13
+    },
+    "hist_gb": {
+      "status": "ok",
+      "params": {
+        "algorithm": "hist_gb",
+        "n_estimators": 300,
+        "learning_rate": 0.05
+      },
+      "parcel": {
+        "n": 312,
+        "overall_accuracy": 0.8782051282051282,
+        "kappa": 0.8569498069498069,
+        "macro_f1": 0.8605828438149574,
+        "weighted_f1": 0.8746270569931084,
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "soybean",
+          "vegetables",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "confusion_matrix": [
+          [
+            50,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            45,
+            1,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            46,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            14,
+            13,
+            0,
+            0
+          ],
+          [
+            0,
+            2,
+            3,
+            0,
+            35,
+            4,
+            2
+          ],
+          [
+            0,
+            1,
+            0,
+            0,
+            7,
+            37,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            47
+          ]
+        ],
+        "per_class": {
+          "grassland": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 1.0,
+            "f1": 1.0,
+            "reference_count": 50,
+            "map_count": 50
+          },
+          "maize": {
+            "producers_accuracy": 0.9574468085106383,
+            "users_accuracy": 0.9375,
+            "f1": 0.9473684210526315,
+            "reference_count": 47,
+            "map_count": 48
+          },
+          "oil_pumpkin": {
+            "producers_accuracy": 0.9787234042553191,
+            "users_accuracy": 0.8846153846153846,
+            "f1": 0.9292929292929293,
+            "reference_count": 47,
+            "map_count": 52
+          },
+          "soybean": {
+            "producers_accuracy": 0.4827586206896552,
+            "users_accuracy": 1.0,
+            "f1": 0.6511627906976745,
+            "reference_count": 29,
+            "map_count": 14
+          },
+          "vegetables": {
+            "producers_accuracy": 0.7608695652173914,
+            "users_accuracy": 0.625,
+            "f1": 0.6862745098039216,
+            "reference_count": 46,
+            "map_count": 56
+          },
+          "winter_cereals": {
+            "producers_accuracy": 0.8043478260869565,
+            "users_accuracy": 0.8809523809523809,
+            "f1": 0.8409090909090908,
+            "reference_count": 46,
+            "map_count": 42
+          },
+          "winter_rapeseed": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.94,
+            "f1": 0.9690721649484536,
+            "reference_count": 47,
+            "map_count": 50
+          }
+        }
+      },
+      "pixel": {
+        "n": 12325,
+        "overall_accuracy": 0.8489249492900609,
+        "macro_f1": 0.8311653811941383,
+        "kappa": 0.82266430150553
+      },
+      "bootstrap": {
+        "n_boot": 1000,
+        "units": "spatial blocks",
+        "n_units": 34,
+        "confidence": 0.95,
+        "overall_accuracy_ci": [
+          0.8295759766640353,
+          0.9250817382181068
+        ],
+        "macro_f1_ci": [
+          0.79419224384588,
+          0.9161278470954058
+        ],
+        "per_class_f1_ci": {
+          "grassland": [
+            1.0,
+            1.0
+          ],
+          "maize": [
+            0.8809285714285714,
+            0.9909909909909909
+          ],
+          "oil_pumpkin": [
+            0.8607358334319177,
+            0.9771162001696352
+          ],
+          "soybean": [
+            0.33313953488372117,
+            0.9167008196721311
+          ],
+          "vegetables": [
+            0.5351643192488262,
+            0.8281425957207208
+          ],
+          "winter_cereals": [
+            0.6856947162426614,
+            0.9375
+          ],
+          "winter_rapeseed": [
+            0.923076923076923,
+            1.0
+          ]
+        }
+      },
+      "conformal": {
+        "coverage": 0.8910256410256411,
+        "mean_set_size": 1.2243589743589745,
+        "singleton_rate": 0.7724358974358975,
+        "empty_rate": 0.003205128205128205,
+        "per_class_coverage": {
+          "grassland": 0.94,
+          "maize": 0.9148936170212766,
+          "oil_pumpkin": 0.851063829787234,
+          "soybean": 0.4827586206896552,
+          "vegetables": 0.9565217391304348,
+          "winter_cereals": 0.9782608695652174,
+          "winter_rapeseed": 0.9574468085106383
+        },
+        "target": 0.9,
+        "always_include_classes": []
+      },
+      "review": {
+        "target_accuracy": 0.95,
+        "threshold_from_calibration": 0.8215599783199875,
+        "review_share": 0.16666666666666663,
+        "accepted_accuracy": 0.9346153846153846,
+        "accepted_parcels": 260
+      },
+      "time": {
+        "fit_s": 28.181,
+        "predict_s": 0.187,
+        "predict_pixels_per_s": 94535.0,
+        "fit_pixels": 19407
+      },
+      "peak_rss_mb_after": 1648.6,
+      "wall_s": 28.86
+    },
+    "lightgbm": {
+      "status": "skipped",
+      "reason": "pip install lightgbm",
+      "params": {
+        "algorithm": "lightgbm",
+        "n_estimators": 400,
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "class_weight": "balanced",
+        "n_jobs": -1
+      },
+      "wall_s": 0.0
+    },
+    "catboost": {
+      "status": "ok",
+      "params": {
+        "algorithm": "catboost",
+        "n_estimators": 500,
+        "max_depth": 6,
+        "class_weight": "balanced"
+      },
+      "parcel": {
+        "n": 312,
+        "overall_accuracy": 0.8846153846153846,
+        "kappa": 0.8646176098354728,
+        "macro_f1": 0.8719277136299611,
+        "weighted_f1": 0.8831525824456765,
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "soybean",
+          "vegetables",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "confusion_matrix": [
+          [
+            50,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            44,
+            0,
+            0,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            46,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            17,
+            12,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            2,
+            1,
+            35,
+            4,
+            3
+          ],
+          [
+            0,
+            1,
+            0,
+            0,
+            7,
+            37,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            47
+          ]
+        ],
+        "per_class": {
+          "grassland": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.9803921568627451,
+            "f1": 0.99009900990099,
+            "reference_count": 50,
+            "map_count": 51
+          },
+          "maize": {
+            "producers_accuracy": 0.9361702127659575,
+            "users_accuracy": 0.9565217391304348,
+            "f1": 0.9462365591397849,
+            "reference_count": 47,
+            "map_count": 46
+          },
+          "oil_pumpkin": {
+            "producers_accuracy": 0.9787234042553191,
+            "users_accuracy": 0.9583333333333334,
+            "f1": 0.968421052631579,
+            "reference_count": 47,
+            "map_count": 48
+          },
+          "soybean": {
+            "producers_accuracy": 0.5862068965517241,
+            "users_accuracy": 0.8947368421052632,
+            "f1": 0.7083333333333333,
+            "reference_count": 29,
+            "map_count": 19
+          },
+          "vegetables": {
+            "producers_accuracy": 0.7608695652173914,
+            "users_accuracy": 0.6481481481481481,
+            "f1": 0.7000000000000001,
+            "reference_count": 46,
+            "map_count": 54
+          },
+          "winter_cereals": {
+            "producers_accuracy": 0.8043478260869565,
+            "users_accuracy": 0.8809523809523809,
+            "f1": 0.8409090909090908,
+            "reference_count": 46,
+            "map_count": 42
+          },
+          "winter_rapeseed": {
+            "producers_accuracy": 1.0,
+            "users_accuracy": 0.9038461538461539,
+            "f1": 0.9494949494949495,
+            "reference_count": 47,
+            "map_count": 52
+          }
+        }
+      },
+      "pixel": {
+        "n": 12325,
+        "overall_accuracy": 0.8482758620689655,
+        "macro_f1": 0.8316097269716628,
+        "kappa": 0.82195677467151
+      },
+      "bootstrap": {
+        "n_boot": 1000,
+        "units": "spatial blocks",
+        "n_units": 34,
+        "confidence": 0.95,
+        "overall_accuracy_ci": [
+          0.8353649408500072,
+          0.9320416988859295
+        ],
+        "macro_f1_ci": [
+          0.8092015280619197,
+          0.9268987255820167
+        ],
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9666666666666666,
+            1.0
+          ],
+          "maize": [
+            0.875,
+            0.9911580062022539
+          ],
+          "oil_pumpkin": [
+            0.9278209934395503,
+            1.0
+          ],
+          "soybean": [
+            0.3901652242328876,
+            0.9500000000000001
+          ],
+          "vegetables": [
+            0.5683409610983982,
+            0.8276282590412112
+          ],
+          "winter_cereals": [
+            0.6856947162426614,
+            0.9375
+          ],
+          "winter_rapeseed": [
+            0.8524241367282875,
+            1.0
+          ]
+        }
+      },
+      "conformal": {
+        "coverage": 0.9198717948717948,
+        "mean_set_size": 1.5737179487179487,
+        "singleton_rate": 0.46474358974358976,
+        "empty_rate": 0.0,
+        "per_class_coverage": {
+          "grassland": 0.96,
+          "maize": 0.9361702127659575,
+          "oil_pumpkin": 0.8723404255319149,
+          "soybean": 0.5862068965517241,
+          "vegetables": 1.0,
+          "winter_cereals": 0.9782608695652174,
+          "winter_rapeseed": 0.9787234042553191
+        },
+        "target": 0.9,
+        "always_include_classes": []
+      },
+      "review": {
+        "target_accuracy": 0.95,
+        "threshold_from_calibration": 0.6139077651346582,
+        "review_share": 0.08333333333333337,
+        "accepted_accuracy": 0.9125874125874126,
+        "accepted_parcels": 286
+      },
+      "time": {
+        "fit_s": 5.935,
+        "predict_s": 0.007,
+        "predict_pixels_per_s": 2411243.8,
+        "fit_pixels": 19407
+      },
+      "peak_rss_mb_after": 1795.8,
+      "wall_s": 6.43
+    }
+  },
+  "stages": {
+    "labels": {
+      "seconds": 1.3,
+      "peak_rss_mb": 273.5
+    },
+    "imagery_and_samples": {
+      "seconds": 449.3,
+      "peak_rss_mb": 1625.0
+    },
+    "models": {
+      "seconds": 39.4,
+      "peak_rss_mb": 1795.8
+    }
+  },
+  "peak_rss_mb": 1795.8,
+  "note": "Parcel-level scores on a spatial-block holdout of public EuroCrops declarations (declared, not field-verified, labels). Valid for this protocol only; not evidence of accuracy elsewhere."
+}

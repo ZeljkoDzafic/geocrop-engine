@@ -8,6 +8,18 @@ public part of gap G1; the private Semberija field-data study follows the same p
 |---|---|---|---|
 | [`eurocrops_si_2021_pomurje.v1.yaml`](../../configs/benchmarks/eurocrops_si_2021_pomurje.v1.yaml) | EuroCrops Slovenia 2021 (CC-BY-SA-4.0) | Sentinel-2 L2A, Earth Search STAC | [eurocrops-si-2021-pomurje.v1.md](eurocrops-si-2021-pomurje.v1.md) ([JSON](eurocrops-si-2021-pomurje.v1.json)) |
 
+### v1 result in brief (2026-10-26)
+
+Parcel-level overall accuracy 86.9 % (RF baseline) to 88.5 % (CatBoost), macro-F1 85.5-87.2 %, with block-bootstrap
+intervals of roughly ±5 points; the four models overlap. Grassland, maize, oil pumpkin and winter rapeseed reach
+F1 > 92 %; vegetables (mixed declarations) and soybean (29 test parcels) stay near 65-70 % with wide intervals.
+Split-conformal sets at 90 % target covered 89-93 % of test parcels with 1.2-1.6 classes on average. Sending
+8-20 % of parcels to review raised the accuracy of the accepted parcels to 91-94 %, short of the 95 % target set
+on the calibration parcels. Imagery import and compositing took ~7.5 min for the four tiles; model fitting took
+0.5-28 s per model on 19 407 training pixels; peak RSS 1.8 GB. LightGBM was skipped (its native library could not
+be loaded on the benchmark machine). The same scores and sample fingerprint were obtained in three runs (two with a
+fresh work directory). Full table: [eurocrops-si-2021-pomurje.v1.md](eurocrops-si-2021-pomurje.v1.md).
+
 ## Running
 
 ```bash
