@@ -8,14 +8,20 @@ Two families share one output contract:
 * **Presto** (Tseng et al., 2023) embeddings computed locally (CPU) from GeoCrop's own monthly
   Sentinel-1/Sentinel-2 composites, per pixel (blockwise) or per parcel (from parcel-mean series).
 
+Further sources (Galileo, AnySat, third-party plugins) are feature providers registered in
+`geocrop.plugins.feature_providers` (see `geocrop.feature_providers`); the monthly-composite machinery below
+(`timeseries_pixels`, `timeseries_parcels`) is shared by every on-VM encoder.
+
 Output: ``embeddings/<source>_<year>.tif`` on the reference grid, float32, nodata -9999, one band per
-embedding dimension with descriptions ``emb_00``, ``emb_01``, ... and a feature manifest
-(``<source>_<year>.features.json``, group ``emb``) so that `geocrop.features.attach_embeddings` (or
-``geocrop merge-stacks``) can append it to a handcrafted feature stack. Only one embedding source can be part
-of a stack at a time (feature names are the band descriptions).
+embedding dimension and a feature manifest (``<source>_<year>.features.json``, group ``emb``) so that
+`geocrop.features.attach_embeddings` (or ``geocrop merge-stacks``) can append it to a handcrafted feature
+stack. Band descriptions are the feature names: ``emb_<provider>_00`` ... (namespaced, several providers fit
+in one stack) or the legacy ``emb_00`` ... that AlphaEarth, TESSERA and Presto still write by default. Stacks
+with legacy names stay readable (`parse_band_name`, `embedding_features`).
 """
 from __future__ import annotations
 
+import json
 import warnings
 from contextlib import ExitStack
 from dataclasses import asdict
@@ -27,7 +33,7 @@ import rasterio
 from affine import Affine
 from rasterio.warp import Resampling, reproject
 
-from .features import Feature
+from .features import Feature, manifest_path
 from .features import write_manifest as write_feature_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned, same_grid
 
@@ -59,13 +65,81 @@ SOURCE_INFO: dict[str, dict] = {
 }
 
 
-def band_names(dims: int) -> list[str]:
-    return [f"emb_{i:02d}" for i in range(dims)]
+#: Sources that wrote legacy (not namespaced) feature names before feature providers existed.
+LEGACY_SOURCES = SOURCES
+
+
+def band_names(dims: int, provider: str | None = None) -> list[str]:
+    """Feature names of an embedding: legacy ``emb_00`` ... or, with `provider`, ``emb_<provider>_00`` ..."""
+    prefix = "emb_" if provider is None else f"emb_{provider}_"
+    return [f"{prefix}{i:02d}" for i in range(int(dims))]
+
+
+def parse_band_name(name: str) -> tuple[str | None, int] | None:
+    """``emb_07`` -> (None, 7) (legacy), ``emb_presto_07`` -> ("presto", 7); None for non-embedding names."""
+    parts = str(name).split("_")
+    if len(parts) < 2 or parts[0] != "emb" or not parts[-1].isdigit():
+        return None
+    provider = "_".join(parts[1:-1]) or None
+    return provider, int(parts[-1])
+
+
+def embedding_features(features, provider: str | None = None) -> list[str]:
+    """Names of the ``emb`` features of a manifest, optionally of one provider.
+
+    Legacy stacks (``emb_00`` ...) carry no provider in the name; their provider is recovered from the
+    feature's sensor (``AlphaEarth``, ``TESSERA``, ``Presto`` or a provider's ``sensor``)."""
+    out = []
+    for f in features:
+        if f.group != "emb":
+            continue
+        if provider is not None:
+            parsed = parse_band_name(f.name)
+            owner = parsed[0] if parsed else None
+            if owner is None:
+                owner = _sensor_to_source(f.sensor)
+            if owner != provider:
+                continue
+        out.append(f.name)
+    return out
+
+
+def _sensor_to_source(sensor) -> str | None:
+    for name, info in SOURCE_INFO.items():
+        if info["sensor"] == sensor:
+            return name
+    try:
+        from . import plugins
+        for name in plugins.feature_providers.names():
+            if getattr(plugins.feature_providers.get(name), "sensor", None) == sensor:
+                return name
+    except Exception:     # pragma: no cover - a broken plugin must not break reading a stack
+        return None
+    return None
+
+
+def source_info(source: str) -> dict:
+    """Metadata (dims, sensor, product, licence, attribution, dequantisation) of a source or provider."""
+    if source in SOURCE_INFO:
+        return SOURCE_INFO[source]
+    from . import plugins
+    p = plugins.feature_providers.get(source)
+    return {"dims": int(p.dims), "sensor": p.sensor, "product": p.product, "licence": p.licence,
+            "attribution": p.attribution, "dequantisation": getattr(p, "dequantisation", "none")}
+
+
+def known_source(source: str) -> bool:
+    if source in SOURCES:
+        return True
+    from . import plugins
+    return source in plugins.feature_providers
 
 
 def output_path(directory: str | Path, source: str, year: int) -> Path:
-    if source not in SOURCES:
-        raise ValueError(f"Unknown embedding source {source!r}; choose from {', '.join(SOURCES)}")
+    if not known_source(source):
+        from . import plugins
+        raise ValueError(f"Unknown embedding source {source!r}; choose from "
+                         f"{', '.join(dict.fromkeys([*SOURCES, *plugins.feature_providers.names()]))}")
     return Path(directory) / f"{source}_{int(year)}.tif"
 
 
@@ -120,9 +194,12 @@ class EmbeddingWriter:
     """Create ``<source>_<year>.tif`` on a reference grid and its ``emb`` feature manifest."""
 
     def __init__(self, output: str | Path, reference: str | Path, source: str, year: int, dims: int | None = None,
-                 extra: dict | None = None):
+                 extra: dict | None = None, names: list[str] | None = None):
         self.output, self.reference, self.source, self.year = ensure_parent(output), Path(reference), source, int(year)
-        self.dims = int(dims or SOURCE_INFO[source]["dims"])
+        self.dims = int(dims or (len(names) if names else source_info(source)["dims"]))
+        self.names = list(names) if names else band_names(self.dims)
+        if len(self.names) != self.dims:
+            raise ValueError(f"{len(self.names)} feature names for {self.dims} embedding dimensions")
         self.extra = dict(extra or {})
         self._sink = None
 
@@ -133,7 +210,7 @@ class EmbeddingWriter:
             self.crs, self.transform, self.shape = ref.crs, ref.transform, ref.shape
             profile = float_profile(ref, count=self.dims)
         self._sink = rasterio.open(self.output, "w", **profile)
-        for i, n in enumerate(band_names(self.dims), 1):
+        for i, n in enumerate(self.names, 1):
             self._sink.set_band_description(i, n)
         return self
 
@@ -142,20 +219,21 @@ class EmbeddingWriter:
         self._sink.write(np.where(np.isfinite(data), data, NODATA).astype("float32"), window=window)
 
     def __exit__(self, *exc):
-        info = {k: v for k, v in SOURCE_INFO[self.source].items() if k != "dims"}
+        info = {k: v for k, v in source_info(self.source).items() if k != "dims"}
         self._sink.update_tags(embedding_source=self.source, year=str(self.year), licence=info["licence"],
                                attribution=info["attribution"], dequantisation=info["dequantisation"],
                                **{k: str(v) for k, v in self.extra.items()})
         self._sink.close()
         if exc[0] is None:
-            write_manifest(self.output, self.source, self.year, self.dims, self.extra)
+            write_manifest(self.output, self.source, self.year, self.dims, self.extra, self.names)
         return False
 
 
-def write_manifest(output: str | Path, source: str, year: int, dims: int, extra: dict | None = None) -> Path:
-    info = SOURCE_INFO[source]
+def write_manifest(output: str | Path, source: str, year: int, dims: int, extra: dict | None = None,
+                   names: list[str] | None = None) -> Path:
+    info = source_info(source)
     feats = [Feature(n, "emb", info["sensor"], None, (), f"{info['product']} {year}, dimension {i}")
-             for i, n in enumerate(band_names(dims))]
+             for i, n in enumerate(names or band_names(dims))]
     return write_feature_manifest(output, {
         "stack": Path(output).name, "nodata": NODATA,
         "embedding": {"source": source, "year": int(year), "dims": dims,
@@ -163,16 +241,46 @@ def write_manifest(output: str | Path, source: str, year: int, dims: int, extra:
         "features": [asdict(f) for f in feats]})
 
 
+def namespaced_copy(raster: str | Path, output: str | Path) -> Path:
+    """Copy of a legacy embeddings raster (``emb_NN``) whose features are renamed ``emb_<source>_NN``.
+
+    The source comes from the raster's manifest (``embedding.source``) or its ``embedding_source`` tag. Used to
+    attach a second embedding source written with legacy names to a stack that already holds ``emb_NN``."""
+    import shutil
+
+    from .features import load_manifest
+
+    raster, output = Path(raster), ensure_parent(output)
+    body = json.loads(manifest_path(raster).read_text(encoding="utf8")) if manifest_path(raster).exists() else {}
+    with rasterio.open(raster) as ds:
+        source = (body.get("embedding") or {}).get("source") or ds.tags().get("embedding_source")
+    if not source:
+        raise ValueError(f"{raster}: cannot tell the embedding source (no manifest / embedding_source tag)")
+    feats = load_manifest(raster)
+    rename = {f.name: f"emb_{source}_{p[1]:02d}" for f in feats if (p := parse_band_name(f.name)) and p[0] is None}
+    shutil.copy(raster, output)
+    with rasterio.open(output, "r+") as ds:
+        for i, d in enumerate(ds.descriptions, 1):
+            if d in rename:
+                ds.set_band_description(i, rename[d])
+    body = body or {"stack": output.name, "nodata": NODATA, "features": [asdict(f) for f in feats]}
+    body["stack"] = output.name
+    body["features"] = [{**f, "name": rename.get(f["name"], f["name"])} for f in body["features"]]
+    write_feature_manifest(output, body)
+    return output
+
+
 def summary(path: str | Path, sample: int = 200_000, seed: int = 0) -> dict:
     """Value ranges of an embeddings raster (for reports): valid fraction, min/max/mean, mean vector norm."""
     with rasterio.open(path) as ds:
-        data = ds.read().astype("float64")
-        data[data == ds.nodata] = np.nan
+        data = ds.read()                       # float32; only the sampled rows are promoted to float64
+        nodata = ds.nodata
     flat = data.reshape(data.shape[0], -1).T
-    valid = np.isfinite(flat).all(axis=1)
-    v = flat[valid]
-    if len(v) > sample:
-        v = v[np.random.default_rng(seed).choice(len(v), sample, replace=False)]
+    valid = (np.isfinite(flat) & (flat != nodata)).all(axis=1)
+    rows = np.flatnonzero(valid)
+    if len(rows) > sample:
+        rows = rows[np.random.default_rng(seed).choice(len(rows), sample, replace=False)]
+    v = flat[rows].astype("float64")
     if not len(v):
         return {"pixels": int(len(flat)), "valid_fraction": 0.0}
     norms = np.linalg.norm(v, axis=1)
@@ -394,51 +502,74 @@ def _latlon(transform, crs, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
     return np.column_stack([lat, lon]).astype("float32")
 
 
-def presto_pixels(monthly: str | Path, reference: str | Path, output: str | Path, start: str, months: int = 12,
-                  model=None, checkpoint: str | Path | None = None, block_size: int = 256,
-                  batch_size: int = 512, extra: dict | None = None) -> Path:
-    """Pixel-level Presto embeddings from monthly composites, block by block on CPU (memory O(block²))."""
-    names = month_names(start, months)
-    model = model if model is not None else load_presto(checkpoint)
-    month0 = int(names[0].split("-")[1]) - 1
-    year = int(names[-1].split("-")[0])
-    info = {"start": names[0], "months": len(names), "start_month_index": month0, **(extra or {})}
+def default_names(provider, dims: int) -> list[str]:
+    """Feature names a provider writes by default: legacy ``emb_NN`` for legacy providers, else namespaced."""
+    return band_names(dims, None if getattr(provider, "legacy_names", False) else provider.name)
+
+
+def _fit_state(provider, sources, ref, block_size: int) -> dict:
+    """Dataset-level state of a provider (e.g. AnySat's per-channel statistics), from one pass over the grid."""
+    fit = getattr(provider, "fit", None)
+    if fit is None:
+        return {}
+    return fit(_block_series(sources, ref, w) for w in blocks(ref.width, ref.height, block_size)) or {}
+
+
+def timeseries_pixels(provider, monthly: str | Path, reference: str | Path, output: str | Path, start: str,
+                      months: int = 12, model=None, block_size: int = 256, batch_size: int = 512,
+                      extra: dict | None = None, names: list[str] | None = None, state: dict | None = None) -> Path:
+    """Pixel-level embeddings of a monthly-composite encoder (`provider`), block by block on CPU.
+
+    `provider` needs ``name``, ``model_dims(model)`` and ``encode(model, s2, s1, latlons, month0, batch_size,
+    state)`` returning (N, D) with NaN rows for pixels without observations; ``fit(blocks)`` is optional."""
+    names_m = month_names(start, months)
+    month0 = int(names_m[0].split("-")[1]) - 1
+    year = int(names_m[-1].split("-")[0])
+    info = {"start": names_m[0], "months": len(names_m), "start_month_index": month0, **(extra or {})}
     with ExitStack() as stack, rasterio.open(reference) as ref:
-        sources = _monthly_sources(stack, Path(monthly), names)
+        sources = _monthly_sources(stack, Path(monthly), names_m)
         info["months_with_s2"] = sum(bool(s["s2"]) for s in sources)
         info["months_with_s1"] = sum(bool(s["s1"]) for s in sources)
-        with EmbeddingWriter(output, reference, "presto", year, getattr(model, "embedding_size", 128), info) as sink:
+        if state is None:
+            state = _fit_state(provider, sources, ref, max(block_size, 512))
+        if state:
+            info["provider_state"] = json.dumps(state, default=float)
+        dims = provider.model_dims(model)
+        with EmbeddingWriter(output, reference, provider.name, year, dims, info,
+                             names or default_names(provider, dims)) as sink:
             for w in blocks(ref.width, ref.height, block_size):
                 s2, s1 = _block_series(sources, ref, w)
-                x, mask = presto_inputs(s2, s1)
                 rr, cc = np.mgrid[int(w.row_off):int(w.row_off + w.height), int(w.col_off):int(w.col_off + w.width)]
-                emb = presto_embed(model, x, mask, _latlon(ref.transform, ref.crs, rr.ravel(), cc.ravel()), month0,
-                                   batch_size)
+                emb = provider.encode(model, s2, s1, _latlon(ref.transform, ref.crs, rr.ravel(), cc.ravel()), month0,
+                                      batch_size, state)
                 sink.write(emb.T.reshape(-1, int(w.height), int(w.width)), window=w)
     return Path(output)
 
 
-def presto_parcels(monthly: str | Path, reference: str | Path, parcels, output: str | Path, start: str,
-                   months: int = 12, id_field: str = "parcel_id", model=None, checkpoint: str | Path | None = None,
-                   block_size: int = 512, min_pixels: int = 1):
-    """Parcel-level Presto embeddings from parcel-mean monthly series (S2 reflectance mean, S1 linear mean).
+def timeseries_parcels(provider, monthly: str | Path, reference: str | Path, parcels, output: str | Path, start: str,
+                       months: int = 12, id_field: str = "parcel_id", model=None, block_size: int = 512,
+                       min_pixels: int = 1, batch_size: int = 512, names: list[str] | None = None,
+                       state: dict | None = None):
+    """Parcel-level embeddings from parcel-mean monthly series (S2 reflectance mean, S1 linear mean).
 
-    Writes ``output`` (.csv or .parquet) with id, n_pixels, emb_00 ... One Presto sequence per parcel: much
-    cheaper than pixel level and less affected by mixed pixels, but blind to within-parcel heterogeneity."""
+    Writes ``output`` (.csv or .parquet) with id, n_pixels and the feature columns. One sequence per parcel:
+    much cheaper than pixel level and less affected by mixed pixels, but blind to within-parcel
+    heterogeneity. Dataset-level state (``fit``) comes from the pixels of the whole grid, as at pixel level."""
     import geopandas as gpd
     import pandas as pd
     from rasterio.features import rasterize
 
-    names = month_names(start, months)
-    model = model if model is not None else load_presto(checkpoint)
-    month0 = int(names[0].split("-")[1]) - 1
+    names_m = month_names(start, months)
+    month0 = int(names_m[0].split("-")[1]) - 1
     gdf = parcels if isinstance(parcels, gpd.GeoDataFrame) else gpd.read_file(parcels)
     if id_field not in gdf.columns:
         raise ValueError(f"Parcel layer lacks {id_field!r}")
     with ExitStack() as stack, rasterio.open(reference) as ref:
         gdf = gdf.to_crs(ref.crs)
-        P, T = len(gdf), len(names)
-        sources = _monthly_sources(stack, Path(monthly), names)
+        P, T = len(gdf), len(names_m)
+        sources = _monthly_sources(stack, Path(monthly), names_m)
+        if state is None:
+            state = _fit_state(provider, sources, ref, block_size)
         keys = [*GEOCROP_S2.values(), "VV", "VH"]
         sums = {k: np.zeros((T, P + 1)) for k in keys}
         counts = {k: np.zeros((T, P + 1)) for k in keys}
@@ -460,13 +591,12 @@ def presto_parcels(monthly: str | Path, reference: str | Path, parcels, output: 
         with np.errstate(invalid="ignore", divide="ignore"):
             mean = {k: (sums[k] / counts[k])[:, 1:].astype("float32") for k in keys}
         has_s2, has_s1 = any(s["s2"] for s in sources), any(s["s1"] for s in sources)
-        x, mask = presto_inputs({k: mean[k] for k in GEOCROP_S2.values()} if has_s2 else None,
-                                {k: mean[k] for k in ("VV", "VH")} if has_s1 else None)
         pts = gdf.geometry.representative_point().to_crs("EPSG:4326")
         latlons = np.column_stack([pts.y, pts.x]).astype("float32")
-    emb = presto_embed(model, x, mask, latlons, month0)
+    emb = provider.encode(model, {k: mean[k] for k in GEOCROP_S2.values()} if has_s2 else None,
+                          {k: mean[k] for k in ("VV", "VH")} if has_s1 else None, latlons, month0, batch_size, state)
     emb[pixels[1:] < min_pixels] = np.nan
-    cols = band_names(emb.shape[1])
+    cols = list(names) if names else default_names(provider, emb.shape[1])
     table = pd.concat([pd.DataFrame({id_field: gdf[id_field].to_numpy(), "n_pixels": pixels[1:].astype(int)}),
                        pd.DataFrame(emb, columns=cols)], axis=1)
     out = ensure_parent(output)
@@ -475,3 +605,69 @@ def presto_parcels(monthly: str | Path, reference: str | Path, parcels, output: 
     else:
         table.to_csv(out, index=False)
     return table
+
+
+def raster_parcel_means(raster: str | Path, parcels, output: str | Path, id_field: str = "parcel_id",
+                        block_size: int = 512, min_pixels: int = 1):
+    """Parcel means of an embeddings raster (pixels whose centre lies in the parcel), e.g. for pre-computed
+    annual embeddings. Writes ``output`` (.csv or .parquet) with id, n_pixels and one column per band."""
+    import geopandas as gpd
+    import pandas as pd
+    from rasterio.features import rasterize
+
+    gdf = parcels if isinstance(parcels, gpd.GeoDataFrame) else gpd.read_file(parcels)
+    if id_field not in gdf.columns:
+        raise ValueError(f"Parcel layer lacks {id_field!r}")
+    with rasterio.open(raster) as ds:
+        gdf = gdf.to_crs(ds.crs)
+        P, D = len(gdf), ds.count
+        cols = [d or f"band_{i + 1}" for i, d in enumerate(ds.descriptions)]
+        sums, counts, pixels = np.zeros((D, P + 1)), np.zeros(P + 1), np.zeros(P + 1)
+        shapes = list(zip(gdf.geometry, range(1, P + 1)))
+        for w in blocks(ds.width, ds.height, block_size):
+            ids = rasterize(shapes, out_shape=(int(w.height), int(w.width)), transform=ds.window_transform(w), fill=0,
+                            dtype="int32").ravel()
+            if not ids.any():
+                continue
+            pixels += np.bincount(ids, minlength=P + 1)
+            data = ds.read(window=w).reshape(D, -1).astype("float64")
+            ok = (ids > 0) & np.all(np.isfinite(data) & (data != ds.nodata), axis=0)
+            counts += np.bincount(ids[ok], minlength=P + 1)
+            for d in range(D):
+                sums[d] += np.bincount(ids[ok], weights=data[d, ok], minlength=P + 1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        emb = (sums / counts).T[1:].astype("float32")
+    emb[counts[1:] < min_pixels] = np.nan
+    table = pd.concat([pd.DataFrame({id_field: gdf[id_field].to_numpy(), "n_pixels": pixels[1:].astype(int)}),
+                       pd.DataFrame(emb, columns=cols)], axis=1)
+    out = ensure_parent(output)
+    if out.suffix == ".parquet":
+        table.to_parquet(out, index=False)
+    else:
+        table.to_csv(out, index=False)
+    return table
+
+
+def presto_pixels(monthly: str | Path, reference: str | Path, output: str | Path, start: str, months: int = 12,
+                  model=None, checkpoint: str | Path | None = None, block_size: int = 256,
+                  batch_size: int = 512, extra: dict | None = None, names: list[str] | None = None) -> Path:
+    """Pixel-level Presto embeddings from monthly composites, block by block on CPU (memory O(block²))."""
+    from .feature_providers import PRESTO
+
+    model = model if model is not None else load_presto(checkpoint)
+    return timeseries_pixels(PRESTO, monthly, reference, output, start, months, model, block_size, batch_size,
+                             extra, names)
+
+
+def presto_parcels(monthly: str | Path, reference: str | Path, parcels, output: str | Path, start: str,
+                   months: int = 12, id_field: str = "parcel_id", model=None, checkpoint: str | Path | None = None,
+                   block_size: int = 512, min_pixels: int = 1, names: list[str] | None = None):
+    """Parcel-level Presto embeddings from parcel-mean monthly series (S2 reflectance mean, S1 linear mean).
+
+    Writes ``output`` (.csv or .parquet) with id, n_pixels, emb_00 ... One Presto sequence per parcel: much
+    cheaper than pixel level and less affected by mixed pixels, but blind to within-parcel heterogeneity."""
+    from .feature_providers import PRESTO
+
+    model = model if model is not None else load_presto(checkpoint)
+    return timeseries_parcels(PRESTO, monthly, reference, parcels, output, start, months, id_field, model, block_size,
+                              min_pixels, names=names)

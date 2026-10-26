@@ -186,6 +186,25 @@ def test_event_markers_and_marker_rules(study):
     assert sum(summary["traffic_light_counts"].values()) == len(parcels)
 
 
+def test_temporal_support_routing(study):
+    _, ran, out = _enable(study, "temporal", {"cbm": {"temporal_support": {"enabled": True,
+                                                                          "min_clear_observations": 40}}})
+    assert ran == {"cbm", "parcels"}
+    support = (out / "cbm" / "temporal_support.csv").read_text()
+    assert "tq_clear_observations" in support
+    parcels = gpd.read_file(out / "parcels" / "parcels.gpkg")
+    assert "tq_clear_observations" in parcels and "traffic_light_reasons" in parcels
+    assert parcels.traffic_light_reasons.fillna("").str.contains("LOW_OBS").any()
+
+
+def test_temporal_support_raster_changes_only_features(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    ts = {"enabled": True, "start": "2023-03-01", "end": "2023-10-31"}
+    _, base = _inner_fingerprints({"timeseries": ts})
+    _, fps = _inner_fingerprints({"timeseries": {**ts, "temporal_support": True}})
+    assert {s for s in fps if fps[s] != base[s]} == {"features"}
+
+
 @pytest.mark.parametrize("decision", ["additional", "replace"])
 def test_parcel_classifier(study, decision):
     options = {"parcel_classify": {"enabled": True, "label_field": "true_class", "decision": decision,

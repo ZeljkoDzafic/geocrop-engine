@@ -373,8 +373,16 @@ class Runner:
                 raise FileNotFoundError(f"{attach} missing; run the embeddings stage first "
                                         "(geocrop run --stages embeddings features)")
         # the embeddings options enter through the attached raster's identity (None = as before they existed)
-        fp = _fp_with(({**f, "embeddings": None}, t, periods, inputs, ts_inputs),
-                      {"embeddings": [attach, features.manifest_path(attach)]} if attach else {})
+        support = t["enabled"] and t["temporal_support"]
+        tolerance = self.cfg["cbm"]["temporal_support"]["tolerance_days"]
+        if support:
+            from .tsfeatures import support_path
+            sp = support_path(target.with_name(target.stem + "_ts.tif"))
+            outputs.extend([sp, sp.with_suffix(".json")])
+        extra = {"embeddings": [attach, features.manifest_path(attach)]} if attach else {}
+        if support:
+            extra["support_tolerance_days"] = tolerance
+        fp = _fp_with(({**f, "embeddings": None}, self._section("timeseries"), periods, inputs, ts_inputs), extra)
 
         def run():
             info = build()
@@ -403,7 +411,8 @@ class Runner:
                     t["s1_indices"], t["step_days"], t["output_step_days"], t["lambda"], t["envelope_iterations"],
                     t["harmonic_order"], self.cfg["compositing"]["scl_invalid"],
                     self.cfg["compositing"]["cloud_probability_max"],
-                    min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"])
+                    min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"],
+                    **({"temporal_support": True, "support_tolerance_days": tolerance} if support else {}))
                 parts.append(tsp)
                 if len(parts) > 1:
                     merge_stacks(parts, target)
@@ -477,10 +486,13 @@ class Runner:
             return info
         return self.stage("train", fp, outputs, run)
 
+    def _section(self, name: str) -> dict:
+        """A config section for fingerprints, without keys added later that still hold their default
+        (`config.FINGERPRINT_NEUTRAL`)."""
+        return cfgmod.without_neutral_defaults(self.cfg)[name]
+
     def _model_section(self) -> dict:
-        """`model:` for fingerprints, without keys added later that still hold their default."""
-        m = self.cfg["model"]
-        return {k: v for k, v in m.items() if not (k == "params" and not v)}
+        return self._section("model")
 
     def _cv_strategy(self) -> str:
         cv = self.cfg["cv"]
@@ -538,7 +550,11 @@ class Runner:
                              if m.get("sensor") == "S1" and start <= m["date"] <= end]
             if s1_period:
                 outputs.append(self.out / "cbm" / "s1_signatures.csv")
-        fp = _fp_with((self._cbm_section(), t, self.paths["parcels"], self.paths["s2_scenes"], ref,
+        tq = self._temporal_rules()
+        if tq:
+            outputs.append(self.out / "cbm" / "temporal_support.csv")
+        fp = _fp_with((self._cbm_section(), self._section("timeseries"), self.paths["parcels"],
+                       self.paths["s2_scenes"], ref,
                        self.cfg["parcels"]["id_field"], self.cfg["parcels"]["interior_buffer_px"]),
                       {"event_markers": True, "s1_scenes": self.paths["s1_scenes"] if s1_period else None}
                       if events else {})
@@ -547,6 +563,8 @@ class Runner:
             idx = [c["index"], "BSI"] if c["index"] != "BSI" else ["BSI"]
             if events and c["events"]["index"] not in idx:
                 idx.append(c["events"]["index"])
+            if tq and tq["index"] not in idx:
+                idx.append(tq["index"])
             sig = cbm.parcel_signatures(self.paths["s2_scenes"], self.paths["parcels"], ref,
                                         self.out / "cbm" / "signatures.csv", start, end, idx,
                                         id_field=self.cfg["parcels"]["id_field"],
@@ -555,6 +573,11 @@ class Runner:
             m = cbm.markers(sig, start, end, index=c["index"], min_coverage=c["min_coverage"])
             m.to_csv(target, index=False)
             info = {"parcels": int(len(m))}
+            if tq:
+                from .temporal_quality import parcel_support
+                sup = parcel_support(sig, start, end, tq, markers=m)
+                sup.to_csv(self.out / "cbm" / "temporal_support.csv", index=False)
+                info["temporal_support_parcels"] = int(len(sup))
             if events:
                 from .cbm_markers import event_markers
                 s1sig = None
@@ -575,8 +598,17 @@ class Runner:
         return bool(c["enabled"] and (c["event_markers"] or c["rules"]["enabled"]))
 
     def _cbm_section(self) -> dict:
-        c = self.cfg["cbm"]
-        return {k: v for k, v in c.items() if not (k == "event_markers" and v is False)}
+        return self._section("cbm")
+
+    def _temporal_rules(self) -> dict | None:
+        """Enabled `cbm.temporal_support` (docs/temporal-quality.md), else None."""
+        rules = self.cfg["cbm"]["temporal_support"]
+        return rules if self.cfg["cbm"]["enabled"] and rules["enabled"] else None
+
+    def _temporal_support_table(self):
+        import pandas as pd
+        path = self.out / "cbm" / "temporal_support.csv"
+        return pd.read_csv(path, dtype={"parcel_id": str}) if self._temporal_rules() and path.exists() else None
 
     def _marker_table(self):
         """cbm phenology markers, joined with the event markers when they are computed (None without cbm)."""
@@ -632,7 +664,9 @@ class Runner:
                                 "calibration_mode", "calibration_fraction")}
         fp = _fp(q, params, cv, self.cfg["seed"], t["start"], t["end"], self.cfg["cbm"]["index"], p,
                  self.paths["parcels"], signatures, self.out / "cbm" / "markers.csv", mapping, calendar,
-                 {"rules": rules, "events": events_csv} if rules else None)
+                 {"rules": rules, "events": events_csv} if rules else None,
+                 *([{"temporal_rules": self._temporal_rules(), "support": self.out / "cbm" / "temporal_support.csv"}]
+                   if self._temporal_rules() else []))
 
         def run():
             import geopandas as gpd
@@ -648,8 +682,9 @@ class Runner:
             summary = pc.predict(model_dir, frame, gdf, target, p["id_field"], p["declared_field"],
                                  p["conformal_alpha"], p["min_valid_pixels"], p["min_confidence"], p["min_margin"],
                                  p["min_aoa_fraction"], mapping, self._marker_table(), calendar)
-            if rules:
-                summary = _apply_marker_rules(target, self._marker_table(), rules, p["id_field"])
+            if rules or self._temporal_rules():
+                summary = _apply_marker_rules(target, self._marker_table(), rules, p["id_field"],
+                                              self._temporal_support_table(), self._temporal_rules())
             return {"cv_macro_f1": rep["cross_validation"]["macro_f1"], "parcels_trained": rep["samples"],
                     "decision_counts": summary["decision_counts"]}
         return self.stage("parcel_classify", fp, outputs, run)
@@ -685,6 +720,9 @@ class Runner:
         extra = {}
         if rules:
             extra.update(rules=rules, events=self.out / "cbm" / "event_markers.csv")
+        temporal = self._temporal_rules()
+        if temporal:
+            extra.update(temporal_rules=temporal, temporal_support=self.out / "cbm" / "temporal_support.csv")
         if replace:
             extra["decision"] = "parcel_classifier"
 
@@ -704,7 +742,9 @@ class Runner:
                 min_margin=p["min_margin"], crop_mapping=mapping,
                 conformal=conformal if conformal.exists() else None, alpha=p["conformal_alpha"],
                 aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
-                markers=self._marker_table(), calendar=calendar, **({"marker_rules": rules} if rules else {}))
+                markers=self._marker_table(), calendar=calendar, **({"marker_rules": rules} if rules else {}),
+                **({"temporal_support": self._temporal_support_table(), "temporal_rules": temporal}
+                   if temporal else {}))
         fp = _fp_with((fp, mapping, conformal, aoa, markers_csv, calendar, self.cfg["cbm"]["enabled"],
                        self.out / "prediction" / "prediction_manifest.json"), extra)
         return self.stage("parcels", fp, [target, target.with_suffix(".csv"), target.with_suffix(".summary.json")], run)
@@ -757,8 +797,10 @@ class Runner:
         return self.stage("experiments", fp, [target, target.with_suffix(".json")], run)
 
 
-def _apply_marker_rules(target: Path, markers, rules: dict, id_field: str) -> dict:
-    """Re-evaluate the traffic light of a parcel product with the event markers and `cbm.rules`."""
+def _apply_marker_rules(target: Path, markers, rules: dict | None, id_field: str, support=None,
+                        temporal_rules: dict | None = None) -> dict:
+    """Re-evaluate the traffic light of a parcel product with the event markers and `cbm.rules`, and/or the
+    temporal support and `cbm.temporal_support`."""
     from collections import Counter
 
     import geopandas as gpd
@@ -772,7 +814,10 @@ def _apply_marker_rules(target: Path, markers, rules: dict, id_field: str) -> di
         for col in EVENT_COLUMNS:
             if col in mk:
                 gdf[col] = mk[col].to_numpy()
-    details = traffic_light_details(gdf, rules)
+    if support is not None:
+        from .temporal_quality import attach
+        gdf = attach(gdf, support, id_field)
+    details = traffic_light_details(gdf, rules, temporal_rules)
     gdf["traffic_light"] = details["traffic_light"].to_numpy()
     gdf["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
     target.unlink(missing_ok=True)
@@ -784,6 +829,8 @@ def _apply_marker_rules(target: Path, markers, rules: dict, id_field: str) -> di
     summary["traffic_light_reason_counts"] = dict(sorted(Counter(
         code for codes in gdf["traffic_light_reasons"] for code in str(codes).split(";") if code).items()))
     summary["marker_rules"] = rules
+    if temporal_rules:
+        summary["temporal_rules"] = temporal_rules
     summary_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
     return summary
 

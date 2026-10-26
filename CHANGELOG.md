@@ -2,6 +2,28 @@
 
 ## Unreleased
 ### Added
+- Feature-provider adapter interface for foundation-model embeddings (`geocrop.feature_providers`, plugin
+  registry `geocrop.plugins.feature_providers`, entry-point group `geocrop.feature_providers`): name, licence,
+  pinned weights (URL + SHA-256), input contract, `embed_pixels` / `embed_parcels`. AlphaEarth, TESSERA and
+  Presto now implement it (unchanged output); new providers `galileo` (Galileo-nano, MIT, encoder port verified
+  against the official code, max abs diff 1.2e-7) and `anysat` (AnySat base, MIT, s2 inference port, max abs
+  diff 0.0 per tile). Features are namespaced `emb_<provider>_NN` so several providers fit in one stack
+  (`features.embeddings.source` accepts a list; `namespace`, `allow_license` keys; `geocrop embeddings
+  --source a b`, `--namespace`, `--allow-license`, `--list`); legacy `emb_NN` stacks stay readable and a second
+  legacy source is attached under namespaced names. Parcel tables for pre-computed sources (parcel means).
+- Temporal quality (`geocrop.temporal_quality`, docs/temporal-quality.md): observed vs interpolated support per
+  pixel (`ts-features --temporal-support` writes `<stack>_temporal_support.tif` + versioned manifest: clear
+  observations, longest gap, season coverage, distance of SOS/peak/EOS to the nearest clear acquisition, gap at the
+  peak, interpolation-dependent feature share) and per parcel (`geocrop temporal-support`, `tq_*` columns). Optional
+  `cbm.temporal_support` rules route weakly supported parcels to review with reason codes `LOW_OBS`, `LONG_GAP`,
+  `LONG_GAP_AT_PEAK`, `INTERPOLATED_PHENOLOGY`, `INTERPOLATED_FEATURES`, `NO_TEMPORAL_SUPPORT`
+  (`cbm.traffic_light_details(..., temporal_rules=...)`, `parcels.aggregate(..., temporal_support=, temporal_rules=)`);
+  disabled by default, existing traffic lights unchanged.
+- Parcel evidence packages (`geocrop evidence`, `geocrop.evidence`, docs/evidence.md): per parcel a versioned
+  `evidence.json` (contract `evidence`) with classification, conformal set, AOA, markers, temporal support, every
+  evaluated rule with inputs/thresholds/outcome/reason code, observed vs rejected acquisitions and the interpolated
+  grid, model sha256 and run-manifest reference; a self-contained strict-CSP HTML page with an inline SVG chart; a
+  PNG chart; batch `index.csv`/`index.gpkg` and `evidence_manifest.json`. Byte-deterministic for identical inputs.
 - Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
   fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
   real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
@@ -151,7 +173,9 @@
   configured); `cbm.event_markers` (Sentinel-1 signatures and event markers) and `cbm.rules` in the cbm and
   parcels stages; an optional `parcel_classify` stage (`decision: additional | replace`). Optional stages and
   options enter fingerprints only when enabled (`pipeline.OPTIONAL_DEPENDS`, `config.FINGERPRINT_NEUTRAL`), so
-  existing configurations keep their configuration and stage fingerprints.
+  existing configurations keep their configuration and stage fingerprints. Temporal support is wired in too:
+  `timeseries.temporal_support` (per-pixel raster in the features stage) and `cbm.temporal_support`
+  (`cbm/temporal_support.csv` in the cbm stage, routing in the parcels/parcel_classify stages).
 - `model.params`: estimator-specific hyperparameters (e.g. of plugin estimators) passed through unchanged and
   validated against the selected estimator's constructor (`model.config_params`, `model.check_params`); used by
   `geocrop run`, `ablation`, `reduce-features` and `transfer`. `--algorithm`/`--algorithms` accept registered

@@ -10,7 +10,7 @@ and impossible to upgrade. A plugin mechanism must not add a framework, a server
 
 ## Decision
 Use the standard Python packaging mechanism: entry points, discovered with `importlib.metadata`.
-[`geocrop.plugins`](../../src/geocrop/plugins.py) defines five registries:
+[`geocrop.plugins`](../../src/geocrop/plugins.py) defines six registries:
 
 | Registry | Entry-point group | Contract |
 |---|---|---|
@@ -19,6 +19,7 @@ Use the standard Python packaging mechanism: entry points, discovered with `impo
 | `segmenters` | `geocrop.segmenters` | object or class satisfying `geocrop.segmenters.Segmenter`: `name`, `segment(raster, output, **params) -> dict` with `path`, `segments` |
 | `exporters` | `geocrop.exporters` | `export(source, destination, **options) -> Path \| dict` |
 | `validators` | `geocrop.validators` | `validate(path, **options) -> dict` with a `problems` list |
+| `feature_providers` | `geocrop.feature_providers` | object or class satisfying `geocrop.feature_providers.FeatureProvider`: `name`, `dims`, `licence`, pinned `weights`, input `contract`, `load_model`, `embed_pixels`, `embed_parcels` (see [embeddings](../embeddings.md#feature-provider-interface)) |
 
 * Built-ins register through the same registries in code (`estimators.py`, `indices.py`, `segmenters.py`;
   exporters/validators as lazy `"module:attribute"` names so core does not import adapters).

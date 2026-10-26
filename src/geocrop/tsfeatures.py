@@ -23,8 +23,9 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling
 
-from . import indices
+from . import contracts, indices
 from . import scenes as scene_meta
+from . import temporal_quality as tq
 from . import timeseries as ts
 from .features import Feature, load_manifest, write_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned
@@ -39,6 +40,12 @@ def quality_path(output: str | Path) -> Path:
     return path.with_name(path.stem + "_quality.tif")
 
 
+def support_path(output: str | Path) -> Path:
+    """Per-pixel temporal-support raster written next to the stack (`temporal_support=True`)."""
+    path = Path(output)
+    return path.with_name(path.stem + "_temporal_support.tif")
+
+
 def _doy(d: date) -> int:
     return d.timetuple().tm_yday
 
@@ -48,7 +55,15 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                            output_step_days: int = 15, lam: float = 50.0, envelope_iterations: int = 0,
                            harmonic_order: int = 2, scl_invalid=DEFAULT_SCL_INVALID, cloud_probability_max=None,
                            orbit: str | None = None, block_size: int = 256,
-                           min_observed_fraction: float = 0, max_gap_days: float | None = None) -> Path:
+                           min_observed_fraction: float = 0, max_gap_days: float | None = None,
+                           temporal_support: bool = False, support_tolerance_days: float = 10) -> Path:
+    """Regular-grid time-series feature stack plus a ``_quality.tif`` QA raster.
+
+    With `temporal_support=True` a third raster ``<stack>_temporal_support.tif`` (+ ``.json`` manifest)
+    separates observed from interpolated values per pixel and index (`geocrop.temporal_quality`): clear
+    acquisitions, longest gap, season coverage and the distance of SOS/peak/EOS to the nearest clear
+    acquisition. The feature stack itself is unchanged.
+    """
     if not np.isfinite(min_observed_fraction) or not 0 <= min_observed_fraction <= 1:
         raise ValueError("min_observed_fraction must be between zero and one")
     if max_gap_days is not None and (not np.isfinite(max_gap_days) or max_gap_days < 0):
@@ -82,9 +97,15 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         missing = [b for b in need if not (m["path"] / f"{b}.tif").exists()]
         if missing:
             raise FileNotFoundError(f"{m['path']} lacks {missing}")
+    if temporal_support and (not np.isfinite(support_tolerance_days) or support_tolerance_days <= 0):
+        raise ValueError("support_tolerance_days must be positive")
     out = ensure_parent(output)
     qa_path = quality_path(out)
     qa_names = [f"qa_{name}_{metric}" for _, name, _ in series for metric in QUALITY_METRICS]
+    tq_path = support_path(out)
+    tq_names = [f"tq_{name}_{metric}" for _, name, _ in series for metric in tq.PIXEL_METRICS] \
+        if temporal_support else []
+    tq_sink = None
     totals = {name: {"pixels": 0, "passes_policy": 0, "without_observations": 0} for _, name, _ in series}
     with rasterio.open(reference) as ref, rasterio.open(out, "w", **float_profile(ref, count=len(names))) as sink, \
             rasterio.open(qa_path, "w", **float_profile(ref, count=len(qa_names))) as qa_sink:
@@ -92,6 +113,10 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
             sink.set_band_description(i, n)
         for i, n in enumerate(qa_names, 1):
             qa_sink.set_band_description(i, n)
+        if temporal_support:
+            tq_sink = rasterio.open(tq_path, "w", **float_profile(ref, count=len(tq_names)))
+            for i, n in enumerate(tq_names, 1):
+                tq_sink.set_band_description(i, n)
         handles = {}
         try:
             for w in blocks(ref.width, ref.height, block_size):
@@ -145,8 +170,15 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                     z[~passes] = np.nan
                     for k in out_idx:
                         values[f"ts_{name}_d{int(days[k])}"] = z[:, k]
-                    for metric, arr in ts.phenology(z, days).items():
+                    phen = ts.phenology(z, days)
+                    for metric, arr in phen.items():
                         values[f"phen_{name}_{metric}"] = arr
+                    if temporal_support:
+                        scene_doy = np.array([_doy(m["date"]) for m in scenes], dtype="float64")
+                        support = tq.support_metrics(np.where(ok, scene_doy[None, :], np.nan), days,
+                                                     support_tolerance_days, phen, days[out_idx])
+                        for metric in tq.PIXEL_METRICS:
+                            qa_values[f"tq_{name}_{metric}"] = support[metric]
                     for c, arr in ts.harmonics(y, wgt, days, harmonic_order).items():
                         arr[~passes] = np.nan
                         values[f"harm_{name}_{c}"] = arr
@@ -155,9 +187,14 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                 for i, n in enumerate(names, 1):
                     v = values[n].reshape(shape)
                     sink.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), i, window=w)
+                for i, n in enumerate(tq_names, 1):
+                    v = qa_values[n].reshape(shape)
+                    tq_sink.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), i, window=w)
         finally:
             for h in handles.values():
                 h.close()
+            if tq_sink is not None:
+                tq_sink.close()
     write_manifest(out, {
         "stack": out.name, "kind": "timeseries", "grid_start": start.isoformat(), "grid_end": end.isoformat(),
         "step_days": step_days, "lambda": lam, "envelope_iterations": envelope_iterations,
@@ -172,6 +209,20 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                  "Input observations sharing a bin do not increase coverage. Policy pass does not guarantee "
                  "all phenology/harmonic features are finite or classification is accurate. "
                  "QA bands are separate from classifier features."}, indent=2), encoding="utf8")
+    if temporal_support:
+        tq_path.with_suffix(".json").write_text(json.dumps(contracts.stamp("temporal_support", {
+            "schema": "geocrop-temporal-support-pixels", "raster": tq_path.name, "stack": out.name,
+            "start": start.isoformat(), "end": end.isoformat(), "step_days": step_days,
+            "output_step_days": output_step_days, "lambda": lam, "tolerance_days": support_tolerance_days,
+            "nodata": NODATA, "scenes": {"S2": [m["date"].isoformat() for m in s2],
+                                         "S1": [m["date"].isoformat() for m in s1]},
+            "bands": [{"band": i, "name": f"tq_{name}_{metric}", "index": name, "metric": metric,
+                       "description": tq.PIXEL_DESCRIPTIONS[metric]}
+                      for i, (name, metric) in enumerate(((n, m) for _, n, _ in series for m in tq.PIXEL_METRICS), 1)],
+            "scope": "Observed = clear acquisition of the pixel (S2: SCL/cloud masks; S1: finite backscatter). "
+                     "Everything between observations is Whittaker interpolation. Distances use exact "
+                     "acquisition dates. Phenology distances are nodata where the series fails the policy "
+                     "or has no detectable season."}), indent=2), encoding="utf8")
     return out
 
 

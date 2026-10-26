@@ -32,7 +32,7 @@ import rasterio
 from rasterio.features import rasterize
 from rasterio.warp import Resampling
 
-from . import cbm_markers, indices
+from . import cbm_markers, indices, temporal_quality
 from . import scenes as scene_meta
 from . import timeseries as ts
 from .cbm_markers import event_markers, homogeneity  # noqa: F401  (public re-exports)
@@ -291,16 +291,19 @@ def calendar_consistency(markers_df: pd.DataFrame, declared: pd.Series, calendar
     return pd.Series(result, index=markers_df.index, dtype=object)
 
 
-def traffic_light(frame: pd.DataFrame, rules: dict | None = None) -> pd.Series:
+def traffic_light(frame: pd.DataFrame, rules: dict | None = None, temporal_rules: dict | None = None) -> pd.Series:
     """Combine parcel evidence without promoting a review decision to a confident discrepancy.
 
     Explicit review/uncertain outcomes remain yellow even when the prediction set or calendar
     disagrees. An insufficient-resolution decision remains grey. With enabled marker `rules`
     (`geocrop.cbm_markers.RULE_DEFAULTS`) marker evidence can escalate green/yellow parcels; without
-    rules the result is the unchanged base rule.
+    rules the result is the unchanged base rule. Enabled `temporal_rules`
+    (`geocrop.temporal_quality.RULE_DEFAULTS`, config ``cbm.temporal_support``) route weakly supported
+    parcels (``tq_*`` columns) to review.
     """
-    if rules is not None and cbm_markers.resolve_rules(rules)["enabled"]:
-        return traffic_light_details(frame, rules)["traffic_light"]
+    if (rules is not None and cbm_markers.resolve_rules(rules)["enabled"]) or \
+            (temporal_rules is not None and temporal_quality.resolve(temporal_rules)["enabled"]):
+        return traffic_light_details(frame, rules, temporal_rules)["traffic_light"]
     return _base_traffic_light(frame)[0]
 
 
@@ -333,17 +336,26 @@ def _base_traffic_light(frame: pd.DataFrame) -> tuple[pd.Series, list[list[str]]
     return pd.Series(out, index=frame.index), reasons
 
 
-def traffic_light_details(frame: pd.DataFrame, rules: dict | None = None) -> pd.DataFrame:
+def traffic_light_details(frame: pd.DataFrame, rules: dict | None = None,
+                          temporal_rules: dict | None = None) -> pd.DataFrame:
     """`traffic_light` plus `traffic_light_reasons` (semicolon-separated reason codes).
 
     Base reason codes: review_decision, calendar_inconsistent, conformal_discrepancy,
     declaration_discrepancy, ambiguous_prediction_set, mixed_evidence, not_declared, insufficient_data.
     Marker rule codes (when rules are enabled): no_harvest_evidence, insufficient_mowing_events,
     tillage_detected, heterogeneous_parcel, mixed_class_pixels, insufficient_marker_data_<marker>.
+    Temporal-support codes (when `temporal_rules` are enabled, `geocrop.temporal_quality`): LOW_OBS,
+    LONG_GAP, LONG_GAP_AT_PEAK, INTERPOLATED_PHENOLOGY, INTERPOLATED_FEATURES, NO_TEMPORAL_SUPPORT.
     """
     base, reasons = _base_traffic_light(frame)
     resolved = cbm_markers.resolve_rules(rules)
     if not resolved["enabled"]:
-        return pd.DataFrame({"traffic_light": base, "traffic_light_reasons": [";".join(c) for c in reasons]},
-                            index=frame.index)
-    return cbm_markers.apply_rules(frame, base, reasons, resolved)
+        out = pd.DataFrame({"traffic_light": base, "traffic_light_reasons": [";".join(c) for c in reasons]},
+                           index=frame.index)
+    else:
+        out = cbm_markers.apply_rules(frame, base, reasons, resolved)
+    tq = temporal_quality.resolve(temporal_rules) if temporal_rules is not None else None
+    if tq is None or not tq["enabled"]:
+        return out
+    codes = [[c for c in str(r).split(";") if c] for r in out["traffic_light_reasons"]]
+    return temporal_quality.apply_rules(frame, out["traffic_light"], codes, tq)

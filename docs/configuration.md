@@ -25,7 +25,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
 | | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md); enables the `embeddings` stage of `geocrop run` |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
-| `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
+| `timeseries` | `enabled`, `start`, `end`, `temporal_support` | false, –, –, false | build time-series features from scene folders and merge them into the stack; `temporal_support` also writes the per-pixel observed-vs-interpolated raster ([temporal-quality.md](temporal-quality.md)) |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
 | | `step_days`, `output_step_days`, `lambda`, `envelope_iterations`, `harmonic_order` | 5, 15, 50, 0, 2 | grid, output sampling, smoothness, upper envelope, harmonics |
 | | `min_observed_fraction`, `max_gap_days` | 0, null | optional occupied-bin/gap policy for reconstructed features; separate QA products always emitted |
@@ -33,6 +33,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | `cbm.events` | event-marker parameters (`abrupt_drop`, `s1_group_by`, ...) | see [markers.md](markers.md) | harvest/tillage/mowing/homogeneity markers |
 | `cbm.rules` | `enabled`, class lists, outcomes, `min_marker_confidence`, `mixed_class_share` | off | marker rules for the traffic light, reason codes ([markers.md](markers.md)); applied by the parcels stage |
 | `cbm` | `event_markers` | false | `geocrop run`: also Sentinel-1 signatures and `cbm/event_markers.csv` (implied by `rules.enabled`) |
+| `cbm.temporal_support` | `enabled`, `tolerance_days`, `min_clear_observations`, `max_gap_days`, `max_gap_at_peak_days`, `max_interpolated_phenology`, `max_interpolated_feature_fraction`, `outcome`, `demote_red` | off | route weakly supported parcels to review (`LOW_OBS`, `LONG_GAP_AT_PEAK`, ...; [temporal-quality.md](temporal-quality.md)) |
 | `classes` | `label_field`, `id_field`, `targets` | `class_name`, `polygon_id`, [] | reference schema; target classes get extra columns in ablation tables |
 | `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn`, `ltae` or a registered plugin estimator |
 | | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs`, `learning_rate` | 500, sqrt, 1, null, balanced_subsample, −1, null | estimator settings (keys unknown to an algorithm are ignored) |
@@ -82,6 +83,8 @@ default configuration against GeoCrop main at c091962). Turning one on re-runs o
 | `cbm.rules.enabled` | cbm, parcels | `traffic_light_reasons`, marker escalations of `traffic_light` |
 | `parcel_classify.enabled` | parcel_classify (+ parcels with `decision: replace`) | `parcel_classify/model/`, `parcel_classify/parcels.*` |
 | `model.params` | train, experiments | estimator built with these parameters |
+| `timeseries.temporal_support` | features | `<stack>_ts_temporal_support.tif` ([temporal quality](temporal-quality.md)) |
+| `cbm.temporal_support.enabled` | cbm, parcels (and parcel_classify) | `cbm/temporal_support.csv`, `tq_*` columns, `LOW_OBS`/`LONG_GAP*`/`INTERPOLATED_*` routing |
 
 `model.params` is checked before any stage runs: the estimator selected by `model.algorithm` (built-in or plugin)
 is constructed and every key must be one of its constructor parameters and must arrive there unchanged. A

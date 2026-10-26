@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from . import cbm_markers, indices
+from . import cbm_markers, indices, temporal_quality
 
 #: Defaults of the optional `parcel_classify` section (off: `geocrop run` outputs are unchanged).
 PARCEL_CLASSIFY_DEFAULTS: dict[str, Any] = {
@@ -87,6 +87,8 @@ DEFAULTS: dict[str, Any] = {
         "harmonic_order": 2,
         "min_observed_fraction": 0,
         "max_gap_days": None,
+        # per-pixel observed-vs-interpolated support raster next to the stack (geocrop.temporal_quality)
+        "temporal_support": False,
     },
     "cbm": {
         "enabled": False,
@@ -100,6 +102,8 @@ DEFAULTS: dict[str, Any] = {
         # `geocrop run`: also compute Sentinel-1 parcel signatures and event/homogeneity markers in the cbm
         # stage (implied by rules.enabled).
         "event_markers": False,
+        # temporal-support routing (LOW_OBS, LONG_GAP_AT_PEAK, INTERPOLATED_PHENOLOGY ...); off by default
+        "temporal_support": copy.deepcopy(temporal_quality.RULE_DEFAULTS),
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -202,6 +206,9 @@ DEFAULTS: dict[str, Any] = {
 # `data:` (scene source for `geocrop cube load`) is not read by `geocrop run`; at its defaults it leaves the
 # configuration fingerprint as it was before the section existed.
 FINGERPRINT_NEUTRAL[("data",)] = copy.deepcopy(DEFAULTS["data"])
+# Temporal-support measurement/routing (docs/temporal-quality.md), off by default.
+FINGERPRINT_NEUTRAL[("timeseries", "temporal_support")] = False
+FINGERPRINT_NEUTRAL[("cbm", "temporal_support")] = copy.deepcopy(temporal_quality.RULE_DEFAULTS)
 
 
 class ConfigError(ValueError):
@@ -210,7 +217,7 @@ class ConfigError(ValueError):
 
 #: Keys of the optional ``features.embeddings`` mapping (docs/embeddings.md).
 EMBEDDING_DEFAULTS: dict[str, Any] = {
-    "source": None,            # alphaearth | tessera | presto
+    "source": None,            # a feature provider (alphaearth | tessera | presto | galileo | anysat | plugin) or a list
     "year": None,
     "dir": None,               # default: <paths.features parent>/embeddings
     "resampling": "nearest",   # pre-computed sources: nearest | bilinear
@@ -222,7 +229,21 @@ EMBEDDING_DEFAULTS: dict[str, Any] = {
     "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
     "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
     "attach": True,            # append the embeddings raster to the feature stack
+    "namespace": None,         # feature names emb_<source>_NN (true) / legacy emb_NN (false); default: new providers
+                               # and lists of sources are namespaced, alphaearth/tessera/presto alone are legacy
+    "allow_license": [],       # licence ids acknowledged for providers that are not permissive
 }
+
+
+def embedding_sources(opts: dict) -> list[str]:
+    """``features.embeddings.source`` as a list (one or several feature providers)."""
+    src = opts.get("source")
+    return [] if not src else [src] if isinstance(src, str) else list(src)
+
+
+def embedding_namespace(opts: dict) -> bool | None:
+    """Namespace option: several sources always need namespaced feature names."""
+    return True if len(embedding_sources(opts)) > 1 and opts.get("namespace") is None else opts.get("namespace")
 
 
 def embedding_options(cfg: dict, always: bool = False) -> dict | None:
@@ -285,6 +306,8 @@ def validate(cfg: dict) -> dict:
         if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                 or not 0 <= value <= upper):
             raise ConfigError(f"Invalid timeseries.{key}")
+    if not isinstance(t.get("temporal_support", False), bool):
+        raise ConfigError("timeseries.temporal_support must be true or false")
     buffer = cfg["model"]["spatial_buffer_m"]
     if isinstance(buffer, bool) or not isinstance(buffer, (int, float)) or not math.isfinite(buffer) or buffer < 0:
         raise ConfigError("model.spatial_buffer_m must be a finite nonnegative distance in metres")
@@ -310,6 +333,7 @@ def validate(cfg: dict) -> dict:
     try:
         cbm_markers.resolve_event_params(cfg["cbm"]["events"])
         cbm_markers.resolve_rules(cfg["cbm"]["rules"])
+        temporal_quality.resolve(cfg["cbm"]["temporal_support"])
     except ValueError as exc:
         raise ConfigError(f"cbm: {exc}") from exc
     from .splits import STRATEGIES
@@ -408,8 +432,20 @@ def _validate_embeddings(raw) -> None:
     unknown = set(raw) - set(EMBEDDING_DEFAULTS)
     if unknown:
         raise ConfigError(f"Unknown configuration key: features.embeddings.{sorted(unknown)[0]}")
-    if raw.get("source") not in ("alphaearth", "tessera", "presto"):
-        raise ConfigError("features.embeddings.source must be alphaearth, tessera or presto")
+    from . import plugins
+    sources = embedding_sources(raw)
+    known = plugins.feature_providers.names()
+    if not sources or not all(isinstance(x, str) and x in plugins.feature_providers for x in sources):
+        raise ConfigError(f"features.embeddings.source must be one or a list of: {', '.join(known)}")
+    if len(set(sources)) != len(sources):
+        raise ConfigError("features.embeddings.source lists a provider twice")
+    if raw.get("namespace") not in (None, True, False):
+        raise ConfigError("features.embeddings.namespace must be true, false or unset")
+    if len(sources) > 1 and raw.get("namespace") is False:
+        raise ConfigError("Several embedding sources need namespaced feature names (features.embeddings.namespace)")
+    allow = raw.get("allow_license", [])
+    if not isinstance(allow, list) or not all(isinstance(x, str) for x in allow):
+        raise ConfigError("features.embeddings.allow_license must be a list of licence ids")
     year = raw.get("year")
     if isinstance(year, bool) or not isinstance(year, int) or not 2015 <= year <= 2100:
         raise ConfigError("features.embeddings.year must be a year, e.g. 2023")

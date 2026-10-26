@@ -55,6 +55,7 @@ cbm:
   calendar: configs/crop_calendar.example.yaml
   # event_markers: false     # geocrop run: also S1 signatures + harvest/tillage/mowing/homogeneity markers
   # events: {abrupt_drop: 0.2, s1_group_by: orbit_direction}   # docs/markers.md
+  # temporal_support: {enabled: true, min_clear_observations: 6}   # route weak support to review
   # rules:                   # traffic-light marker rules with reason codes (implies event_markers)
   #   enabled: true
   #   harvest_expected_classes: [maize, soybean, sunflower]
