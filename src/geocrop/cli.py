@@ -200,7 +200,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--tune", type=_json_arg, help='JSON grid, e.g. {"max_features": ["sqrt", 0.3]}')
     x.add_argument("--groups", nargs="*", help="restrict to feature groups")
     x.add_argument("--manifest", help="feature stack (for --groups)")
-    x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"])
+    x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn", "ltae"])
     x.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling")
     x.add_argument("--holdout", type=float, default=0.0, help="fraction of spatial blocks locked as final test")
     x.add_argument("--calibration-mode", choices=["oof", "holdout"], default="oof",
@@ -210,7 +210,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("benchmark", "Compare classifiers on identical spatial folds; internal model selection only")
     x.add_argument("--samples", required=True)
     x.add_argument("--out", required=True)
-    x.add_argument("--algorithms", nargs="+", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn"],
+    x.add_argument("--algorithms", nargs="+", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn",
+                                                       "ltae"],
                    default=["rf", "extra_trees", "hist_gb"])
     x.add_argument("--config", help="inherit model settings and spatial validation policy")
     x.add_argument("--params", type=_json_arg, help="JSON estimator settings shared across candidates")
@@ -269,6 +270,56 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--label-field", required=True)
     x.add_argument("--out", required=True)
     x.add_argument("--block-m", type=float, default=5000)
+
+    # parcel-level classification on signatures (gaps G4/G13)
+    x = cmd("parcel-classify", "Classify parcels directly from their signatures (parcel-grouped spatial CV, "
+                               "calibration, conformal sets, traffic light)")
+    x.add_argument("--signatures", required=True, help="signatures .csv/.parquet from geocrop signatures")
+    x.add_argument("--parcels", required=True, help="parcel polygons with ids (and reference labels for training)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True, help="output directory")
+    x.add_argument("--label-field", help="independent reference label column; required unless --model is given")
+    x.add_argument("--model", help="existing parcel model directory (skip training)")
+    x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--declared-field", default="declared_crop")
+    x.add_argument("--indices", nargs="*", help="signature indices to use (default: all in the table)")
+    x.add_argument("--stats", nargs="*", default=["mean", "std"], help="signature columns per date")
+    x.add_argument("--groups", nargs="*", default=["ts", "stats", "windows", "shape"],
+                   help="feature groups for tabular models (temporal models use ts only)")
+    x.add_argument("--step-days", type=int, default=5)
+    x.add_argument("--output-step-days", type=int, default=15)
+    x.add_argument("--window-days", type=int, default=30)
+    x.add_argument("--lam", type=float, default=20.0, help="Whittaker smoothing parameter")
+    x.add_argument("--algorithm", default="rf", help="any registered estimator, e.g. rf, hist_gb, tempcnn, ltae")
+    x.add_argument("--params", type=_json_arg, help="JSON estimator settings")
+    x.add_argument("--block-m", type=float, default=5000)
+    x.add_argument("--buffer-m", type=float, default=0)
+    x.add_argument("--folds", type=int, default=5)
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--holdout", type=float, default=0.0, help="fraction of spatial blocks locked as final test")
+    x.add_argument("--calibration-mode", choices=["oof", "holdout"], default="oof")
+    x.add_argument("--calibration-fraction", type=float, default=0.2)
+    x.add_argument("--bootstrap", type=int, default=200)
+    x.add_argument("--alpha", type=float, default=0.1, help="conformal level 1-alpha for prediction sets")
+    x.add_argument("--min-pixels", type=int, default=4)
+    x.add_argument("--min-confidence", type=float)
+    x.add_argument("--min-margin", type=float)
+    x.add_argument("--min-aoa-fraction", type=float, default=0.5)
+    x.add_argument("--crop-mapping", help="CSV source_code,class_name")
+    x.add_argument("--markers", help="markers.csv from geocrop markers")
+    x.add_argument("--calendar", help="crop calendar YAML")
+    x.add_argument("--compare-pixels", help="pixel samples .npz (polygon = parcel id): compare with pixel->parcel "
+                                            "aggregation on the same parcels and folds")
+    x.add_argument("--pixel-algorithm", default="rf")
+    x.add_argument("--pixel-params", type=_json_arg)
+
+    x = cmd("parcel-series-demo", "Write SYNTHETIC parcel signatures, parcels and pixel samples (software tests)")
+    x.add_argument("--out", required=True)
+    x.add_argument("--n-side", type=int, default=12, help="parcels per grid side")
+    x.add_argument("--seed", type=int, default=11)
+    x.add_argument("--pixel-noise", type=float, default=0.08)
+    x.add_argument("--cloud-fraction", type=float, default=0.3)
 
     x = cmd("validate", "Independent validation with field observations")
     x.add_argument("--prediction", required=True, help="prediction directory")
@@ -411,7 +462,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("benchmark-models", "Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)")
     x.add_argument("--samples", required=True)
     x.add_argument("--out", required=True)
-    x.add_argument("--models", nargs="*", default=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost"])
+    x.add_argument("--models", nargs="*", default=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost"],
+                   help="model names; tempcnn and ltae need --groups ts (any registered algorithm name works)")
     x.add_argument("--features", help="feature stack (manifest) to restrict --groups")
     x.add_argument("--groups", nargs="*")
     x.add_argument("--grids", type=_json_arg, help='JSON {"rf": {"max_features": ["sqrt", 0.3]}}')
@@ -662,6 +714,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print({"parcel_model_macro_f1": r["cross_validation"]["macro_f1"],
                 "majority_macro_f1": r["baselines"]["majority"]["macro_f1"],
                 "mean_probability_macro_f1": r["baselines"]["mean_probability"]["macro_f1"]})
+    elif c in ("parcel-classify", "parcel-series-demo"):
+        _parcel_classify(a)
     elif c == "validate":
         from .adapters import read_mapping
         from .validation import evaluate_points
@@ -782,7 +836,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         if a.groups:
             from .features import load_manifest, select
             feats = select([f for f in load_manifest(a.features) if f.name in s.features], groups=a.groups)
-        cands = {m: benchmark.DEFAULT_MODELS[m] for m in a.models}
+        cands = {m: benchmark.candidate(m) for m in a.models}
         t = benchmark.models(s, a.out, feats, cands, a.grids, a.folds, a.block_m, repeats=a.repeats,
                              holdout_fraction=a.holdout, targets=a.targets)
         print(t.to_string(index=False))
@@ -798,6 +852,64 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             from .config import load
             cfg = load(a.config)
         print(run_manifest(a.out, cfg, a.inputs, a.snap_gpt))
+
+
+def _parcel_classify(a):
+    """Dispatch of `parcel-classify` and `parcel-series-demo` (gaps G4/G13)."""
+    from datetime import date
+
+    if a.cmd == "parcel-series-demo":
+        from .demo import write_parcel_series
+        _print({"mode": "SYNTHETIC ONLY - software verification, not scientific accuracy",
+                **write_parcel_series(a.out, n_side=a.n_side, seed=a.seed, pixel_noise=a.pixel_noise,
+                                      cloud_fraction=a.cloud_fraction)})
+        return
+    import geopandas as gpd
+    import pandas as pd
+    import yaml
+
+    from . import parcel_classify as pc
+    from .adapters import read_mapping
+
+    if not a.model and not a.label_field:
+        raise SystemExit("parcel-classify needs --label-field (training) or --model (prediction only)")
+    out = Path(a.out)
+    sig = pd.read_parquet(a.signatures) if a.signatures.endswith(".parquet") else pd.read_csv(a.signatures)
+    parcels = gpd.read_file(a.parcels)
+    frame = pc.parcel_features(sig, parcels, date.fromisoformat(a.start), date.fromisoformat(a.end), a.id_field,
+                               a.indices, a.stats, a.groups, a.step_days, a.output_step_days, a.window_days, a.lam)
+    params = {**pc.DEFAULT_PARAMS, "algorithm": a.algorithm} if a.algorithm in ("rf", "extra_trees") else \
+        {"algorithm": a.algorithm}
+    params.update(a.params or {})
+    result = {}
+    model_dir = Path(a.model) if a.model else out / "model"
+    if not a.model:
+        rep = pc.train(frame, parcels, a.label_field, model_dir, params, a.groups, a.id_field, a.folds, a.block_m,
+                       a.seed, a.holdout, a.calibration_mode, a.calibration_fraction, a.buffer_m, a.bootstrap)
+        result["cross_validation"] = {k: rep["cross_validation"][k] for k in ("overall_accuracy", "macro_f1", "kappa")}
+        if "holdout" in rep:
+            result["holdout"] = {k: rep["holdout"][k] for k in ("overall_accuracy", "macro_f1", "kappa")}
+        result["parcels_trained"] = rep["samples"]
+    result["prediction"] = pc.predict(
+        model_dir, frame, parcels, out / "parcels.gpkg", a.id_field, a.declared_field, a.alpha, a.min_pixels,
+        a.min_confidence, a.min_margin, a.min_aoa_fraction, read_mapping(a.crop_mapping) or None if a.crop_mapping
+        else None, pd.read_csv(a.markers) if a.markers else None,
+        yaml.safe_load(Path(a.calendar).read_text()) if a.calendar else None)
+    if a.compare_pixels:
+        from .samples import Samples
+        if not a.label_field:
+            raise SystemExit("--compare-pixels needs --label-field")
+        cols = pc._resolve_columns(frame, params, a.groups)
+        parcel_samples, _ = pc.to_samples(frame, parcels, a.label_field, cols, a.id_field)
+        pixel_params = {**pc.DEFAULT_PARAMS, "algorithm": a.pixel_algorithm} \
+            if a.pixel_algorithm in ("rf", "extra_trees") else {"algorithm": a.pixel_algorithm}
+        pixel_params.update(a.pixel_params or {})
+        cmp = pc.compare_pixel_aggregation(parcel_samples, Samples.load(a.compare_pixels), out / "comparison",
+                                           params, pixel_params, a.folds, a.block_m, a.seed, a.holdout)
+        result["comparison"] = {m: {"overall_accuracy": r["overall_accuracy"], "macro_f1": r["macro_f1"]}
+                                for m, r in cmp["cross_validation"].items()}
+        result["comparison"]["fold_fingerprint"] = cmp["fold_fingerprint"]
+    _print(result)
 
 
 if __name__ == "__main__":

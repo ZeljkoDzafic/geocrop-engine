@@ -126,6 +126,20 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
 
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
+
 ## `geocrop s2-composite`
 
 Cloud-masked temporal composite of S2 scene folders
@@ -375,6 +389,62 @@ Second-stage parcel classifier on aggregated descriptors
 | `--out` | yes |  |  |
 | `--block-m` |  | `5000` |  |
 
+## `geocrop parcel-classify`
+
+Classify parcels directly from their signatures (parcel-grouped spatial CV, calibration, conformal sets, traffic light)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` | yes |  | signatures .csv/.parquet from geocrop signatures |
+| `--parcels` | yes |  | parcel polygons with ids (and reference labels for training) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | output directory |
+| `--label-field` |  |  | independent reference label column; required unless --model is given |
+| `--model` |  |  | existing parcel model directory (skip training) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` |  |
+| `--indices` |  |  | signature indices to use (default: all in the table) |
+| `--stats` |  | `['mean', 'std']` | signature columns per date |
+| `--groups` |  | `['ts', 'stats', 'windows', 'shape']` | feature groups for tabular models (temporal models use ts only) |
+| `--step-days` |  | `5` |  |
+| `--output-step-days` |  | `15` |  |
+| `--window-days` |  | `30` |  |
+| `--lam` |  | `20.0` | Whittaker smoothing parameter |
+| `--algorithm` |  | `rf` | any registered estimator, e.g. rf, hist_gb, tempcnn, ltae |
+| `--params` |  |  | JSON estimator settings |
+| `--block-m` |  | `5000` |  |
+| `--buffer-m` |  |  |  |
+| `--folds` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--holdout` |  |  | fraction of spatial blocks locked as final test |
+| `--calibration-mode` |  | `oof` |  |
+| `--calibration-fraction` |  | `0.2` |  |
+| `--bootstrap` |  | `200` |  |
+| `--alpha` |  | `0.1` | conformal level 1-alpha for prediction sets |
+| `--min-pixels` |  | `4` |  |
+| `--min-confidence` |  |  |  |
+| `--min-margin` |  |  |  |
+| `--min-aoa-fraction` |  | `0.5` |  |
+| `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--markers` |  |  | markers.csv from geocrop markers |
+| `--calendar` |  |  | crop calendar YAML |
+| `--compare-pixels` |  |  | pixel samples .npz (polygon = parcel id): compare with pixel->parcel aggregation on the same parcels and folds |
+| `--pixel-algorithm` |  | `rf` |  |
+| `--pixel-params` |  |  |  |
+
+## `geocrop parcel-series-demo`
+
+Write SYNTHETIC parcel signatures, parcels and pixel samples (software tests)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--n-side` |  | `12` | parcels per grid side |
+| `--seed` |  | `11` |  |
+| `--pixel-noise` |  | `0.08` |  |
+| `--cloud-fraction` |  | `0.3` |  |
+
 ## `geocrop validate`
 
 Independent validation with field observations
@@ -610,7 +680,7 @@ Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)
 |---|---|---|---|
 | `--samples` | yes |  |  |
 | `--out` | yes |  |  |
-| `--models` |  | `['rf', 'extra_trees', 'hist_gb', 'lightgbm', 'catboost']` |  |
+| `--models` |  | `['rf', 'extra_trees', 'hist_gb', 'lightgbm', 'catboost']` | model names; tempcnn and ltae need --groups ts (any registered algorithm name works) |
 | `--features` |  |  | feature stack (manifest) to restrict --groups |
 | `--groups` |  |  |  |
 | `--grids` |  |  | JSON {"rf": {"max_features": ["sqrt", 0.3]}} |

@@ -16,6 +16,16 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- `geocrop parcel-classify` / `geocrop.parcel_classify` (gap G4): parcel-level classification on parcel
+  signatures (Whittaker-smoothed mean/std series, temporal percentiles, window means, shape descriptors)
+  through the same parcel-grouped spatial CV, locked holdout, calibration, conformal sets and AOA as
+  `geocrop train`; output uses the `geocrop parcels` decision/traffic-light schema; `--compare-pixels` scores it
+  against pixel -> parcel aggregation on identical parcels and folds. `geocrop parcel-series-demo` writes
+  SYNTHETIC parcel series; `tools/parcel_vs_pixel_experiment.py` reproduces the documented synthetic comparison.
+- `ltae` estimator (gap G13): Lightweight Temporal Attention Encoder (Garnot & Landrieu, 2020) in
+  `geocrop.temporal_models`, seeded, early stopping, picklable; `tempcnn` gains optional early stopping and the
+  scikit-learn estimator API. `estimators.sequence_params` derives `n_channels`/day-of-year positions from
+  `ts_` feature names; `benchmark-models --models tempcnn ltae` (and any registered algorithm name) works.
 
 ### Changed
 - SNAP `gpt` execution moved to the adapter `geocrop.snap` (`geocrop.s1.run_snap` remains); `sha256` moved

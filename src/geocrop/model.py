@@ -22,7 +22,7 @@ from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
 from . import applicability, contracts, metrics, uncertainty
-from .estimators import channels_from_names, importances, make_estimator
+from .estimators import importances, make_estimator, sequence_params
 from .hashing import sha256
 from .raster import NODATA, blocks, gtiff_profile, valid_mask
 from .samples import Samples
@@ -329,8 +329,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     X = samples.subset(features)
     y = samples.y
     params = dict(params or {"n_estimators": 500, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1})
-    if params.get("algorithm") == "tempcnn" and "n_channels" not in params:
-        params["n_channels"] = channels_from_names(features)
+    params = sequence_params(params, features)
     report: dict = {"features": len(features), "samples": int(len(y)), "polygons": int(len(np.unique(samples.polygon))),
                     "spatial_groups": int(len(np.unique(groups))), "spatial_block_m": spatial_block_m,
                     "class_counts": pd.Series(y).value_counts().to_dict(),

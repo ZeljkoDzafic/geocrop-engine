@@ -7,6 +7,7 @@
 5. [Features and index registry](features.md)
 6. [Classification and validation](classification-validation.md)
 7. [Parcels and declaration verification](parcels.md)
+   - [Parcel-level classification on signatures, LightTAE/TempCNN](parcel-classification.md)
 8. [Clouds, shadows and time series](timeseries.md)
 9. [Uncertainty, calibration and applicability](uncertainty.md)
 10. [Checks-by-Monitoring: signatures, markers, traffic light](cbm.md)
