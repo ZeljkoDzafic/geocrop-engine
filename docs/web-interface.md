@@ -84,6 +84,10 @@ stops the active process group; after an abrupt machine/process failure, inspect
 processes before manually rerunning an interrupted job. Cancellation can leave partial engine outputs;
 they are retained for inspection and the engine's own pipeline resume rules still apply.
 
+On POSIX each job runs as `python -c <bootstrap> <workspace> <args>` started with `posix_spawn` in its own
+session (stdin `/dev/null`, stdout and stderr to the job log). The server never forks: map previews load PROJ,
+whose fork handler could crash a forked child before it started the job (jobs then exited with -11).
+
 Job outputs must stay beneath the workspace and outside the web state directory. A config-driven `run`
 also checks `paths.output`, `paths.features` and `paths.composites`. Inputs may reference accessible local
 data. Choose fresh output paths for new experiments; the underlying engine retains its documented

@@ -26,7 +26,7 @@ from rasterio.warp import Resampling
 from . import indices
 from . import scenes as scene_meta
 from . import timeseries as ts
-from .features import Feature, load_manifest, manifest_path
+from .features import Feature, load_manifest, write_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned
 from .s2 import DEFAULT_SCL_INVALID, clear_mask
 
@@ -158,11 +158,11 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         finally:
             for h in handles.values():
                 h.close()
-    manifest_path(out).write_text(json.dumps({
+    write_manifest(out, {
         "stack": out.name, "kind": "timeseries", "grid_start": start.isoformat(), "grid_end": end.isoformat(),
         "step_days": step_days, "lambda": lam, "envelope_iterations": envelope_iterations,
         "scenes": {"S2": len(s2), "S1": len(s1)}, "nodata": NODATA,
-        "features": [asdict(f) for f in features]}, indent=2), encoding="utf8")
+        "features": [asdict(f) for f in features]})
     qa_path.with_suffix(".json").write_text(json.dumps({
         "schema": "geocrop-temporal-support/1", "quality_raster": qa_path.name,
         "start": start.isoformat(), "end": end.isoformat(), "grid_bins": len(grid), "step_days": step_days,
@@ -201,7 +201,6 @@ def merge_stacks(stacks, output: str | Path, block_size: int = 512) -> Path:
     finally:
         for h in handles:
             h.close()
-    manifest_path(out).write_text(json.dumps({"stack": out.name, "merged_from": [str(s) for s in stacks],
-                                              "nodata": NODATA, "features": [asdict(f) for f in feats]}, indent=2),
-                                  encoding="utf8")
+    write_manifest(out, {"stack": out.name, "merged_from": [str(s) for s in stacks],
+                         "nodata": NODATA, "features": [asdict(f) for f in feats]})
     return out

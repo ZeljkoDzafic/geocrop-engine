@@ -31,7 +31,7 @@ with an upgrade hint. See [ADR 0003](adr/0003-file-contracts-and-schema-versions
 
 | Output | Format | Content |
 |---|---|---|
-| `stack.tif` + `stack.features.json` | GeoTIFF float32 | one band per feature (description = name); manifest lists group, sensor, window(s), formula |
+| `stack.tif` + `stack.features.json` | GeoTIFF float32 | one band per feature (description = name); manifest lists group, sensor, window(s), formula, `schema_version` |
 | `samples.npz` | NumPy | `X, y, polygon, x, yy, features, crs` |
 | `model.joblib` | joblib | `schema_version`, estimator, ordered feature list, classes, parameters, seed, scikit-learn version |
 | `classes.tif` + `class_legend.json` | GeoTIFF uint8 | class index (255 = nodata) and index → name |

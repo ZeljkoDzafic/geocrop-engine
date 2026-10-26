@@ -124,6 +124,19 @@
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+- `geocrop run` wires in the standalone capabilities, all off by default (docs/configuration.md#optional-parts-of-geocrop-run):
+  `cv.strategy` with sample region/year ids and `model/transfer_report.json`; `predict.smoothing`; an
+  `embeddings` stage (`features.embeddings`, attached to the stack; network adapters imported only when
+  configured); `cbm.event_markers` (Sentinel-1 signatures and event markers) and `cbm.rules` in the cbm and
+  parcels stages; an optional `parcel_classify` stage (`decision: additional | replace`). Optional stages and
+  options enter fingerprints only when enabled (`pipeline.OPTIONAL_DEPENDS`, `config.FINGERPRINT_NEUTRAL`), so
+  existing configurations keep their configuration and stage fingerprints.
+- `model.params`: estimator-specific hyperparameters (e.g. of plugin estimators) passed through unchanged and
+  validated against the selected estimator's constructor (`model.config_params`, `model.check_params`); used by
+  `geocrop run`, `ablation`, `reduce-features` and `transfer`. `--algorithm`/`--algorithms` accept registered
+  plugin estimators (`plugins.Registry.declared_names`).
+- Feature manifests (`<stack>.features.json`) carry `schema_version` (`features.write_manifest`) and are checked on
+  read (`features.read_manifest`); unversioned manifests still load (ADR 0003).
 
 ### Security
 - Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
@@ -150,6 +163,9 @@
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
   (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
   now stop and ask for the upstream stage to be rerun.
+- Web workspace: after a map preview had used PROJ, later jobs could crash with exit code -11 before starting
+  (PROJ's fork handler closed its cached proj.db handle in the forked child; reproduced on macOS when proj.db
+  had been replaced on disk). Jobs are now started with `posix_spawn`, which runs no fork handlers.
 - Truncated or corrupt GeoTIFFs failed with GDAL's anonymous "Read failed"; the error now names the file and window.
 - A composite band that is entirely nodata/NaN/inf, or a stack without one valid pixel, used to produce an
   empty classification without an error. Both are now rejected and the empty products removed. Tests confirm

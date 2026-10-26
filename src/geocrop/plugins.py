@@ -155,6 +155,11 @@ class Registry:
         self.discover()
         return list(dict.fromkeys([*self._items, *self._lazy]))
 
+    def declared_names(self) -> list[str]:
+        """Names registered so far plus entry-point names, without importing any plugin or the built-in provider
+        (cheap enough for command-line choices; `names` loads everything)."""
+        return list(dict.fromkeys([*self._items, *self._lazy, *(ep.name for ep in _entry_points(self.group))]))
+
     def source(self, name: str) -> str:
         self.get(name)
         return self._sources[name]

@@ -17,6 +17,18 @@ def _json_arg(text):
     return json.loads(text) if text else None
 
 
+#: Built-in estimator names (`geocrop.estimators.ALGORITHMS`, checked by the tests); listed here so that building
+#: the parser does not import scikit-learn.
+BUILTIN_ALGORITHMS = ("rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn", "ltae")
+
+
+def _algorithm_choices() -> list[str]:
+    """Built-in estimators plus registered plugins: entry points of `geocrop.estimators` (names only, nothing is
+    imported) and estimators registered in code (`geocrop.plugins.estimators.register`)."""
+    from . import plugins
+    return list(dict.fromkeys([*BUILTIN_ALGORITHMS, *plugins.estimators.declared_names()]))
+
+
 def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParser:
     p = parser_class(prog="geocrop", description="GeoCrop Engine: open Sentinel-1/2 crop classification "
                                 "and parcel-level declaration verification.")
@@ -231,7 +243,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--tune", type=_json_arg, help='JSON grid, e.g. {"max_features": ["sqrt", 0.3]}')
     x.add_argument("--groups", nargs="*", help="restrict to feature groups")
     x.add_argument("--manifest", help="feature stack (for --groups)")
-    x.add_argument("--algorithm", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn", "ltae"])
+    x.add_argument("--algorithm", choices=_algorithm_choices(), help="built-in or registered plugin estimator")
     x.add_argument("--no-calibrate", action="store_true", help="skip temperature scaling")
     x.add_argument("--holdout", type=float, default=0.0, help="fraction of spatial blocks locked as final test")
     x.add_argument("--calibration-mode", choices=["oof", "holdout"], default="oof",
@@ -243,8 +255,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("benchmark", "Compare classifiers on identical spatial folds; internal model selection only")
     x.add_argument("--samples", required=True)
     x.add_argument("--out", required=True)
-    x.add_argument("--algorithms", nargs="+", choices=["rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn",
-                                                       "ltae"],
+    x.add_argument("--algorithms", nargs="+", choices=_algorithm_choices(),
                    default=["rf", "extra_trees", "hist_gb"])
     x.add_argument("--config", help="inherit model settings and spatial validation policy")
     x.add_argument("--params", type=_json_arg, help="JSON estimator settings shared across candidates")
@@ -1048,12 +1059,12 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from . import experiments
         from .config import load
         from .features import load_manifest
-        from .model import RF_KEYS
+        from .model import config_params
         from .samples import Samples
         cfg = load(a.config)
         exps = cfg["experiments"] or None
         m = cfg["model"]
-        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        params = config_params(m)
         n_splits = a.folds if a.folds is not None else m["cv_folds"]
         block_m = a.block_m if a.block_m is not None else m["spatial_block_m"]
         buffer_m = a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"]
@@ -1067,12 +1078,12 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "reduce-features":
         from .config import load
         from .experiments import feature_reduction
-        from .model import RF_KEYS
+        from .model import config_params
         from .samples import Samples
         s = Samples.load(a.samples)
         cfg = load(a.config)
         m = cfg["model"]
-        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        params = config_params(m)
         t = feature_reduction(s, s.features, params, a.out,
                               a.block_m if a.block_m is not None else m["spatial_block_m"],
                               n_splits=m["cv_folds"], seed=cfg["seed"], step=a.step,
@@ -1392,11 +1403,11 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "transfer":
         from . import experiments
         from .config import load
-        from .model import RF_KEYS
+        from .model import config_params
         from .samples import Samples
         cfg = load(a.config)
         m = cfg["model"]
-        params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+        params = config_params(m)
         params.update(a.params or {})
         t = experiments.transfer(Samples.load(a.samples), a.out, params=params, strategies=a.strategies,
                                  n_splits=a.folds if a.folds is not None else m["cv_folds"],

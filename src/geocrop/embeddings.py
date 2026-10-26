@@ -16,7 +16,6 @@ of a stack at a time (feature names are the band descriptions).
 """
 from __future__ import annotations
 
-import json
 import warnings
 from contextlib import ExitStack
 from dataclasses import asdict
@@ -28,7 +27,8 @@ import rasterio
 from affine import Affine
 from rasterio.warp import Resampling, reproject
 
-from .features import Feature, manifest_path
+from .features import Feature
+from .features import write_manifest as write_feature_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned, same_grid
 
 SOURCES = ("alphaearth", "tessera", "presto")
@@ -156,13 +156,11 @@ def write_manifest(output: str | Path, source: str, year: int, dims: int, extra:
     info = SOURCE_INFO[source]
     feats = [Feature(n, "emb", info["sensor"], None, (), f"{info['product']} {year}, dimension {i}")
              for i, n in enumerate(band_names(dims))]
-    path = manifest_path(output)
-    path.write_text(json.dumps({
+    return write_feature_manifest(output, {
         "stack": Path(output).name, "nodata": NODATA,
         "embedding": {"source": source, "year": int(year), "dims": dims,
                       **{k: v for k, v in info.items() if k != "dims"}, **(extra or {})},
-        "features": [asdict(f) for f in feats]}, indent=2, default=str), encoding="utf8")
-    return path
+        "features": [asdict(f) for f in feats]})
 
 
 def summary(path: str | Path, sample: int = 200_000, seed: int = 0) -> dict:

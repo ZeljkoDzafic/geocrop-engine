@@ -333,7 +333,7 @@ Spatial CV + final Random Forest
 | `--tune` |  |  | JSON grid, e.g. {"max_features": ["sqrt", 0.3]} |
 | `--groups` |  |  | restrict to feature groups |
 | `--manifest` |  |  | feature stack (for --groups) |
-| `--algorithm` |  |  |  |
+| `--algorithm` |  |  | built-in or registered plugin estimator |
 | `--no-calibrate` |  |  | skip temperature scaling |
 | `--holdout` |  |  | fraction of spatial blocks locked as final test |
 | `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |

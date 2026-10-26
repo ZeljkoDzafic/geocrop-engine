@@ -3,7 +3,6 @@ command restrictions and resource bounds. See docs/security.md for the threat mo
 import json
 import os
 import re
-import subprocess
 import time
 from pathlib import Path
 
@@ -372,13 +371,13 @@ def test_shell_operators_are_never_interpreted(client, workspace, command):
 
 def test_accepted_metacharacters_reach_the_engine_as_literal_arguments(live, workspace, monkeypatch):
     launched = []
-    original = subprocess.Popen
+    original = web_jobs.spawn
 
-    def spy(args, **kwargs):
-        launched.append((args, kwargs.get("shell", False)))
-        return original(args, **kwargs)
+    def spy(args, cwd, env, stdout):
+        launched.append((args, False))     # spawn has no shell: argv goes to posix_spawn / Popen as a list
+        return original(args, cwd, env, stdout)
 
-    monkeypatch.setattr(subprocess, "Popen", spy)
+    monkeypatch.setattr(web_jobs, "spawn", spy)
     job = submit(live, command="geocrop manifest --out 'outputs/$(touch pwned);x'").json()
     deadline = time.monotonic() + 30
     while live.get(f"/api/jobs/{job['id']}", headers=AUTH).json()["status"] not in web_jobs.TERMINAL:
@@ -457,13 +456,13 @@ def test_queue_limit_and_single_worker(client):
 
 def test_one_engine_process_at_a_time(live, monkeypatch):
     running, peak = [0], [0]
-    original = subprocess.Popen
+    original = web_jobs.spawn
 
     class Tracked:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args):
             running[0] += 1
             peak[0] = max(peak[0], running[0])
-            self._p = original(*args, **kwargs)
+            self._p = original(*args)
             self.pid = self._p.pid
 
         def wait(self, timeout=None):
@@ -476,7 +475,7 @@ def test_one_engine_process_at_a_time(live, monkeypatch):
         def __getattr__(self, name):
             return getattr(self._p, name)
 
-    monkeypatch.setattr(subprocess, "Popen", Tracked)
+    monkeypatch.setattr(web_jobs, "spawn", Tracked)
     ids = [submit(live, argv=["indices"]).json()["id"] for _ in range(3)]
     deadline = time.monotonic() + 60
     while any(live.get(f"/api/jobs/{i}", headers=AUTH).json()["status"] not in web_jobs.TERMINAL for i in ids):

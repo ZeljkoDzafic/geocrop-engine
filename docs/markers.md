@@ -133,8 +133,13 @@ data are sufficient. Otherwise they produce `insufficient_marker_data_<marker>`,
 
 `geocrop traffic-light` applies the rules from `--config` and/or `--rules` JSON to an existing `parcels.gpkg`,
 with `enabled` forced to true. `parcels.aggregate(..., markers=events, marker_rules=cfg["cbm"]["rules"])` does
-the same during aggregation. The pipeline stage `run --stages parcels` does not yet read `cbm.rules` or
-compute event markers; use the commands above.
+the same during aggregation.
+
+In `geocrop run`, `cbm.event_markers: true` (or `cbm.rules.enabled: true`, which implies it) makes the cbm stage
+compute the Sentinel-2 signatures with moments, Sentinel-1 signatures from `paths.s1_scenes` (when S1 scenes
+fall in the season) and `cbm/event_markers.csv` with `cbm.events`. With `cbm.rules.enabled` the parcels stage
+(and the optional parcel classifier) applies the rules and writes `traffic_light_reasons`. Both are off by
+default, and then the cbm and parcels outputs and fingerprints are unchanged.
 
 ## Assumptions and limitations
 

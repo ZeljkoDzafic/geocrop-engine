@@ -16,6 +16,31 @@ import yaml
 
 from . import cbm_markers, indices
 
+#: Defaults of the optional `parcel_classify` section (off: `geocrop run` outputs are unchanged).
+PARCEL_CLASSIFY_DEFAULTS: dict[str, Any] = {
+    "enabled": False,
+    "decision": "additional",          # additional: extra parcel_classify/ outputs | replace: parcels/ uses it
+    "label_field": None,               # independently verified class column of paths.parcels (never declarations)
+    "indices": None,                   # signature indices (default: [cbm.index])
+    "stats": ["mean", "std"],
+    "groups": ["ts", "stats", "windows", "shape"],
+    "step_days": 5,
+    "output_step_days": 15,
+    "window_days": 30,
+    "lambda": 20.0,
+    "bootstrap": 200,
+    "params": {},                      # estimator settings, e.g. {algorithm: rf, n_estimators: 300}
+}
+
+#: Keys added after configurations were first fingerprinted. While they hold these defaults they are left
+#: out of `fingerprint` (and of the resumable stage fingerprints, see `geocrop.pipeline`), so existing
+#: studies keep their fingerprints.
+FINGERPRINT_NEUTRAL: dict[tuple[str, ...], Any] = {
+    ("model", "params"): {},
+    ("cbm", "event_markers"): False,
+    ("parcel_classify",): PARCEL_CLASSIFY_DEFAULTS,
+}
+
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
     "seed": 42,
@@ -72,6 +97,9 @@ DEFAULTS: dict[str, Any] = {
         # (RULE_DEFAULTS); rules are off by default so existing outputs are unchanged.
         "events": copy.deepcopy(cbm_markers.EVENT_DEFAULTS),
         "rules": copy.deepcopy(cbm_markers.RULE_DEFAULTS),
+        # `geocrop run`: also compute Sentinel-1 parcel signatures and event/homogeneity markers in the cbm
+        # stage (implied by rules.enabled).
+        "event_markers": False,
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -93,6 +121,9 @@ DEFAULTS: dict[str, Any] = {
         "calibration_fraction": 0.2,
         "holdout_fraction": 0.0,
         "inner_splits": 3,
+        # Estimator-specific hyperparameters passed through unchanged (e.g. for plugin estimators), validated
+        # against the parameters the selected estimator accepts; they override the shared keys above.
+        "params": {},
     },
     "cv": {
         "strategy": "spatial_blocks",   # spatial_blocks | region | year | region_year (transfer validation)
@@ -103,6 +134,8 @@ DEFAULTS: dict[str, Any] = {
     "predict": {
         "smoothing": {"enabled": False, "window": 7, "smoothness": 10.0},
     },
+    # Optional parcel-level classifier on the cbm parcel signatures (docs/parcel-classification.md).
+    "parcel_classify": copy.deepcopy(PARCEL_CLASSIFY_DEFAULTS),
     "experiments": {},
     "parcels": {
         "id_field": "parcel_id",
@@ -259,6 +292,8 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    if not isinstance(cfg["cbm"]["event_markers"], bool):
+        raise ConfigError("cbm.event_markers must be true or false")
     try:
         cbm_markers.resolve_event_params(cfg["cbm"]["events"])
         cbm_markers.resolve_rules(cfg["cbm"]["rules"])
@@ -279,6 +314,8 @@ def validate(cfg: dict) -> dict:
     k = sm["smoothness"]
     if isinstance(k, bool) or not isinstance(k, (int, float)) or not math.isfinite(k) or k <= 0:
         raise ConfigError("predict.smoothing.smoothness must be a positive number")
+    _validate_model_params(cfg["model"])
+    _validate_parcel_classify(cfg)
     o = cfg["openeo"]
     unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
     if unknown:
@@ -290,6 +327,49 @@ def validate(cfg: dict) -> dict:
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
     return cfg
+
+
+def _validate_model_params(m: dict) -> None:
+    if m["params"] is None:
+        m["params"] = {}
+    extra = m["params"]
+    if not isinstance(extra, dict) or not all(isinstance(k, str) and k for k in extra):
+        raise ConfigError("model.params must be a mapping of estimator parameter names to values")
+    if "algorithm" in extra:
+        raise ConfigError("Set the estimator with model.algorithm, not model.params.algorithm")
+    seeded = sorted({"random_state", "seed", "random_seed"} & set(extra))
+    if seeded:
+        raise ConfigError(f"model.params.{seeded[0]}: the estimator seed comes from the top-level seed key")
+
+
+def _validate_parcel_classify(cfg: dict) -> None:
+    pc = cfg["parcel_classify"]
+    if not isinstance(pc["enabled"], bool):
+        raise ConfigError("parcel_classify.enabled must be true or false")
+    if pc["decision"] not in ("additional", "replace"):
+        raise ConfigError("parcel_classify.decision must be additional or replace")
+    allowed = PARCEL_CLASSIFY_DEFAULTS["groups"]
+    if not isinstance(pc["groups"], list) or not pc["groups"] or set(pc["groups"]) - set(allowed):
+        raise ConfigError(f"parcel_classify.groups must be a non-empty subset of {allowed}")
+    for key in ("step_days", "output_step_days", "window_days", "bootstrap"):
+        low = 0 if key == "bootstrap" else 1
+        if isinstance(pc[key], bool) or not isinstance(pc[key], int) or pc[key] < low:
+            raise ConfigError(f"parcel_classify.{key} must be an integer >= {low}")
+    if not _number(pc["lambda"]) or pc["lambda"] <= 0:
+        raise ConfigError("parcel_classify.lambda must be a positive number")
+    if pc["params"] is None:
+        pc["params"] = {}
+    if not isinstance(pc["params"], dict):
+        raise ConfigError("parcel_classify.params must be a mapping of estimator settings")
+    if not pc["enabled"]:
+        return
+    if not cfg["cbm"]["enabled"]:
+        raise ConfigError("parcel_classify needs cbm.enabled: true (it classifies the cbm parcel signatures)")
+    if not pc["label_field"]:
+        raise ConfigError("parcel_classify.label_field must name an independently verified class column of "
+                          "paths.parcels")
+    if pc["label_field"] == cfg["parcels"]["declared_field"]:
+        raise ConfigError("parcel_classify.label_field must not be the declaration column being checked")
 
 
 def _validate_embeddings(raw) -> None:
@@ -354,7 +434,26 @@ def load(path: str | Path | None = None, overrides: dict | None = None) -> dict:
     return validate(cfg)
 
 
+def without_neutral_defaults(cfg: dict) -> dict:
+    """Copy of `cfg` without the `FINGERPRINT_NEUTRAL` keys that hold their default (sections copied shallowly)."""
+    out = dict(cfg)
+    for path, default in FINGERPRINT_NEUTRAL.items():
+        parent = out
+        for key in path[:-1]:
+            if not isinstance(parent.get(key), dict):
+                parent = None
+                break
+            parent[key] = dict(parent[key])
+            parent = parent[key]
+        if parent is not None and path[-1] in parent and parent[path[-1]] == default:
+            del parent[path[-1]]
+    return out
+
+
 def fingerprint(cfg: dict) -> str:
-    """Stable hash of a resolved configuration, recorded in every run manifest."""
-    body = json.dumps(cfg, sort_keys=True, default=str).encode()
+    """Stable hash of a resolved configuration, recorded in every run manifest.
+
+    `FINGERPRINT_NEUTRAL` keys are omitted while they hold their default, so adding an optional feature to
+    GeoCrop does not change the fingerprint of configurations that do not use it."""
+    body = json.dumps(without_neutral_defaults(cfg), sort_keys=True, default=str).encode()
     return hashlib.sha256(body).hexdigest()[:16]

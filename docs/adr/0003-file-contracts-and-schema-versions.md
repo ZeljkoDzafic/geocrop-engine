@@ -24,7 +24,8 @@ malformed one, and a future layout change would be misread silently.
 ## Consequences
 * All existing files keep working; files written by this version are readable by older GeoCrop releases
   (they ignore the extra key).
-* Pending: the feature manifest (`<stack>.features.json`) is listed in `SCHEMA_VERSIONS` but not yet stamped
-  or validated, because `features.py` was out of scope for this change; reports (`train_report.json`,
-  `benchmark.json`) keep their `schema` strings.
+* The feature manifest (`<stack>.features.json`) is stamped by `features.write_manifest` (used for window,
+  time-series, merged and embedding stacks) and validated by `features.read_manifest` / `load_manifest`
+  (added after this ADR; unversioned manifests still load). Reports (`train_report.json`, `benchmark.json`)
+  keep their `schema` strings.
 * Version numbers are per contract, not per GeoCrop release.

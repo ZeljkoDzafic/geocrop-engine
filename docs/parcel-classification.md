@@ -62,6 +62,25 @@ geocrop parcel-classify --signatures signatures.csv --parcels parcels.gpkg \
 
 Python API: `parcel_features`, `train`, `predict`, `compare_pixel_aggregation` in `geocrop.parcel_classify`.
 
+### In `geocrop run`
+
+The optional `parcel_classify` stage runs after `cbm` on `<output>/cbm/signatures.csv` (so it needs
+`cbm.enabled: true` and `timeseries.start/end`). It uses the `parcels:` schema and thresholds, the `model:`
+validation settings (`cv_folds`, `spatial_block_m`, `spatial_buffer_m`, `holdout_fraction`, calibration) and
+writes `<output>/parcel_classify/model/` and `<output>/parcel_classify/parcels.gpkg|.csv|.summary.json`.
+
+```yaml
+parcel_classify:
+  enabled: true
+  label_field: verified_crop     # independently verified classes; never the declarations being checked
+  decision: additional           # additional: extra outputs | replace: parcels/ holds these decisions
+  params: {algorithm: rf, n_estimators: 300}
+```
+
+With `decision: replace` the parcels stage copies the parcel classifier's product into `<output>/parcels/`
+(same schema) instead of aggregating pixels. With `cbm.rules.enabled` the marker rules are applied to the
+parcel classifier's traffic light as well. Parcels with a label are predicted in-sample (`in_training`).
+
 ## Temporal deep models (LightTAE, TempCNN)
 
 The estimator registry has two sequence models. They read the channel-major `ts_…_d<doy>` layout,

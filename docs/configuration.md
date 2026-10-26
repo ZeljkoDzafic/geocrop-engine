@@ -23,7 +23,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `s1` | VV_dB, VH_dB, VHVV_dB | radar features |
 | | `deltas` | NDVI, NDRE, NDMI | consecutive-window differences (S2 or S1 feature names) |
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
-| | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md) |
+| | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md); enables the `embeddings` stage of `geocrop run` |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
 | `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
@@ -31,9 +31,10 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `min_observed_fraction`, `max_gap_days` | 0, null | optional occupied-bin/gap policy for reconstructed features; separate QA products always emitted |
 | `cbm` | `enabled`, `index`, `calendar`, `min_coverage` | false, NDVI, –, 0.5 | parcel signatures + markers; crop-calendar YAML |
 | `cbm.events` | event-marker parameters (`abrupt_drop`, `s1_group_by`, ...) | see [markers.md](markers.md) | harvest/tillage/mowing/homogeneity markers |
-| `cbm.rules` | `enabled`, class lists, outcomes, `min_marker_confidence`, `mixed_class_share` | off | marker rules for the traffic light, reason codes ([markers.md](markers.md)) |
+| `cbm.rules` | `enabled`, class lists, outcomes, `min_marker_confidence`, `mixed_class_share` | off | marker rules for the traffic light, reason codes ([markers.md](markers.md)); applied by the parcels stage |
+| `cbm` | `event_markers` | false | `geocrop run`: also Sentinel-1 signatures and `cbm/event_markers.csv` (implied by `rules.enabled`) |
 | `classes` | `label_field`, `id_field`, `targets` | `class_name`, `polygon_id`, [] | reference schema; target classes get extra columns in ablation tables |
-| `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn` |
+| `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn`, `ltae` or a registered plugin estimator |
 | | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs`, `learning_rate` | 500, sqrt, 1, null, balanced_subsample, −1, null | estimator settings (keys unknown to an algorithm are ignored) |
 | | `calibrate` | true | temperature scaling of probabilities |
 | | `calibration_mode`, `calibration_fraction` | oof, 0.2 | empirical OOF sets or frozen-predictor holdout; fraction of spatial groups reserved in holdout |
@@ -41,9 +42,14 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
 | | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
-| `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop ablation --config` |
-| | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids; CLI `geocrop samples --region-field/--year-field/--year` |
-| `predict` | `smoothing: {enabled, window, smoothness}` | false, 7, 10 | edge-aware probability smoothing before argmax and parcel aggregation; used by `geocrop predict --config` |
+| | `params` | `{}` | estimator-specific hyperparameters passed to the estimator unchanged (e.g. a plugin's own settings); overrides the shared keys above; validated against the estimator's constructor (see below) |
+| `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop run` (train, experiments) and `geocrop ablation --config` |
+| | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids (samples stage of `geocrop run`); CLI `geocrop samples --region-field/--year-field/--year` |
+| `predict` | `smoothing: {enabled, window, smoothness}` | false, 7, 10 | edge-aware probability smoothing before argmax and parcel aggregation; used by `geocrop run` and `geocrop predict --config` |
+| `parcel_classify` | `enabled`, `decision`, `label_field` | false, `additional`, null | optional parcel-level classifier on the cbm signatures ([parcel classification](parcel-classification.md#in-geocrop-run)); `replace` makes it the parcel product |
+| | `indices`, `stats`, `groups` | [`cbm.index`], [mean, std], [ts, stats, windows, shape] | signature features |
+| | `step_days`, `output_step_days`, `window_days`, `lambda`, `bootstrap` | 5, 15, 30, 20, 200 | series grid, Whittaker smoothing, bootstrap replicates |
+| | `params` | `{}` | parcel estimator settings, e.g. `{algorithm: rf, n_estimators: 300}` (validated like `model.params`) |
 | `experiments` | `<id>: {groups, periods, features, exclude}` | E0–E4 ladder | ablation definitions |
 | `parcels` | `id_field`, `declared_field`, `crop_mapping` | `parcel_id`, `declared_crop`, null | parcel schema |
 | | `strategy` | `mean_probability` | `majority`, `mean_probability`, `combined` |
@@ -58,6 +64,29 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | `preflight` | `min_s2_scenes_per_window`, `min_s1_scenes_per_window` | 3, 2 | warn below these scene counts |
 | | `max_unobserved_fraction` | 0.05 | warn when more of the AOI lacks `min_valid_observations` clear observations |
 | | `coverage_max_px`, `inventories` | 512, [] | decimated coverage grid size (≥ 16); inventory CSVs counted per window |
+
+## Optional parts of `geocrop run`
+
+All of the following are off by default. While they are off, `geocrop run` produces the same products and the
+same stage fingerprints as before they existed (`tests/test_pipeline_options.py` pins the fingerprints of a
+default configuration against GeoCrop main at c091962). Turning one on re-runs only the stages that depend on it.
+
+| Option | Stage(s) | Products |
+|---|---|---|
+| `cv.strategy` (+ `region_field`/`year_field`/`year`) | samples (group ids), train, experiments | `model/transfer_report.json`, `model/transfer_per_group.csv`, transfer columns in `ablation.csv` |
+| `predict.smoothing.enabled` | predict | smoothed `probabilities.tif`/`classes.tif`, `prediction/probabilities_unsmoothed.tif` |
+| `features.embeddings` | embeddings, features | `<features dir>/embeddings/<source>_<year>.tif`, `emb` group in the stack |
+| `cbm.event_markers` | cbm | `cbm/event_markers.csv`, `cbm/s1_signatures.csv` |
+| `cbm.rules.enabled` | cbm, parcels | `traffic_light_reasons`, marker escalations of `traffic_light` |
+| `parcel_classify.enabled` | parcel_classify (+ parcels with `decision: replace`) | `parcel_classify/model/`, `parcel_classify/parcels.*` |
+| `model.params` | train, experiments | estimator built with these parameters |
+
+`model.params` is checked before any stage runs: the estimator selected by `model.algorithm` (built-in or plugin)
+is constructed and every key must be one of its constructor parameters and must arrive there unchanged. A
+misspelt key, a seed (`random_state`; the top-level `seed` is used) or a key the estimator factory does not
+forward (the built-in CatBoost factory maps only the shared keys) is a configuration error. `geocrop ablation`,
+`reduce-features` and `transfer --config` use the same parameters; `geocrop benchmark` compares several
+algorithms and therefore uses only the shared keys.
 
 Parallelism: there is no separate worker cap; model training follows `model.n_jobs`, raster stages are
 block-wise single-process (see [preflight](preflight.md#disk-guard-during-runs)).
