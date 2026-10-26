@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- `geocrop preflight`: pass/warn/error checks and a ready / ready-with-warnings / blocked verdict (JSON and
+  Markdown) before long runs: scenes per window and S1 orbit (scene folders and inventory CSVs), decimated
+  clear-observation coverage, class support under the configured spatial blocks, folds and locked holdout,
+  grid/layer CRS and AOI overlap, the input audit, and rough disk/RAM/runtime estimates against free space.
+- Disk guard before `composite`, `features` and `predict` (`resources.disk_guard`, `min_free_gb`,
+  `safety_factor`, `compression_ratio`); stops with a clear message before writing.
+- Partial outputs of failed or interrupted stages are moved to `<output>/.quarantine`; `geocrop clean`
+  (`--dry-run`, `--all-intermediates`, `--include-results`) removes temporary files, quarantine and
+  regenerable intermediates while never touching scene folders, reference layers or configs.
 - `geocrop quicklook`: real Sentinel-2 imagery for a bounding box and period (windowed COG reads, monthly
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2

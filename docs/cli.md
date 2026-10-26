@@ -41,6 +41,29 @@ Validate a configuration file and print the resolved config
 |---|---|---|---|
 | `--config` | yes |  |  |
 
+## `geocrop preflight`
+
+Check whether a configured run can succeed and estimate its cost (no data changed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--inventory` |  | `[]` | catalog/stac-search CSVs to count planned scenes |
+| `--out` |  |  | save the JSON report |
+| `--markdown` |  |  | save a Markdown report |
+| `--strict` |  |  | exit 2 also on warnings (default: only when blocked) |
+
+## `geocrop clean`
+
+Remove temporary files, quarantined partial outputs and (optionally) regenerable intermediates
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--dry-run` |  |  | list paths and sizes without removing anything |
+| `--all-intermediates` |  |  | also composites, feature stacks, samples and hash cache (regenerated on the next run) |
+| `--include-results` |  |  | also model/prediction/parcels/cbm/validation/experiments outputs of the run directory |
+
 ## `geocrop indices`
 
 Print the spectral/radar index table (name, formula, reference)
@@ -125,6 +148,20 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--max-cloud` |  | `80` | tile cloud cover pre-filter (%%) |
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
+
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
 
 ## `geocrop s2-composite`
 
