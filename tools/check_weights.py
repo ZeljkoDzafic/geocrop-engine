@@ -9,6 +9,8 @@ The pins are imported from the engine itself, never duplicated here:
 * ``geocrop.clouds.omnicloudmask_files()``        - OmniCloudMask weights (Hugging Face revision, SHA-256)
 * ``geocrop.public_data.WORLDCEREAL_CHECKSUMS``   - WorldCereal crop-calendar GeoTIFFs on PANGAEA (SHA-256)
 * ``configs/benchmarks/*.yaml`` ``dataset``       - EuroCrops archives on Zenodo (checksum as pinned, e.g. md5)
+* ``configs/benchmarks/*.yaml`` ``sources``       - label sources of the transfer protocols (EuroCrops on Zenodo,
+                                                    KMRS 2025 and other pinned URLs)
 
 Usage::
 
@@ -64,11 +66,38 @@ def pins() -> list[dict]:
              "size": None, "licence": "CC-BY-SA-4.0"}
             for name, checksum in public_data.WORLDCEREAL_CHECKSUMS.items()]
     for path in sorted((ROOT / "configs" / "benchmarks").glob("*.yaml")):
-        ds = (yaml.safe_load(path.read_text(encoding="utf8")) or {}).get("dataset") or {}
+        body = yaml.safe_load(path.read_text(encoding="utf8")) or {}
+        ds = body.get("dataset") or {}
         if ds.get("zenodo_record") and ds.get("archive"):
             out.append({"name": f"{ds.get('name', 'dataset')}:{ds['archive']} ({path.name})",
                         "url": public_data.zenodo_url(str(ds["zenodo_record"]), ds["archive"]),
                         "checksum": ds.get("checksum"), "size": None, "licence": ds.get("licence")})
+        out += protocol_sources(body, path.name)
+    unique, seen = [], set()
+    for pin in out:                 # one check per pinned file, even when several configs pin it
+        if (pin["url"], pin["checksum"]) not in seen:
+            seen.add((pin["url"], pin["checksum"]))
+            unique.append(pin)
+    return unique
+
+
+def protocol_sources(body: dict, filename: str) -> list[dict]:
+    """Pinned label sources of a transfer protocol (``sources:``): Zenodo archives (``kind: eurocrops``) and
+    plain URLs (``kind: url``, e.g. the Slovenian KMRS 2025 layer), each with its checksum."""
+    from geocrop import public_data
+
+    out = []
+    for key, src in (body.get("sources") or {}).items():
+        if not isinstance(src, dict):
+            continue
+        if src.get("zenodo_record") and src.get("archive"):
+            url = public_data.zenodo_url(str(src["zenodo_record"]), src["archive"])
+        elif src.get("url"):
+            url = src["url"]
+        else:
+            continue
+        out.append({"name": f"{key}:{src.get('archive') or url.rsplit('/', 1)[-1]} ({filename})", "url": url,
+                    "checksum": src.get("checksum"), "size": None, "licence": src.get("licence")})
     return out
 
 

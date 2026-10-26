@@ -109,8 +109,9 @@ Status after the gate-findings fixes (2026-10-26):
 
 1. **No checksum mismatches and no unreachable pinned URLs** (20 pinned files: 9 FTW, 1 Presto, 2 Galileo,
    1 AnySat, 2 OmniCloudMask, 4 WorldCereal, 1 EuroCrops). The KMRS 2025 file of the transfer protocol is pinned
-   by SHA-256 too but is listed under the protocol's `sources:` key, which `tools/check_weights.py` does not read
-   yet; it was verified by the transfer run itself.
+   by SHA-256 too, under the protocol's `sources:` key; it was verified by the transfer run itself.
+   `tools/check_weights.py` now also reads every transfer protocol's `sources:` key, so the next gate run
+   re-checks it (not yet run with downloads after this change).
 2. Fixed: **Copernicus attribution** is now written where Sentinel data enter (Earth Search, CDSE SAFE, SNAP,
    Planetary Computer, openEO) and carried through composites, stacks and predictions into COG exports and STAC
    items (see the table). Synthetic demo data carry no such tag. Not covered: external cubes loaded through

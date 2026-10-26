@@ -24,7 +24,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `s1` | VV_dB, VH_dB, VHVV_dB | radar features |
 | | `deltas` | NDVI, NDRE, NDMI | consecutive-window differences (S2 or S1 feature names) |
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
-| | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md); enables the `embeddings` stage of `geocrop run` |
+| | `embeddings` | null | optional `emb` group: `{source: <provider> or a list, year, ...}`, see [embeddings](embeddings.md); enables the `embeddings` stage of `geocrop run` |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
 | `timeseries` | `enabled`, `start`, `end`, `temporal_support` | false, –, –, false | build time-series features from scene folders and merge them into the stack; `temporal_support` also writes the per-pixel observed-vs-interpolated raster ([temporal-quality.md](temporal-quality.md)) |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
@@ -84,7 +84,7 @@ default configuration against GeoCrop main at c091962). Turning one on re-runs o
 |---|---|---|
 | `cv.strategy` (+ `region_field`/`year_field`/`year`) | samples (group ids), train, experiments | `model/transfer_report.json`, `model/transfer_per_group.csv`, transfer columns in `ablation.csv` |
 | `predict.smoothing.enabled` | predict | smoothed `probabilities.tif`/`classes.tif`, `prediction/probabilities_unsmoothed.tif` |
-| `features.embeddings` | embeddings, features | `<features dir>/embeddings/<source>_<year>.tif`, `emb` group in the stack |
+| `features.embeddings` | embeddings, features | `<features dir>/embeddings/<source>_<year>.tif` per source (+ `monthly/` for on-VM providers), `emb` group in the stack |
 | `cbm.event_markers` | cbm | `cbm/event_markers.csv`, `cbm/s1_signatures.csv` |
 | `cbm.rules.enabled` | cbm, parcels | `traffic_light_reasons`, marker escalations of `traffic_light` |
 | `parcel_classify.enabled` | parcel_classify (+ parcels with `decision: replace`) | `parcel_classify/model/`, `parcel_classify/parcels.*` |

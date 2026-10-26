@@ -13,9 +13,10 @@ Comparisons are only made between results that were scored on identical splits: 
 a fingerprint of its sample support and of the exact fold (or holdout, or transfer-group) assignment, and
 `compare` / `leaderboard` refuse or separate results whose fingerprints differ.
 
-Pretrained external checkpoints (Fields of The World, Presto) appear as read-only entries of kind
-``pretrained``; their URL, size, SHA-256 and licence come from the pins in `geocrop.ftw` and
-`geocrop.embedding_sources`. They are downloaded at runtime by those modules, never stored here.
+Pretrained external checkpoints (Fields of The World, Presto, and the weights every feature provider declares,
+e.g. Galileo and AnySat) appear as read-only entries of kind ``pretrained``; their URL, size, SHA-256 and licence
+come from the pins in `geocrop.ftw`, `geocrop.embedding_sources` and the feature-provider registry. They are
+downloaded at runtime by those modules, never stored here.
 """
 from __future__ import annotations
 
@@ -321,18 +322,43 @@ def _validation(report: dict | None, conformal: dict | None) -> dict:
 
 
 def _licences(manifest: list[dict] | None, extra: dict | None) -> list[dict]:
-    """Licences of pretrained components: embedding sources found in the feature manifest plus declared ones."""
-    from .embeddings import SOURCE_INFO
+    """Licences of pretrained components: every embedding provider found in the feature manifest (built-in or
+    plugin, with the licence, code licence and pinned weights it declares as a feature provider) plus declared
+    ones."""
+    from .embeddings import _sensor_to_source, parse_band_name
 
-    out = []
-    sensors = {f.get("sensor") for f in manifest or [] if f.get("group") == "emb"}
-    for source, info in SOURCE_INFO.items():
-        if info["sensor"] in sensors:
-            out.append({"component": f"{source} embeddings", "licence": info["licence"],
-                        "attribution": info.get("attribution")})
+    sources: list[str] = []
+    for f in manifest or []:
+        if f.get("group") != "emb":
+            continue
+        parsed = parse_band_name(f.get("name", ""))
+        source = (parsed[0] if parsed else None) or _sensor_to_source(f.get("sensor"))
+        if source and source not in sources:
+            sources.append(source)
+    out = [_provider_licence(source) for source in sources]
     for component, licence in (extra or {}).items():
         out.append({"component": component, "licence": licence, "attribution": None})
     return out
+
+
+def _provider_licence(source: str) -> dict:
+    from . import plugins
+    from .embeddings import SOURCE_INFO
+
+    record = {"component": f"{source} embeddings", "licence": None, "attribution": None}
+    if source in SOURCE_INFO:
+        record.update(licence=SOURCE_INFO[source]["licence"], attribution=SOURCE_INFO[source].get("attribution"))
+    try:
+        provider = plugins.feature_providers.get(source)
+    except Exception:          # unregistered or broken plugin: keep what the manifest tells
+        return record
+    record["licence"] = record["licence"] or getattr(provider, "licence", None)
+    record["attribution"] = record["attribution"] or getattr(provider, "attribution", None)
+    record["code_licence"] = getattr(provider, "code_licence", None)
+    weights = getattr(provider, "weights", ()) or ()
+    if weights:
+        record["weights"] = [{"url": w.url, "sha256": w.sha256} for w in weights]
+    return record
 
 
 def _stack_info(stack: str | Path) -> dict:
@@ -731,7 +757,8 @@ def annotate_prediction(manifest: str | Path, resolved: dict) -> None:
 # --------------------------------------------------------------------------- pretrained checkpoints
 
 def pretrained_entries() -> list[dict]:
-    """Pinned external checkpoints (FTW, Presto) as registry entries of kind ``pretrained``."""
+    """Pinned external checkpoints (FTW, Presto, feature-provider weights) as registry entries of kind
+    ``pretrained``."""
     from .ftw import MODELS, checkpoint_path
     out = []
     for m in MODELS.values():
@@ -752,6 +779,32 @@ def pretrained_entries() -> list[dict]:
                 # same location as geocrop.embedding_sources.presto_checkpoint()
                 "cache_path": str(cache_dir() / "presto" / f"presto_{PRESTO_COMMIT[:12]}_default_model.pt"),
                 "pinned_in": "geocrop.embedding_sources.PRESTO_CHECKPOINT", "stage": "external"})
+    out += _provider_entries(cache_dir(), {PRESTO_CHECKPOINT["url"]})
+    return out
+
+
+def _provider_entries(cache: Path, known_urls: set[str]) -> list[dict]:
+    """Pinned weights of every registered feature provider (Galileo, AnySat, plugins) from the ``weights`` and
+    ``licence`` they declare (`geocrop.feature_providers.FeatureProvider`); one entry per file, cached where
+    `geocrop.embedding_sources.fetch_weights` puts it."""
+    from . import plugins
+
+    out = []
+    for name in plugins.feature_providers.names():
+        try:
+            provider = plugins.feature_providers.get(name)
+        except Exception:      # a broken plugin must not break the registry listing
+            continue
+        files = [w for w in getattr(provider, "weights", ()) or () if w.url not in known_urls]
+        for w in files:
+            out.append({"kind": "pretrained", "name": f"{name}/{w.name}" if len(files) > 1 else f"{name}/default",
+                        "version": w.sha256[:12], "algorithm": name, "task": "embedding",
+                        "licence": provider.licence,
+                        "commercial_use": None if getattr(provider, "requires_licence_ack", False) else True,
+                        "description": getattr(provider, "product", "") or f"{name} encoder weights",
+                        "classes": None, "artifact": {"url": w.url, "sha256": w.sha256, "bytes": w.size},
+                        "cache_path": str(cache / name / w.name),
+                        "pinned_in": f"geocrop feature provider {name!r} (weights)", "stage": "external"})
     return out
 
 

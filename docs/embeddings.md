@@ -62,10 +62,10 @@ features:
     # resampling: nearest              nearest | bilinear (pre-computed sources)
     # mirror: source.coop              AlphaEarth: source.coop | gcs
     # index: null                      AlphaEarth: local or remote aef_index.parquet
-    # monthly: null                    Presto: monthly composites root (default <dir>/monthly)
-    # start: "2023-01"                 Presto: first month (default <year>-01)
-    # months: 12                       Presto: 1..24 monthly timesteps
-    # checkpoint: null                 Presto: local checkpoint instead of the pinned download
+    # monthly: null                    monthly providers: composites root (default <dir>/monthly)
+    # start: "2023-01"                 monthly providers: first month (default <year>-01)
+    # months: 12                       monthly providers: 1..24 monthly timesteps
+    # checkpoint: null                 one monthly provider: local weights instead of the pinned download
     # parcels: false                   also write parcel-level embeddings for paths.parcels
     # attach: true                     geocrop features --config appends the raster(s) to the stack
     # namespace: null                  true: emb_<source>_NN, false: legacy emb_NN (null: see Output contract)
@@ -74,8 +74,7 @@ features:
 
 `monthly`, `start`, `months` and `checkpoint` apply to every monthly provider (Presto, Galileo, AnySat). A list
 of sources (`source: [presto, galileo, anysat]`) produces one raster per source with namespaced names; all are
-attached to the stack. In `geocrop run` the embeddings stage currently supports a single AlphaEarth, TESSERA or
-Presto source only (see [Limitations](#limitations)).
+attached to the stack, in `geocrop run` as with the commands below.
 
 ## Commands
 
@@ -107,11 +106,24 @@ define your own `experiments:` with that baseline listed first, for example `{gr
 
 `geocrop run` has an `embeddings` stage between `composite` and `features`. It runs only when
 `features.embeddings` is configured; only then are the network adapters (AlphaEarth/TESSERA reads, the pinned
-Presto checkpoint download) imported. For Presto without `monthly`, the stage first builds the monthly
-composites from `paths.s2_scenes`/`paths.s1_scenes` into `<dir>/monthly`. With `attach: true` (default) the
-features stage appends the raster to the stack, and the raster's content becomes part of the features
-fingerprint, so a re-extracted embedding re-runs features and everything after it. Without
-`features.embeddings`, neither the stage nor any fingerprint changes.
+weight downloads) imported. It accepts everything `geocrop embeddings` accepts:
+
+* **One or several providers.** `source` may be a list; each provider writes its own raster, with namespaced
+  names `emb_<provider>_NN` (forced for lists), and `namespace` applies as on the CLI.
+* **One monthly input for every on-VM provider.** Presto, Galileo, AnySat and plugin `MonthlyProvider`s all read
+  the same monthly composites: `monthly`, or, without it, `<dir>/monthly`, which the stage builds once from
+  `paths.s2_scenes`/`paths.s1_scenes` (with the `compositing` cloud settings) before any provider runs.
+* **Licences.** A provider with `requires_licence_ack` is refused, before anything is computed or downloaded,
+  unless its licence id is listed in `allow_license` (the config twin of `--allow-license`).
+* **Parcels.** With `parcels: true`, every provider also writes `<source>_<year>_parcels.csv` for `paths.parcels`.
+
+The stage fingerprint covers the options, the study grid, the provider set (name, kind, dims, licence, where
+it is registered, the SHA-256 of its pinned weights and, for plugins, their source file), the resolved
+`namespace`, a local `checkpoint`'s content and the content of the monthly composites (the `monthly` folder, or
+the scene folders and compositing settings they are built from). Acknowledging a licence changes no output and
+is not part of it. With `attach: true` (default) the features stage appends every raster to the stack, and the
+rasters' content becomes part of the features fingerprint, so a re-extracted embedding re-runs features and
+everything after it. Without `features.embeddings`, neither the stage nor any fingerprint changes.
 
 ## Sources in detail
 
@@ -395,11 +407,6 @@ been run yet.
 * **Version drift.** AlphaEarth, the TESSERA v1 `.npy` tiles (deprecated upstream in favour of Zarr and
   Icechunk) and the model checkpoints can change upstream. GeoCrop pins the Presto, Galileo and AnySat weights
   by commit/revision URL and SHA-256 and records tile URLs and checkpoint hashes in the output tags. Re-extract when you change versions.
-* **Pipeline.** `geocrop run` extracts and attaches embeddings when `features.embeddings` is set (see
-  [Commands](#commands)), but only for a **single** AlphaEarth, TESSERA or Presto source: the embeddings stage
-  does not yet pass monthly composites to Galileo/AnySat, does not accept a list of sources and ignores
-  `namespace`/`allow_license`. For those, run `geocrop embeddings` and then `geocrop features --config` (or
-  `geocrop merge-stacks`).
 * **Licences.** You are responsible for attribution when publishing maps derived from AlphaEarth (CC-BY-4.0)
   and TESSERA (see the licence notes above). The MIT licences of the Galileo and AnySat weights cover the
   weights; they do not re-license the pre-training datasets, which GeoCrop never downloads or redistributes.

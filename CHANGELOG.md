@@ -335,6 +335,21 @@
 - `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
 - `stac-import` reuses cached scenes only for the same study grid and with all bands present.
 - Map responses of a previously selected job are discarded.
+- `geocrop run` embeddings stage: every on-VM provider (Presto, Galileo, AnySat, plugin `MonthlyProvider`s) now gets
+  the monthly composites through one shared path (`features.embeddings.monthly`, or `<dir>/monthly` built once
+  from the scene folders); before, Galileo and AnySat failed because only Presto's composites were built.
+- `features.embeddings.source` as a list no longer raises `TypeError` in the stage: each provider writes its own
+  raster (namespaced `emb_<provider>_NN`) and the features stage attaches all of them.
+- The stage honours `namespace` and `allow_license`; a provider that needs a licence acknowledgement is refused
+  before anything runs, exactly as `geocrop embeddings --allow-license`. `parcels: true` applies to every provider.
+- The embeddings stage fingerprint includes the provider set (with the SHA-256 of pinned weights and plugin
+  source files), the resolved namespace, a local checkpoint and the monthly composites' content; with embeddings
+  off, no fingerprint changes. `checkpoint` with several sources is rejected by config validation.
+- Model registry: `licences` records every embedding provider found in the feature manifest (Galileo, AnySat,
+  plugins) from the licence and weights it declares, and `pretrained` entries list every provider's pinned weights
+  (`anysat/default`, `galileo/<file>`, plugins), not only FTW and Presto.
+- `tools/check_weights.py` also reads the transfer protocols' `sources:` key (EuroCrops, KMRS 2025), so every
+  pinned download is re-checked; identical pins are checked once.
 
 ## 0.9.0 — 2026-10-26
 Hardening release: leakage-free validation for ML and DL, reliable resumable execution, seam-free
