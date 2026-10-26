@@ -2,6 +2,7 @@
 
 ## Unreleased
 ### Added
+- `tools/deploy_website.sh`: manual deployment of the presentation site to Cloudflare static assets, with security headers in `website/_headers`.
 - Analyst parcel review in the web workspace (gap G7, docs/web-interface.md#review-analyst-parcel-decisions): a
   Review view with a filterable, sortable queue (traffic light, declared class, model decision, reason code,
   uncertainty, review state; J/K to move), a parcel card with declared vs predicted class, probabilities, conformal

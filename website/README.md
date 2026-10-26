@@ -56,7 +56,19 @@ The complete `website/` folder can be uploaded to any static host. Relative asse
 a domain root and a project subpath, including GitHub Pages. Source/docs links and installation
 commands target the public main branch.
 
-### GitHub Pages
+### Cloudflare (current deployment)
+
+The site is published as Cloudflare static assets at <https://geocrop.calm-silence-b9f5.workers.dev>.
+After `npx wrangler login` (or with `CLOUDFLARE_API_TOKEN` set), run:
+
+```bash
+tools/deploy_website.sh
+```
+
+It runs the site check and uploads `website/`; `website/_headers` sets the security headers. Deployment
+is manual and makes the page public.
+
+### GitHub Pages (alternative)
 
 1. Ensure `website/`, `tools/check_presentation_site.py` and `.github/workflows/pages.yml` are on `main`.
 2. Open the repository **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.
