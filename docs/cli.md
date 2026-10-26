@@ -648,6 +648,25 @@ Concatenate feature stacks on one grid
 | `--stacks` | yes |  |  |
 | `--out` | yes |  |  |
 
+## `geocrop embeddings`
+
+Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` |  |  | features.embeddings, grid.reference and paths sections |
+| `--source` |  |  | override features.embeddings.source |
+| `--year` |  |  | override features.embeddings.year |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference) |
+| `--out` |  |  | output directory (default <features dir>/embeddings) |
+| `--monthly` |  |  | Presto: monthly composites root <YYYY-MM>/B02.tif ... VV.tif |
+| `--start` |  |  | Presto: first month YYYY-MM (default <year>-01) |
+| `--months` |  |  | Presto: number of months (default 12) |
+| `--parcels` |  |  | Presto: also write parcel-level embeddings for this layer |
+| `--id-field` |  |  | parcel id field (default parcels.id_field) |
+| `--checkpoint` |  |  | Presto: local checkpoint instead of the pinned download |
+| `--make-monthly` |  |  | Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes |
+
 ## `geocrop signatures`
 
 Parcel-mean time series (CbM signatures) from S2 scene folders

@@ -47,6 +47,7 @@ DEFAULTS: dict[str, Any] = {
         "s1": list(indices.DEFAULT_S1_FEATURES),
         "deltas": ["NDVI", "NDRE", "NDMI"],
         "seasonal": ["NDVI"],
+        "embeddings": None,     # optional foundation-model feature group, see EMBEDDING_DEFAULTS
     },
     "timeseries": {
         "enabled": False,
@@ -161,6 +162,34 @@ class ConfigError(ValueError):
     pass
 
 
+#: Keys of the optional ``features.embeddings`` mapping (docs/embeddings.md).
+EMBEDDING_DEFAULTS: dict[str, Any] = {
+    "source": None,            # alphaearth | tessera | presto
+    "year": None,
+    "dir": None,               # default: <paths.features parent>/embeddings
+    "resampling": "nearest",   # pre-computed sources: nearest | bilinear
+    "mirror": "source.coop",   # AlphaEarth: source.coop | gcs
+    "index": None,             # AlphaEarth: local/remote aef_index.parquet override
+    "monthly": None,           # Presto: monthly composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
+    "start": None,             # Presto: first month YYYY-MM (default <year>-01)
+    "months": 12,              # Presto: number of monthly timesteps (1..24)
+    "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
+    "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
+    "attach": True,            # append the embeddings raster to the feature stack
+}
+
+
+def embedding_options(cfg: dict, always: bool = False) -> dict | None:
+    """Resolved ``features.embeddings`` options (None when the group is not configured, unless `always`)."""
+    raw = cfg["features"].get("embeddings")
+    if not raw and not always:
+        return None
+    opts = {**EMBEDDING_DEFAULTS, **(raw or {})}
+    if not opts["dir"]:
+        opts["dir"] = str(Path(cfg["paths"]["features"]).parent / "embeddings")
+    return opts
+
+
 def _merge(base: dict, override: dict, path: str = "") -> dict:
     out = copy.deepcopy(base)
     for key, value in (override or {}).items():
@@ -224,6 +253,7 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("model.calibration_fraction must be a finite fraction between 0 and 1")
     for name in cfg["features"]["s2_indices"] + cfg["features"]["s1"]:
         indices.get(name)
+    _validate_embeddings(cfg["features"].get("embeddings"))
     if cfg["compositing"]["statistic"] not in ("median", "mean") and not str(
             cfg["compositing"]["statistic"]).startswith("p"):
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
@@ -260,6 +290,35 @@ def validate(cfg: dict) -> dict:
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
     return cfg
+
+
+def _validate_embeddings(raw) -> None:
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ConfigError("features.embeddings must be a mapping {source: ..., year: ...}")
+    unknown = set(raw) - set(EMBEDDING_DEFAULTS)
+    if unknown:
+        raise ConfigError(f"Unknown configuration key: features.embeddings.{sorted(unknown)[0]}")
+    if raw.get("source") not in ("alphaearth", "tessera", "presto"):
+        raise ConfigError("features.embeddings.source must be alphaearth, tessera or presto")
+    year = raw.get("year")
+    if isinstance(year, bool) or not isinstance(year, int) or not 2015 <= year <= 2100:
+        raise ConfigError("features.embeddings.year must be a year, e.g. 2023")
+    if raw.get("resampling", "nearest") not in ("nearest", "bilinear"):
+        raise ConfigError("features.embeddings.resampling must be nearest or bilinear")
+    if raw.get("mirror", "source.coop") not in ("source.coop", "gcs"):
+        raise ConfigError("features.embeddings.mirror must be source.coop or gcs")
+    months = raw.get("months", 12)
+    if isinstance(months, bool) or not isinstance(months, int) or not 1 <= months <= 24:
+        raise ConfigError("features.embeddings.months must be an integer in 1..24")
+    start = raw.get("start")
+    if start is not None:
+        try:
+            y, m = (int(p) for p in str(start).split("-"))
+            date(y, m, 1)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError("features.embeddings.start must be YYYY-MM") from exc
 
 
 def _number(value) -> bool:

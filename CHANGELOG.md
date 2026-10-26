@@ -2,6 +2,12 @@
 
 ## Unreleased
 ### Added
+- Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
+  `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
+  TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
+  GeoCrop monthly S2/S1 composites (pixel and parcel level; official MIT checkpoint pinned by SHA-256).
+  `features.embeddings` config key, `features.attach_embeddings`, and ablation rows E5–E7 (handcrafted vs
+  embeddings vs both) when the stack carries `emb`.
 - `geocrop active-learning select|ingest|simulate` (`geocrop.active_learning`, gap G9): batch selection among
   top-uncertain parcels with k-center diversity in standardised feature space, per-predicted-class quotas,
   minimum spacing and trip grouping; ingestion of field/analyst labels with per-round provenance, conflict

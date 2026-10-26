@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from . import metrics
-from .features import Feature, select
+from .features import GROUPS, Feature, select
 from .model import cross_validate, cv_groups, selection_samples, spatial_blocks, transfer_validation
 from .samples import Samples
 
@@ -25,6 +25,14 @@ DEFAULT_EXPERIMENTS = {
     "E2_S2_full_temporal": {"groups": ["s2_band", "s2_index", "delta", "seasonal"]},
     "E3_S1_only": {"groups": ["s1"]},
     "E4_S1_S2_fusion": {"groups": ["s2_band", "s2_index", "s1", "delta", "seasonal"]},
+}
+# Added to the defaults only when the stack carries an `emb` group (geocrop.embeddings): handcrafted vs
+# foundation-model embeddings vs both, on the same samples and folds.
+HANDCRAFTED_GROUPS = [g for g in GROUPS if g != "emb"]
+EMBEDDING_EXPERIMENTS = {
+    "E5_handcrafted_all": {"groups": HANDCRAFTED_GROUPS},
+    "E6_embeddings_only": {"groups": ["emb"]},
+    "E7_handcrafted_plus_embeddings": {"groups": [*HANDCRAFTED_GROUPS, "emb"]},
 }
 
 
@@ -51,14 +59,17 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
                                                    calibration_mode, calibration_fraction)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    experiments = experiments or DEFAULT_EXPERIMENTS
+    available = [f for f in manifest if f.name in samples.features]
+    if not experiments:
+        experiments = dict(DEFAULT_EXPERIMENTS)
+        if any(f.group == "emb" for f in available):
+            experiments.update(EMBEDDING_EXPERIMENTS)
     params = params or {"n_estimators": 300, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1}
     groups = spatial_blocks(samples, spatial_block_m)
     spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
                "spatial_buffer_m": spatial_buffer_m}
     transfer_groups = None if cv_strategy == "spatial_blocks" else cv_groups(samples, cv_strategy, spatial_block_m)
     ref_hold = None
-    available = [f for f in manifest if f.name in samples.features]
     rows, full = [], {}
     reference_name, reference_oof = None, None   # first successful experiment is the paired-test baseline
     for name, spec in experiments.items():
