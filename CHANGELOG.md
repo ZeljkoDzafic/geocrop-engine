@@ -2,12 +2,35 @@
 
 ## Unreleased
 ### Added
+- Versioned REST API: every endpoint is also served under `/api/v1/...`, the documented stable contract;
+  unversioned `/api/...` paths remain as compatibility aliases. `EngineClient` uses `/api/v1` and falls back to
+  `/api` on older servers.
+- Security gate (`tests/test_security.py`), threat model ([docs/security.md](docs/security.md)) and `SECURITY.md`.
+- CI: branch coverage with `coverage.xml` artifact and a fail-under threshold, `pip-audit` of the pinned and the
+  latest dependency sets, test run on the pinned set, Docker image build; Dependabot for pip and GitHub Actions.
+- Tag-driven `release` workflow (version consistency check, tests, sdist + wheel, GitHub Release with CHANGELOG
+  notes and checksums); `tools/check_versions.py`; pinned `constraints/py312.txt`;
+  [release and rollback policy](docs/release.md).
 - `geocrop quicklook`: real Sentinel-2 imagery for a bounding box and period (windowed COG reads, monthly
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
 
+### Security
+- Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
+  holder run an arbitrary executable; options are now checked after parsing.
+- Web API: every `/api` path requires the token before routing (including unknown paths); the Host allow-list
+  accepts `[::1]:port` independently of the Starlette version; all security headers (now also
+  `X-Frame-Options`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `Permissions-Policy`,
+  CSP `object-src 'none'`) are sent on rejections and errors too; `Sec-Fetch-Site: cross-site` API requests are
+  refused; request bodies are limited to 1 MiB and job arguments to 128 KiB in total.
+- Web API: unreadable or malformed `run` configurations return HTTP 400 without echoing file content (previously
+  HTTP 500); unexpected errors return a generic HTTP 500 that keeps the security headers.
+- Docker: job state, `.env` files and virtual environments are excluded from the build context.
+
 ### Fixed
+- Docker image build: the conda environment step tried to install the not-yet-copied checkout.
+- Packaging: SPDX license expression (`license = "Apache-2.0"`), removing setuptools deprecation warnings.
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
 - `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
 - `stac-import` reuses cached scenes only for the same study grid and with all bands present.
