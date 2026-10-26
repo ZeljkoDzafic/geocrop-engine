@@ -19,3 +19,4 @@
 17. [Scope, status and limitations](limitations.md)
 18. [Open-source review and implementation evidence](open-source-review.md)
 19. [Testing](testing.md)
+20. [Acceptance run on real Sentinel-1/2 data](acceptance.md)

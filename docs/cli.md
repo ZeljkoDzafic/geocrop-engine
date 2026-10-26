@@ -126,6 +126,35 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
 
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
+
+## `geocrop acceptance`
+
+End-to-end acceptance run on real Sentinel-1/2 data (or --offline synthetic) with a pass/fail report
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  | output directory (acceptance_report.json/.md) |
+| `--bbox` |  | `[19.12, 44.73, 19.145, 44.748]` | degrees; default ~2 x 2 km in Semberija |
+| `--start` |  | `2023-06-01` |  |
+| `--end` |  | `2023-09-30` | monthly windows between start and end |
+| `--offline` |  |  | synthetic scenes, no network (CI) |
+| `--seed` |  | `42` |  |
+| `--k` |  | `4` | number of pseudo-classes (k-means) |
+| `--no-s1-coregistration` |  |  | keep Sentinel-1 geolocation as delivered (no offset correction to Sentinel-2) |
+
 ## `geocrop s2-composite`
 
 Cloud-masked temporal composite of S2 scene folders

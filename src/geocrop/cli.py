@@ -107,6 +107,19 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--min-clear", type=float, default=0.3)
     x.add_argument("--max-items", type=int, default=60)
 
+    x = cmd("acceptance", "End-to-end acceptance run on real Sentinel-1/2 data (or --offline synthetic) with a "
+                          "pass/fail report")
+    x.add_argument("--out", required=True, help="output directory (acceptance_report.json/.md)")
+    x.add_argument("--bbox", nargs=4, type=float, metavar=("W", "S", "E", "N"),
+                   default=[19.120, 44.730, 19.145, 44.748], help="degrees; default ~2 x 2 km in Semberija")
+    x.add_argument("--start", default="2023-06-01")
+    x.add_argument("--end", default="2023-09-30", help="monthly windows between start and end")
+    x.add_argument("--offline", action="store_true", help="synthetic scenes, no network (CI)")
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--k", type=int, default=4, help="number of pseudo-classes (k-means)")
+    x.add_argument("--no-s1-coregistration", action="store_true",
+                   help="keep Sentinel-1 geolocation as delivered (no offset correction to Sentinel-2)")
+
     x = cmd("s2-composite", "Cloud-masked temporal composite of S2 scene folders")
     x.add_argument("--scenes", nargs="+", required=True)
     x.add_argument("--out", required=True)
@@ -506,6 +519,14 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         r = quicklook(a.bbox, a.start, a.end, a.out, max_cloud=a.max_cloud, min_clear=a.min_clear,
                       max_items=a.max_items)
         _print({k: r[k] for k in ("crs", "area_km2", "acquisitions_found", "acquisitions_used", "composites")})
+    elif c == "acceptance":
+        from .acceptance import run as acceptance_run
+        report = acceptance_run(a.out, a.bbox, a.start, a.end, offline=a.offline, seed=a.seed, k=a.k,
+                                coregister_s1=not a.no_s1_coregistration, log=lambda m: print(m, file=sys.stderr))
+        _print({"verdict": report["verdict"], "checks": report["summary"], "runtime_s": report["runtime_s"],
+                "error": report.get("error"), "report": str(Path(a.out) / "acceptance_report.md")})
+        if report["verdict"] != "PASS":
+            sys.exit(1)
     elif c == "s2-composite":
         from .s2 import composite
         print(composite(a.scenes, a.out, a.reference, a.statistic, cloud_probability_max=a.cloud_prob_max,
