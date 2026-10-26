@@ -48,7 +48,7 @@ LAYERS: dict[str, frozenset[str]] = {
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
-        "audit", "benchmark", "cache", "config", "demo", "experiments", "pipeline", "provenance",
+        "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),

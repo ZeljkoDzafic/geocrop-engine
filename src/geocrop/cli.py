@@ -45,6 +45,21 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("config-check", "Validate a configuration file and print the resolved config")
     x.add_argument("--config", required=True)
 
+    x = cmd("preflight", "Check whether a configured run can succeed and estimate its cost (no data changed)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--inventory", nargs="*", default=[], help="catalog/stac-search CSVs to count planned scenes")
+    x.add_argument("--out", help="save the JSON report")
+    x.add_argument("--markdown", help="save a Markdown report")
+    x.add_argument("--strict", action="store_true", help="exit 2 also on warnings (default: only when blocked)")
+
+    x = cmd("clean", "Remove temporary files, quarantined partial outputs and (optionally) regenerable intermediates")
+    x.add_argument("--config", required=True)
+    x.add_argument("--dry-run", action="store_true", help="list paths and sizes without removing anything")
+    x.add_argument("--all-intermediates", action="store_true",
+                   help="also composites, feature stacks, samples and hash cache (regenerated on the next run)")
+    x.add_argument("--include-results", action="store_true",
+                   help="also model/prediction/parcels/cbm/validation/experiments outputs of the run directory")
+
     x = cmd("indices", "Print the spectral/radar index table (name, formula, reference)")
     x.add_argument("--format", choices=["json", "markdown"], default="markdown")
 
@@ -534,6 +549,24 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .config import fingerprint, load
         cfg = load(a.config)
         _print({"fingerprint": fingerprint(cfg), "config": cfg})
+    elif c == "preflight":
+        from .config import load
+        from .preflight import run as preflight_run
+        from .preflight import to_markdown
+        report = preflight_run(load(a.config), a.config, a.inventory)
+        for target, text in ((a.out, lambda: json.dumps(report, indent=2, ensure_ascii=False, default=str)),
+                             (a.markdown, lambda: to_markdown(report))):
+            if target:
+                Path(target).parent.mkdir(parents=True, exist_ok=True)
+                Path(target).write_text(text(), encoding="utf8")
+        print(to_markdown(report))
+        if report["verdict"] == "blocked" or (a.strict and report["verdict"] != "ready"):
+            sys.exit(2)
+    elif c == "clean":
+        from .cleanup import clean
+        from .config import load
+        _print(clean(load(a.config), dry_run=a.dry_run, all_intermediates=a.all_intermediates,
+                     include_results=a.include_results, config_path=a.config))
     elif c == "indices":
         from .indices import table
         rows = table()

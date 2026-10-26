@@ -41,6 +41,29 @@ Validate a configuration file and print the resolved config
 |---|---|---|---|
 | `--config` | yes |  |  |
 
+## `geocrop preflight`
+
+Check whether a configured run can succeed and estimate its cost (no data changed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--inventory` |  | `[]` | catalog/stac-search CSVs to count planned scenes |
+| `--out` |  |  | save the JSON report |
+| `--markdown` |  |  | save a Markdown report |
+| `--strict` |  |  | exit 2 also on warnings (default: only when blocked) |
+
+## `geocrop clean`
+
+Remove temporary files, quarantined partial outputs and (optionally) regenerable intermediates
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--dry-run` |  |  | list paths and sizes without removing anything |
+| `--all-intermediates` |  |  | also composites, feature stacks, samples and hash cache (regenerated on the next run) |
+| `--include-results` |  |  | also model/prediction/parcels/cbm/validation/experiments outputs of the run directory |
+
 ## `geocrop indices`
 
 Print the spectral/radar index table (name, formula, reference)

@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- `geocrop preflight`: pass/warn/error checks and a ready / ready-with-warnings / blocked verdict (JSON and
+  Markdown) before long runs: scenes per window and S1 orbit (scene folders and inventory CSVs), decimated
+  clear-observation coverage, class support under the configured spatial blocks, folds and locked holdout,
+  grid/layer CRS and AOI overlap, the input audit, and rough disk/RAM/runtime estimates against free space.
+- Disk guard before `composite`, `features` and `predict` (`resources.disk_guard`, `min_free_gb`,
+  `safety_factor`, `compression_ratio`); stops with a clear message before writing.
+- Partial outputs of failed or interrupted stages are moved to `<output>/.quarantine`; `geocrop clean`
+  (`--dry-run`, `--all-intermediates`, `--include-results`) removes temporary files, quarantine and
+  regenerable intermediates while never touching scene folders, reference layers or configs.
 - Versioned REST API: every endpoint is also served under `/api/v1/...`, the documented stable contract;
   unversioned `/api/...` paths remain as compatibility aliases. `EngineClient` uses `/api/v1` and falls back to
   `/api` on older servers.
