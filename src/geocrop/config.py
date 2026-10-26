@@ -111,6 +111,21 @@ DEFAULTS: dict[str, Any] = {
         "window_px": 1,
         "bootstrap": 1000,
     },
+    # Optional openEO back-end (geocrop openeo-extract / openeo-graph); local processing stays the default.
+    "openeo": {
+        "url": "https://openeo.dataspace.copernicus.eu",
+        "products": ["s2_composites"],
+        "s2_collection": "SENTINEL2_L2A",
+        "s1_collection": "SENTINEL1_GRD",
+        "s1_coefficient": "sigma0-ellipsoid",
+        "s1_card4l": False,
+        "max_cloud_cover": None,
+        "signature_indices": ["NDVI", "BSI"],
+        "start": None,
+        "end": None,
+        "job_options": None,
+        "work_dir": "data/openeo",
+    },
 }
 
 
@@ -186,6 +201,12 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    o = cfg["openeo"]
+    unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
+    if unknown:
+        raise ConfigError(f"Unknown openeo.products {unknown}")
+    if o["s1_coefficient"] not in ("sigma0-ellipsoid", "gamma0-terrain"):
+        raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")

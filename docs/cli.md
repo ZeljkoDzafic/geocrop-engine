@@ -126,6 +126,20 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
 
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
+
 ## `geocrop s2-composite`
 
 Cloud-masked temporal composite of S2 scene folders
@@ -645,3 +659,26 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--config` |  |  |  |
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
+
+## `geocrop openeo-extract`
+
+Run composites, scenes or parcel signatures on an openEO back-end (CDSE) and write them in GeoCrop's file contracts (optional openeo extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--dry-run` |  |  | only write the process graphs; needs no credentials |
+| `--graphs` |  |  | directory for the process graph JSON; default <openeo.work_dir>/graphs |
+| `--auth` |  | `auto` | auto: CDSE_OPENEO_CLIENT_ID/SECRET if set, else the OIDC device flow |
+
+## `geocrop openeo-graph`
+
+Export the configured GeoCrop recipe as openEO process graphs (no credentials needed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
+| `--stdout` |  |  | print the openEO process objects as one JSON document |

@@ -2,6 +2,10 @@
 
 ## Unreleased
 ### Added
+- Optional openEO back-end (`geocrop.openeo_adapter`, gap G10): `geocrop openeo-extract` runs Sentinel-2/-1 window
+  composites, scene extraction or parcel signatures on CDSE openEO and writes them in GeoCrop's composite/scene/
+  signature contracts on the study grid; `geocrop openeo-graph` (and `--dry-run`) exports the recipe as openEO
+  process graphs without credentials. New optional `openeo:` configuration section; see `docs/openeo.md`.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.

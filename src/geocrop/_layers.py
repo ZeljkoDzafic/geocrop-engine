@@ -43,6 +43,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "snap",          # ESA SNAP gpt runner (subprocess)
         "stac",          # STAC inventory (pystac-client)
         "stac_import",   # STAC COG import
+        "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
