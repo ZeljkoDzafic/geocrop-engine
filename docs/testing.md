@@ -73,9 +73,10 @@ CI measures coverage of the default tier on every Python version:
 python -m pytest --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
 ```
 
-`coverage.xml` is uploaded as a workflow artifact. The build fails below `--cov-fail-under=77`, set at 0.9.0
-(measured 79.9 % then, minus two points); raise the threshold when coverage improves. Engine commands run by web
-jobs execute in subprocesses and are not counted; the CLI's own tests cover them in-process.
+`coverage.xml` is uploaded as a workflow artifact. The build fails below `--cov-fail-under=71`: the total measured on
+the minimal CI install `.[dev,stac,web]` (72.9 %, optional backends such as PyTorch skipped) minus two points; raise
+the threshold when coverage improves. Engine commands run by web jobs execute in subprocesses and are not counted;
+the CLI's own tests cover them in-process.
 
 Measured on 2026-10-26 (Python 3.12, default tier, local environment with the optional extras including
 PyTorch, so slightly higher than a CI job without them; statements + branches combined: **83.8 %**; statements

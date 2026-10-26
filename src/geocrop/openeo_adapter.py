@@ -357,6 +357,14 @@ def signatures_graph(grid: dict, start: date, end: date, geometries: dict, index
     return g.finish(g.add("save_result", data=agg, format="JSON", options={}))
 
 
+def _rounded(geometry, digits: int = 7):
+    """GeoJSON with coordinates rounded to 1e-7 degrees (~1 cm), so process graphs are identical across
+    platforms and GEOS/PROJ builds (the last floating-point digits of reprojected buffers differ)."""
+    def walk(c):
+        return round(float(c), digits) if not isinstance(c, (list, tuple)) else [walk(x) for x in c]
+    return {"type": geometry["type"], "coordinates": walk(geometry["coordinates"])}
+
+
 def parcel_geometries(parcels, grid: dict, id_field: str = "parcel_id", interior_buffer_px: float = 1):
     """Interior-buffered parcels (as in `cbm.parcel_signatures`) as a WGS84 GeoJSON FeatureCollection."""
     import geopandas as gpd
@@ -370,7 +378,7 @@ def parcel_geometries(parcels, grid: dict, id_field: str = "parcel_id", interior
     geoms = geoms.to_crs("EPSG:4326")
     ids = gdf[id_field].astype(str).tolist()
     features = [{"type": "Feature", "properties": {"parcel_id": pid},
-                 "geometry": json.loads(json.dumps(mapping(geom)))} for pid, geom in zip(ids, geoms)]
+                 "geometry": _rounded(mapping(geom))} for pid, geom in zip(ids, geoms)]
     return {"type": "FeatureCollection", "features": features}, ids
 
 

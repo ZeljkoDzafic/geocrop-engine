@@ -279,6 +279,8 @@
   `geocrop run` embeddings limitation (single AlphaEarth/TESSERA/Presto source) documented.
 - OBIA and watershed post-processing raise a clear error naming the `segmentation` extra when scikit-image is
   missing (previously a bare `ModuleNotFoundError`, e.g. in `geocrop acceptance --offline` on a core install).
+- The default test tier passes on a minimal install (`.[dev,stac,web]`, no torch/pyarrow/matplotlib), as in CI;
+  openEO parcel geometries are rounded to 1e-7° so process graphs are identical across platforms.
 - STAC imports (Sentinel-2 Earth Search, Sentinel-1 RTC Planetary Computer) set GDAL HTTP connect/total
   timeouts and a low-speed abort, so a stalled HTTPS connection fails that item instead of hanging the import
   (observed: > 1 h hang in a 1000 km² Sentinel-1 import).
