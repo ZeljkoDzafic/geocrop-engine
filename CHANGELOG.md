@@ -2,6 +2,9 @@
 
 ## Unreleased
 ### Added
+- Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
+  fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
+  real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
 - External data-cube adapter (`geocrop.datacube`, docs/datacube.md): `geocrop cube load` reads Sentinel-2 L2A from
   any STAC API through odc-stac directly onto the study grid with the same SCL screening and BOA-offset handling as
   `stac-import` (identical scene folders on a real Semberija July 2023 run); `geocrop cube import` validates
