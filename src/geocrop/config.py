@@ -173,6 +173,15 @@ DEFAULTS: dict[str, Any] = {
         "job_options": None,
         "work_dir": "data/openeo",
     },
+    # Where Sentinel-2 scenes come from (docs/datacube.md). `geocrop cube load --config` reads this section;
+    # the pipeline itself always reads scene folders from paths.s2_scenes, whatever filled them.
+    "data": {
+        "source": "local",          # local (SAFE / stac-import scene folders) | odc-stac
+        "endpoint": "https://earth-search.aws.element84.com/v1",
+        "collection": "sentinel-2-l2a",
+        "max_cloud": 80,
+        "min_clear_fraction": 0.2,
+    },
     # Machine protection: free-space guard before heavy stages (see docs/preflight.md).
     "resources": {
         "disk_guard": True,
@@ -189,6 +198,10 @@ DEFAULTS: dict[str, Any] = {
         "inventories": [],
     },
 }
+
+# `data:` (scene source for `geocrop cube load`) is not read by `geocrop run`; at its defaults it leaves the
+# configuration fingerprint as it was before the section existed.
+FINGERPRINT_NEUTRAL[("data",)] = copy.deepcopy(DEFAULTS["data"])
 
 
 class ConfigError(ValueError):
@@ -323,6 +336,7 @@ def validate(cfg: dict) -> dict:
     if o["s1_coefficient"] not in ("sigma0-ellipsoid", "gamma0-terrain"):
         raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
     _validate_resources(cfg["resources"], cfg["preflight"])
+    _validate_data(cfg["data"])
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
@@ -370,6 +384,20 @@ def _validate_parcel_classify(cfg: dict) -> None:
                           "paths.parcels")
     if pc["label_field"] == cfg["parcels"]["declared_field"]:
         raise ConfigError("parcel_classify.label_field must not be the declaration column being checked")
+
+
+def _validate_data(d: dict) -> None:
+    if d["source"] not in ("local", "odc-stac"):
+        raise ConfigError("data.source must be local or odc-stac")
+    for key in ("endpoint", "collection"):
+        if not isinstance(d[key], str) or not d[key]:
+            raise ConfigError(f"data.{key} must be a non-empty string")
+    mc = d["max_cloud"]
+    if mc is not None and (isinstance(mc, bool) or not isinstance(mc, (int, float)) or not 0 <= mc <= 100):
+        raise ConfigError("data.max_cloud must be a percentage in [0, 100] or null")
+    f = d["min_clear_fraction"]
+    if isinstance(f, bool) or not isinstance(f, (int, float)) or not 0 <= f <= 1:
+        raise ConfigError("data.min_clear_fraction must be in [0, 1]")
 
 
 def _validate_embeddings(raw) -> None:
