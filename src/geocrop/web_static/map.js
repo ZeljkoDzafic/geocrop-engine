@@ -19,7 +19,9 @@ const GeoMap = (() => {
     el("basemap-select").addEventListener("change", (e) => {
       if (basemap) { map.removeLayer(basemap); basemap = null; }
       const choice = BASEMAPS[e.target.value];
-      if (choice) basemap = L.tileLayer(choice[0], { pane: "basemap", maxZoom: 19, maxNativeZoom: choice[2], attribution: choice[1] }).addTo(map);
+      // OSM tile policy requires an identifying Referer; send only the page origin (never path or token).
+      if (choice) basemap = L.tileLayer(choice[0], { pane: "basemap", maxZoom: 19, maxNativeZoom: choice[2], attribution: choice[1],
+                                                    referrerPolicy: "strict-origin-when-cross-origin" }).addTo(map);
     });
     return map;
   }
