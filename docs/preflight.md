@@ -92,7 +92,7 @@ Training samples pixel centres rather than centroids, so a buffered fold plan ca
 | expected size | uncompressed × `resources.compression_ratio` (default 0.8; measured 0.77–0.82 on noisy synthetic data with deflate + floating-point predictor; real data with no-data outside the AOI usually compresses better) |
 | peak RAM | largest per-stage working set from block sizes (512 px; 256 px for time series) and scene counts, plus model size; Python/GDAL overhead and parallel tree building are not included |
 | RF model size | upper bound: trees × 2 × 0.63 × samples / `min_samples_leaf` nodes × (64 + 8 × classes) bytes |
-| runtime | coefficients in `geocrop.preflight.RUNTIME` (seconds per megapixel and scene / feature / tree), measured on the synthetic demo on an 8-core laptop and rounded up |
+| runtime | coefficients in `geocrop.preflight.RUNTIME` (seconds per megapixel and scene / feature / tree), measured on the synthetic demo on an 8-core laptop and rounded up; prediction (incl. the single-core AOA map) and a ~1 GB RAM overhead recalibrated on real 25–1000 km² runs ([performance](performance.md)) |
 
 `resources.disk` compares, **per volume**, the free space with the cumulative need of all stages writing to
 it: error when `expected × safety_factor + min_free_gb` exceeds free space, warn when only the compressed

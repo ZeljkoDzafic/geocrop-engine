@@ -123,7 +123,21 @@ def eurocrops_file(name: str, checksum: str | None = None, record: str = EUROCRO
 def eurocrops_layer(archive: str, checksum: str | None = None, record: str = EUROCROPS_RECORD,
                     cache: str | Path | None = None) -> Path:
     """Path of the vector layer (``.shp``/``.gpkg``) inside a downloaded and extracted EuroCrops archive."""
-    zpath = eurocrops_file(archive, checksum, record, cache)
+    return extract_layer(eurocrops_file(archive, checksum, record, cache), checksum)
+
+
+def url_layer(url: str, checksum: str, cache: str | Path | None = None, subdir: str = "url") -> Path:
+    """Download a zipped single-layer vector dataset from `url` (checksum-pinned) and return its layer path.
+
+    Used for national open data published outside Zenodo (e.g. the Slovenian KMRS crop declarations)."""
+    name = url.rstrip("/").rsplit("/", 1)[-1]
+    return extract_layer(fetch(url, cache_dir(cache) / subdir / name, checksum), checksum)
+
+
+def extract_layer(zpath: str | Path, checksum: str | None = None) -> Path:
+    """Extract a zip archive next to itself once (path traversal refused) and return its only vector layer."""
+    zpath = Path(zpath)
+    archive = zpath.name
     target = zpath.with_suffix("")
     marker = target / ".extracted"
     if not marker.exists():

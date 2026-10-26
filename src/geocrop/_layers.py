@@ -57,6 +57,7 @@ LAYERS: dict[str, frozenset[str]] = {
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
+        "public_transfer",   # frozen-protocol public region/year transfer benchmark
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),
