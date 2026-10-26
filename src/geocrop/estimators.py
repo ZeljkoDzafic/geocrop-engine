@@ -66,11 +66,18 @@ def _hist_gb(p: dict, seed: int):
     return HistGradientBoostingClassifier(random_state=seed, **_filtered(HistGradientBoostingClassifier, p))
 
 
+def _first_line(exc: BaseException) -> str:
+    return (str(exc).splitlines() or [type(exc).__name__])[0][:200]
+
+
 def _lightgbm(p: dict, seed: int):
     try:
         from lightgbm import LGBMClassifier
     except ImportError as exc:
         raise RuntimeError("pip install lightgbm") from exc
+    except OSError as exc:  # installed, but its native library (libomp on macOS) cannot be loaded
+        raise RuntimeError(f"lightgbm is installed but cannot load its native library ({_first_line(exc)}); "
+                           "on macOS install OpenMP with `brew install libomp`") from exc
     if p.get("class_weight") == "balanced_subsample":
         p["class_weight"] = "balanced"
     p.setdefault("verbosity", -1)
@@ -84,6 +91,8 @@ def _catboost(p: dict, seed: int):
         from catboost import CatBoostClassifier
     except ImportError as exc:
         raise RuntimeError("pip install catboost") from exc
+    except OSError as exc:
+        raise RuntimeError(f"catboost is installed but cannot load its native library ({_first_line(exc)})") from exc
     kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
           "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
           "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed,

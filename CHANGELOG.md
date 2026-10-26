@@ -124,6 +124,16 @@
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+- Release gate `tools/release_gate.py` (docs/release-gate.md): verifies a commit from a pristine clone in a
+  fresh venv (all extras, pinned constraints) - ruff, default/slow/network test tiers, real and offline
+  acceptance, crash recovery, Docker clean-machine proxy, combined integration study
+  (`tools/gate_integration.py`), public benchmark rerun, licence/weights audit (`tools/check_weights.py`,
+  docs/licences-and-weights.md) and plugin contracts - and writes `release_gate_report.{json,md}`;
+  `deploy/vm_acceptance.sh` runs the same gate on a fresh Ubuntu VM. Reports under docs/release-gates/.
+- Frozen plugin contract snapshot `plugin-contracts/1` (`tests/golden/plugin_contracts.json`,
+  `tests/test_plugin_contracts.py`): entry-point groups, built-in names, `Registry` API, `Segmenter` protocol,
+  `Index` record, exporter/validator signatures and file-contract versions. Changing any of them requires a new
+  snapshot version and a CHANGELOG line.
 
 ### Security
 - Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
@@ -143,6 +153,13 @@
   subprocess-running code.
 
 ### Fixed
+- LightGBM/CatBoost installed but with an unloadable native library (e.g. LightGBM without `libomp` on macOS)
+  raised `OSError` and aborted `geocrop benchmark-models`; the model is now reported as skipped with the reason.
+- `samples` silently skipped reference polygons without a pixel valid in every feature, so a whole class could
+  vanish (e.g. NaN phenology features of low-amplitude classes from `ts-features`); it now emits a
+  `SampleCoverageWarning` with the skipped polygons per class and the classes left without samples.
+- `hcat.harmonise` returned NaN instead of None for unmapped codes under pandas 3 (the version pinned in
+  `constraints/py312.txt`), failing `tests/test_public_benchmark.py` in a clean pinned install.
 - `docs/limitations.md` no longer states a fixed (stale) number of tests.
 - Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
