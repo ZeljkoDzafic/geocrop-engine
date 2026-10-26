@@ -232,7 +232,10 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
 
 
 def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
-    """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place."""
+    """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place.
+
+    A raster with legacy names (``emb_NN``) that collide with features already in the stack (another embedding
+    source) is attached under namespaced names ``emb_<source>_NN`` (`geocrop.embeddings.namespaced_copy`)."""
     import shutil
     import tempfile
 
@@ -240,6 +243,10 @@ def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
 
     stack = Path(stack)
     with tempfile.TemporaryDirectory(dir=stack.parent) as tmp:
+        existing = {f.name for f in load_manifest(stack)}
+        if existing & {f.name for f in load_manifest(embeddings)}:
+            from .embeddings import namespaced_copy
+            embeddings = namespaced_copy(embeddings, Path(tmp) / "namespaced" / Path(embeddings).name)
         merged = merge_stacks([stack, embeddings], Path(tmp) / stack.name)
         shutil.move(merged, stack)
         shutil.move(manifest_path(merged), manifest_path(stack))
