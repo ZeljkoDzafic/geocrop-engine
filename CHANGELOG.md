@@ -25,6 +25,12 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- Reliability gate `tests/test_reliability.py`: SIGKILL inside features/train/predict of a real `geocrop run`
+  with recovery checked against an uninterrupted reference; corrupt-input matrix; reproducibility of two
+  independent runs; (`slow`) memory bounded by the block size at 2048² and roughly linear runtime.
+- `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
+- `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
+  `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
 
 ### Security
 - Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
@@ -44,6 +50,23 @@
   subprocess-running code.
 
 ### Fixed
+- Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
+  (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
+  now stop and ask for the upstream stage to be rerun.
+- Truncated or corrupt GeoTIFFs failed with GDAL's anonymous "Read failed"; the error now names the file and window.
+- A composite band that is entirely nodata/NaN/inf, or a stack without one valid pixel, used to produce an
+  empty classification without an error. Both are now rejected and the empty products removed. Tests confirm
+  that isolated NaN/±inf input pixels end up unclassified.
+- Grid mismatch errors name the offending file and say whether CRS, shape or transform differ.
+- Missing or duplicate stack band descriptions are reported with the file. Previously predict reported
+  "lacks model features".
+- Training polygons: empty layers, all-empty geometries, blank labels or ids (a missing label used to become
+  the class "nan"), duplicate ids (now listed) and polygons that miss the stack all fail with the file named.
+- `scene.json`: invalid JSON, missing keys, unknown sensor or bad datetime raise errors naming the file.
+- Sentinel-2 compositing rejects SCL masks with values outside 0–11 or a non-integer dtype, instead of treating
+  unknown values as clear sky.
+- Run lock is acquired atomically, so two runs starting together cannot both take it. Stale locks with an
+  empty or garbled pid are taken over. A damaged `.hashcache.json` is rebuilt instead of aborting the run.
 - Docker image build: the conda environment step tried to install the not-yet-copied checkout.
 - Packaging: SPDX license expression (`license = "Apache-2.0"`), removing setuptools deprecation warnings.
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
