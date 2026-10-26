@@ -2,6 +2,14 @@
 
 ## Unreleased
 ### Added
+- `geocrop benchmark-transfer` (`geocrop.public_transfer`) and the frozen protocol
+  `configs/benchmarks/si_transfer_pomurje.v1.yaml`: public region/year transfer benchmark (Slovenia; train in
+  Pomurje 2021, test in Podravje/Posavje/Gorenjska 2021 and Pomurje 2025) with spatial-block bootstrap CIs,
+  per-class drops, conformal coverage under shift, AOA shares, local baselines on identical target parcels and
+  the pooled leave-one-region/year-out CV; result in docs/benchmarks/si-transfer-pomurje.v1.md. Labels:
+  EuroCrops SI 2021 and MKGP KMRS 2025 (`public_data.url_layer`, checksum-pinned runtime download).
+- `tools/scale_benchmark.py` and docs/performance.md: the real chain on 25–1000 km² of Semberija with measured
+  wall/CPU time, RSS, disk and network per stage, scaling plots, regional extrapolation and VM sizing.
 - Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
   `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
   TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
@@ -143,6 +151,12 @@
   subprocess-running code.
 
 ### Fixed
+- STAC imports (Sentinel-2 Earth Search, Sentinel-1 RTC Planetary Computer) set GDAL HTTP connect/total
+  timeouts and a low-speed abort, so a stalled HTTPS connection fails that item instead of hanging the import
+  (observed: > 1 h hang in a 1000 km² Sentinel-1 import).
+- `geocrop preflight`: the prediction runtime now includes the single-core area-of-applicability map (~150 s
+  per megapixel with ~100 features; it was under-estimated about 2x at 500 km²) and peak RAM includes ~1 GB of
+  interpreter/GDAL overhead (it was under-estimated about 3x at 25 km²); see docs/performance.md.
 - `docs/limitations.md` no longer states a fixed (stale) number of tests.
 - Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now

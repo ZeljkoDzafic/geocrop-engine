@@ -31,7 +31,11 @@ ASSET_KEYS = {  # Earth Search v1 names; CDSE/others can pass their own mapping
     "B08": "nir", "B8A": "nir08", "B11": "swir16", "B12": "swir22", "SCL": "scl",
 }
 GDAL_ENV = {"AWS_NO_SIGN_REQUEST": "YES", "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
-            "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif,.tiff", "GDAL_HTTP_MAX_RETRY": "4", "GDAL_HTTP_RETRY_DELAY": "2"}
+            "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif,.tiff", "GDAL_HTTP_MAX_RETRY": "4", "GDAL_HTTP_RETRY_DELAY": "2",
+            # A stalled TLS connection must fail (and be retried / recorded per item) instead of hanging the
+            # import forever: abort a request after 10 min, or when it receives < 1 KB/s for 60 s.
+            "GDAL_HTTP_CONNECTTIMEOUT": "30", "GDAL_HTTP_TIMEOUT": "600",
+            "GDAL_HTTP_LOW_SPEED_TIME": "60", "GDAL_HTTP_LOW_SPEED_LIMIT": "1024"}
 
 
 def grid_identity(reference: str | Path) -> str:
