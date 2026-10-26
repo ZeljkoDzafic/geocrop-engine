@@ -11,6 +11,16 @@
 - Tag-driven `release` workflow (version consistency check, tests, sdist + wheel, GitHub Release with CHANGELOG
   notes and checksums); `tools/check_versions.py`; pinned `constraints/py312.txt`;
   [release and rollback policy](docs/release.md).
+- Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
+  enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
+  `docs/adr/`.
+- Plugin registries (`geocrop.plugins`) with lazy entry-point discovery for classifiers (`geocrop.estimators`),
+  indices (`geocrop.indices`), segmenters (`geocrop.segmenters`), exporters and validators; `model.algorithm`
+  and index names accept plugins; broken plugins only warn. Example package in `examples/plugin_example`.
+- `geocrop.segmenters.Segmenter` protocol with registered OBIA and U-Net + watershed segmenters;
+  `benchmark.segmentation(..., methods=...)` benchmarks any registered segmenter.
+- `schema_version` in `scene.json`, the `model.joblib` payload and `run_manifest.json`, validated on read
+  (`geocrop.contracts`): unversioned files still load, files from a newer version fail with an upgrade hint.
 - `geocrop quicklook`: real Sentinel-2 imagery for a bounding box and period (windowed COG reads, monthly
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
@@ -27,6 +37,11 @@
 - Web API: unreadable or malformed `run` configurations return HTTP 400 without echoing file content (previously
   HTTP 500); unexpected errors return a generic HTTP 500 that keeps the security headers.
 - Docker: job state, `.env` files and virtual environments are excluded from the build context.
+
+### Changed
+- SNAP `gpt` execution moved to the adapter `geocrop.snap` (`geocrop.s1.run_snap` remains); `sha256` moved
+  to `geocrop.hashing` (`geocrop.provenance.sha256` remains), so core modules no longer depend on
+  subprocess-running code.
 
 ### Fixed
 - Docker image build: the conda environment step tried to install the not-yet-copied checkout.

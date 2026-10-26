@@ -6,6 +6,8 @@ reference, so that the feature table in a manuscript can be generated from code
 
 Optical inputs are Sentinel-2 L2A surface reflectance in [0, 1]; radar inputs are
 linear backscatter (sigma0 or gamma0), never dB.
+
+Further indices come from plugins (entry-point group `geocrop.indices`, see `geocrop.plugins`).
 """
 from __future__ import annotations
 
@@ -13,6 +15,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+
+from . import plugins
 
 S2_BANDS = ("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
 S1_POLARISATIONS = ("VV", "VH")
@@ -92,18 +96,29 @@ INDICES: dict[str, Index] = {
     )
 }
 
+for _idx in INDICES.values():
+    plugins.indices.register(_idx.name, _idx, source=plugins.BUILTIN)
+
 DEFAULT_S2_INDICES = ("NDVI", "EVI", "MSAVI2", "NDRE", "RECI", "GCVI", "NDMI", "BSI")
 DEFAULT_S1_FEATURES = ("VV_dB", "VH_dB", "VHVV_dB")
 
 
+def available() -> list[str]:
+    """Built-in index names followed by plugin indices (entry-point group `geocrop.indices`)."""
+    return list(dict.fromkeys([*INDICES, *plugins.indices.names()]))
+
+
 def get(name: str) -> Index:
-    try:
+    """Index by name: `INDICES` first (built-ins and in-code additions), then registered plugins."""
+    if name in INDICES:
         return INDICES[name]
+    try:
+        return plugins.indices.get(name)
     except KeyError:
-        raise KeyError(f"Unknown index {name!r}; available: {', '.join(INDICES)}") from None
+        raise KeyError(f"Unknown index {name!r}; available: {', '.join(available())}") from None
 
 
 def table() -> list[dict[str, str]]:
-    """Machine-readable index table for documentation and manuscripts."""
+    """Machine-readable index table for documentation and manuscripts (plugins included)."""
     return [{"name": i.name, "sensor": i.sensor, "formula": i.formula, "reference": i.reference}
-            for i in INDICES.values()]
+            for i in map(get, available())]

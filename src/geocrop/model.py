@@ -21,9 +21,9 @@ from pyproj import CRS
 from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
-from . import applicability, metrics, uncertainty
+from . import applicability, contracts, metrics, uncertainty
 from .estimators import channels_from_names, importances, make_estimator
-from .provenance import sha256
+from .hashing import sha256
 from .raster import NODATA, blocks, gtiff_profile, valid_mask
 from .samples import Samples
 
@@ -434,7 +434,8 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     report["aoa_threshold"] = aoa.threshold
     importance.sort_values("importance", ascending=False).to_csv(out / "feature_importance.csv", index=False)
     pd.DataFrame(cv["confusion_matrix"], index=cv["labels"], columns=cv["labels"]).to_csv(out / "cv_confusion.csv")
-    payload = {"model": model, "features": features, "classes": [str(c) for c in model.classes_],
+    payload = {"schema_version": contracts.SCHEMA_VERSIONS["model"],
+               "model": model, "features": features, "classes": [str(c) for c in model.classes_],
                "params": params, "seed": seed, "sklearn": sklearn.__version__, "temperature": temperature,
                "provenance": provenance or {}, "calibration_mode": calibration_mode,
                "calibration_split": split}
@@ -453,7 +454,7 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     model_sha256 = sha256(model_path)
-    payload = load(model_path)
+    payload = contracts.check("model", load(model_path), model_path)
     model, wanted = payload["model"], payload["features"]
     temperature = float(payload.get("temperature", 1.0))
     classes = [str(c) for c in model.classes_]
