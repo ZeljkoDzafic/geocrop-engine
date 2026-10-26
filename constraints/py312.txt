@@ -73,7 +73,7 @@ odc-geo==0.5.3
 odc-loader==0.6.5
 odc-stac==0.5.3
 omnicloudmask==1.8.1
-openeo==0.47.0
+openeo==0.37.0
 opentelemetry-api==1.45.1
 packageurl-python==0.17.6
 packaging==26.3
@@ -160,5 +160,5 @@ tzdata==2026.5
 urllib3==2.8.0
 uvicorn==0.54.0
 wrapt==2.5.1
-xarray==2025.1.1
+xarray==2026.9.0
 zarr==3.4.1
