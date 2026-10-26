@@ -87,6 +87,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `downloads`, `cachedirs`, `public_data` | run-time downloads with retry, Range resume and checksums; cache root `$GEOCROP_CACHE`; public reference datasets |
 | `attribution` | Copernicus attribution tags carried from scene import to exports |
 | `temporal_quality` | observed-vs-interpolated temporal support rasters and review routing ([temporal quality](temporal-quality.md)) |
+| `shift` | prediction-time domain-shift check (`shift_report.json`), coverage statements, `DOMAIN_SHIFT` routing, conservative/weighted conformal thresholds ([domain shift](domain-shift.md)) |
 | `temporal_models` | TempCNN and L-TAE sequence classifiers (PyTorch, optional) |
 | `cbm_markers`, `calendars`, `hcat` | event/homogeneity markers and marker rules; data-driven crop calendars; EuroCrops HCAT harmonisation |
 | `parcel_classify` | parcel-level classifier on parcel signatures ([parcel classification](parcel-classification.md)) |

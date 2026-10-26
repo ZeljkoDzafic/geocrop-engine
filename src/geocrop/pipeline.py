@@ -571,15 +571,24 @@ class Runner:
         smoothing = model.smoothing_settings(self.cfg["predict"]["smoothing"])
         if smoothing is not None:
             outputs.append(pred / "probabilities_unsmoothed.tif")
-        fp = _fp_with((self.paths["features"], self.out / "model" / "model.joblib", aoa),
-                      {"smoothing": smoothing} if smoothing is not None else {})
+        shift = self._shift_options()
+        extra = {"smoothing": smoothing} if smoothing is not None else {}
+        if cfgmod.without_neutral_defaults(self.cfg).get("uncertainty") is not None:
+            extra["shift"] = {**shift, "parcels": shift["parcels"] and str(shift["parcels"])}
+        fp = _fp_with((self.paths["features"], self.out / "model" / "model.joblib", aoa), extra)
 
         def run():
             if smoothing is None:   # a previous smoothed run's raw probabilities no longer describe this map
                 (pred / "probabilities_unsmoothed.tif").unlink(missing_ok=True)
             return model.predict(self.paths["features"], self.out / "model" / "model.joblib", pred,
-                                 smoothing=smoothing)
+                                 smoothing=smoothing, shift=shift)
         return self.stage("predict", fp, outputs, run)
+
+    def _shift_options(self) -> dict:
+        """`model.predict` shift-check options (docs/domain-shift.md): sample inside the parcels when available."""
+        u, p = self.cfg["uncertainty"], self.cfg["parcels"]
+        return {"config": u, "parcels": self.paths["parcels"] if self.paths["parcels"].exists() else None,
+                "id_field": p["id_field"], "alpha": p["conformal_alpha"], "seed": self.cfg["seed"]}
 
     def cbm(self):
         from datetime import date
@@ -781,6 +790,9 @@ class Runner:
             extra.update(temporal_rules=temporal, temporal_support=self.out / "cbm" / "temporal_support.csv")
         if replace:
             extra["decision"] = "parcel_classifier"
+        shift_report = self.out / "prediction" / "shift_report.json"
+        if self.cfg["uncertainty"]["shift_detection"] and shift_report.exists():
+            extra["domain_shift"] = shift_report
 
         def run():
             if replace:   # the parcel classifier's decisions are the parcel product (same schema)
@@ -800,7 +812,9 @@ class Runner:
                 aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
                 markers=self._marker_table(), calendar=calendar, **({"marker_rules": rules} if rules else {}),
                 **({"temporal_support": self._temporal_support_table(), "temporal_rules": temporal}
-                   if temporal else {}))
+                   if temporal else {}),
+                **({"domain_shift": json.loads(shift_report.read_text(encoding="utf8"))}
+                   if "domain_shift" in extra else {}))
         fp = _fp_with((fp, mapping, conformal, aoa, markers_csv, calendar, self.cfg["cbm"]["enabled"],
                        self.out / "prediction" / "prediction_manifest.json"), extra)
         return self.stage("parcels", fp, [target, target.with_suffix(".csv"), target.with_suffix(".summary.json")], run)

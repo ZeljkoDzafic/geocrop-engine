@@ -10,6 +10,7 @@
    - [Parcel-level classification on signatures, LightTAE/TempCNN](parcel-classification.md)
 8. [Clouds, shadows and time series](timeseries.md)
 9. [Uncertainty, calibration and applicability](uncertainty.md)
+   - [Domain shift: detection, coverage statements, safeguards](domain-shift.md)
 10. [Checks-by-Monitoring: signatures, markers, traffic light](cbm.md)
     - [Event and homogeneity markers (S1 + S2)](markers.md)
     - [Temporal quality (observed vs interpolated)](temporal-quality.md) and [parcel evidence packages](evidence.md)

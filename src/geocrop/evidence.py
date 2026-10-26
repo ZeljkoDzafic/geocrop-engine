@@ -141,6 +141,20 @@ def _doy_date(year: int, doy) -> str | None:
 
 # --------------------------------------------------------------------------- rules
 
+def shift_rule(row: dict, dshift: dict) -> dict:
+    """Domain-shift routing (`geocrop.shift.apply_policy`) as an evaluated rule."""
+    active = bool(dshift.get("level")) and dshift.get("policy", "warn") != "warn"
+    withheld = bool(_get(row, "model_decision_withheld", False))
+    return {"rule": "applicability.domain_shift", "stage": "applicability",
+            "inputs": {"verdict": dshift.get("verdict"), "policy": dshift.get("policy"),
+                       "conformal_coverage": dshift.get("conformal_coverage"),
+                       "aoa_fraction": _get(row, "aoa_fraction")},
+            "threshold": None, "triggered": active,
+            "outcome": ("withheld" if withheld else "review") if active else "pass",
+            "reason_code": "DOMAIN_SHIFT" if active else None}
+
+
+
 def decision_rules(row: dict, summary: dict) -> list[dict]:
     """Classification decision checks reconstructed from the table row and its summary thresholds."""
     th = summary.get("thresholds", {}) or {}
@@ -536,7 +550,9 @@ non-compliance.</p>
 {_kv({"declared class": b['declared_class'], "predicted class": cls.get('predicted_class'),
       "confidence": cls.get('confidence'), "margin": cls.get('margin'), "entropy": cls.get('entropy'),
       "prediction set": cls.get('prediction_set'), "conformal status": cls.get('cp_status'),
-      "conformal alpha": cls.get('conformal_alpha'), "valid pixels": cls.get('n_valid')})}
+      "conformal alpha": cls.get('conformal_alpha'), "valid pixels": cls.get('n_valid'),
+      **({"conformal coverage": cls['conformal_coverage']} if cls.get('conformal_coverage') else {}),
+      **({"domain shift": cls['domain_shift']} if cls.get('domain_shift') else {})})}
 <h2>Class probabilities</h2>
 {_kv(probs) if probs else '<p>-</p>'}
 <h2>Area of applicability</h2>
@@ -691,6 +707,13 @@ def build(parcels, output_dir, ids=None, signatures=None, start: date | None = N
         frame = tq.attach(frame, sup, id_field)
     details = cbm.traffic_light_details(frame, mrules if mrules["enabled"] else None,
                                         trules if trules["enabled"] else None)
+    dshift = summ.get("domain_shift") or None
+    if dshift and dshift.get("level") and dshift.get("policy", "warn") != "warn":
+        from .shift import apply_policy
+        light, codes, _ = apply_policy(frame, details["traffic_light"],
+                                       [[c for c in str(r).split(";") if c] for r in details["traffic_light_reasons"]],
+                                       dshift, summ.get("min_aoa_fraction"))
+        details = details.assign(traffic_light=light.to_numpy(), traffic_light_reasons=[";".join(c) for c in codes])
     scene_idx = _scene_index(scenes)
     model_ref = None
     if model is not None:
@@ -728,6 +751,8 @@ def build(parcels, output_dir, ids=None, signatures=None, start: date | None = N
                                                          "decision")},
                       "threshold": None, "triggered": base_colour.iloc[0] != "green",
                       "outcome": base_colour.iloc[0], "reason_code": ";".join(base_codes[0]) or None})
+        if dshift:
+            rules.append(shift_rule(row, dshift))
         if mrules["enabled"]:
             rules += marker_rules(row, one, mrules)
         if trules["enabled"] or sup is not None:
@@ -759,7 +784,9 @@ def build(parcels, output_dir, ids=None, signatures=None, start: date | None = N
                 "n_valid": row.get("n_valid"),
                 "probabilities": {c: row.get(f"p_{c}") for c in classes},
                 "prediction_set": row.get("prediction_set"), "set_size": row.get("set_size"),
-                "cp_status": row.get("cp_status"), "conformal_alpha": summ.get("conformal_alpha")},
+                "cp_status": row.get("cp_status"), "conformal_alpha": summ.get("conformal_alpha"),
+                **{k: row.get(k) for k in ("conformal_coverage", "domain_shift", "model_decision_withheld")
+                   if k in row}},
             "applicability": {"aoa_fraction": row.get("aoa_fraction"), "aoa_coverage": row.get("aoa_coverage"),
                               "aoa_dissimilarity": row.get("aoa_dissimilarity"),
                               "min_aoa_fraction": summ.get("min_aoa_fraction"),

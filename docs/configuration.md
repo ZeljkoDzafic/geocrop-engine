@@ -52,6 +52,8 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop run` (train, experiments) and `geocrop ablation --config` |
 | | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids (samples stage of `geocrop run`); CLI `geocrop samples --region-field/--year-field/--year` |
 | `predict` | `smoothing: {enabled, window, smoothness}` | false, 7, 10 | edge-aware probability smoothing before argmax and parcel aggregation; used by `geocrop run` and `geocrop predict --config` |
+| `uncertainty` | `shift_detection`, `shift_policy`, `shift_conformal` | true, `warn`, `none` | prediction-time domain-shift check (`prediction/shift_report.json`), routing `review`/`abstain` and shift-adjusted conformal thresholds `conservative`/`weighted` ([domain shift](domain-shift.md)) |
+| | `shift_sample_pixels`, `shift_test_weight_quantile`, `region`, `year`, `shift_thresholds` | 5000, 0.9, null, null, `{}` | target sample size, weighted-conformal test weight, prediction-domain metadata compared with the calibration regions/years, overrides of the signal limits |
 | `parcel_classify` | `enabled`, `decision`, `label_field` | false, `additional`, null | optional parcel-level classifier on the cbm signatures ([parcel classification](parcel-classification.md#in-geocrop-run)); `replace` makes it the parcel product |
 | | `indices`, `stats`, `groups` | [`cbm.index`], [mean, std], [ts, stats, windows, shape] | signature features |
 | | `step_days`, `output_step_days`, `window_days`, `lambda`, `bootstrap` | 5, 15, 30, 20, 200 | series grid, Whittaker smoothing, bootstrap replicates |
@@ -80,6 +82,12 @@ All of the following are off by default. While they are off, `geocrop run` produ
 same stage fingerprints as before they existed (`tests/test_pipeline_options.py` pins the fingerprints of a
 default configuration against GeoCrop main at c091962). Turning one on re-runs only the stages that depend on it.
 
+The domain-shift check (`uncertainty.shift_detection`, [domain shift](domain-shift.md)) is on by default and keeps
+the stage fingerprints. It adds `model/domain_reference.npz`, `prediction/shift_report.json`, a `domain_shift`
+entry in the prediction manifest and `domain_shift`/`conformal_coverage` columns in the parcel product.
+Decisions and traffic lights do not change under the default `shift_policy: warn`. Set `shift_detection: false` to
+get the earlier products exactly.
+
 | Option | Stage(s) | Products |
 |---|---|---|
 | `cv.strategy` (+ `region_field`/`year_field`/`year`) | samples (group ids), train, experiments | `model/transfer_report.json`, `model/transfer_per_group.csv`, transfer columns in `ablation.csv` |
@@ -90,6 +98,7 @@ default configuration against GeoCrop main at c091962). Turning one on re-runs o
 | `parcel_classify.enabled` | parcel_classify (+ parcels with `decision: replace`) | `parcel_classify/model/`, `parcel_classify/parcels.*` |
 | `model.params` | train, experiments | estimator built with these parameters |
 | `timeseries.temporal_support` | features | `<stack>_ts_temporal_support.tif` ([temporal quality](temporal-quality.md)) |
+| `uncertainty.shift_policy: review/abstain`, `uncertainty.shift_conformal` | predict, parcels | `DOMAIN_SHIFT` routing, `model_decision_withheld`, shift-adjusted parcel prediction sets ([domain shift](domain-shift.md)) |
 | `cbm.temporal_support.enabled` | cbm, parcels (and parcel_classify) | `cbm/temporal_support.csv`, `tq_*` columns, `LOW_OBS`/`LONG_GAP*`/`INTERPOLATED_*` routing |
 
 `model.params` is checked before any stage runs: the estimator selected by `model.algorithm` (built-in or plugin)

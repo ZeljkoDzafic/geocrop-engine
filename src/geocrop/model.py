@@ -649,6 +649,14 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     aoa = applicability.fit(X, fold_id, features, None if np.isnan(imp).all() else imp, seed=seed)
     aoa.to_json(out / "aoa.json")
     report["aoa_threshold"] = aoa.threshold
+    # Reference of the training/calibration domain for prediction-time shift checks (geocrop.shift).
+    from . import shift
+    ref = shift.build_reference(input_samples.subset(features), input_samples.polygon, features, classes,
+                                poly["polygon"], poly[[f"p_{c}" for c in classes]].to_numpy(), poly["label"],
+                                train_di=aoa.train_di, aoa_threshold=aoa.threshold,
+                                importance=None if np.isnan(imp).all() else imp,
+                                region=input_samples.region, year=input_samples.year, seed=seed)
+    shift.save_reference(ref, out / shift.REFERENCE_FILE)
     importance.sort_values("importance", ascending=False).to_csv(out / "feature_importance.csv", index=False)
     pd.DataFrame(cv["confusion_matrix"], index=cv["labels"], columns=cv["labels"]).to_csv(out / "cv_confusion.csv")
     payload = {"schema_version": contracts.SCHEMA_VERSIONS["model"],
@@ -733,7 +741,7 @@ def _uncertainty_bands(proba: np.ndarray, n_classes: int) -> np.ndarray:
 
 
 def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512,
-            smoothing: dict | bool | None = None) -> dict:
+            smoothing: dict | bool | None = None, shift: dict | None = None) -> dict:
     """Blockwise inference -> classes.tif (uint8 index, see class_legend.json), probabilities.tif
     (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy).
 
@@ -741,6 +749,11 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     "smoothness": 10}``) applies `smooth_probabilities` before the argmax, so classes, uncertainty and any
     later parcel aggregation use smoothed probabilities; the raw probabilities are kept in
     ``probabilities_unsmoothed.tif``. Blocks are read with a halo, so results do not depend on block size.
+
+    `shift` (``{"config": <uncertainty section>, "parcels": path|None, "id_field": str, "alpha": float}``)
+    compares a pixel sample of the stack (inside the parcels when given) with the model's
+    ``domain_reference.npz`` and writes ``shift_report.json`` (`geocrop.shift`); the manifest then states
+    whether conformal coverage is established. Without it the outputs are unchanged.
     """
     smooth = smoothing_settings(smoothing)
     out = Path(output_dir)
@@ -854,6 +867,10 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                              "unsmoothed_probabilities": raw_path.name,
                              "note": "Conformal thresholds in conformal.json were fitted on unsmoothed "
                                      "out-of-fold probabilities; their coverage on smoothed maps is not established."}
+    if shift is not None:
+        info = shift_check(stack, model_path, model, classes, wanted, out, shift)
+        if info is not None:
+            body["domain_shift"] = info
     manifest.write_text(json.dumps(body, indent=2), encoding="utf8")
     result = {"classes": str(out / "classes.tif"), "probabilities": str(out / "probabilities.tif"),
               "uncertainty": str(out / "uncertainty.tif"), "legend": legend,
@@ -862,3 +879,40 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
         result["probabilities_unsmoothed"] = str(raw_path)
     return result
 
+
+
+def shift_check(stack, model_path, model, classes, features, out: Path, options: dict) -> dict | None:
+    """Prediction-time domain-shift check (`geocrop.shift`); writes ``shift_report.json`` into `out`."""
+    from . import shift as shiftmod
+    cfg = shiftmod.settings(options.get("config"))
+    target = out / "shift_report.json"
+    if not cfg["shift_detection"]:
+        target.unlink(missing_ok=True)
+        return None
+    ref_path = Path(model_path).with_name(shiftmod.REFERENCE_FILE)
+    if not ref_path.exists():
+        report = shiftmod.unavailable(f"the model has no {shiftmod.REFERENCE_FILE}; retrain to enable shift checks",
+                                      cfg)
+    else:
+        ref = shiftmod.load_reference(ref_path)
+        X, groups, note = shiftmod.sample_stack(stack, features, options.get("parcels"),
+                                                options.get("id_field", "parcel_id"),
+                                                n=cfg["shift_sample_pixels"], seed=int(options.get("seed", 42)))
+        keep = np.isfinite(X).all(axis=1)
+        X, groups = X[keep], groups[keep]
+        order = [classes.index(c) for c in ref["meta"]["classes"]]
+
+        def proba(Z):
+            return np.asarray(model.predict_proba(Z))[:, order]
+        aoa_json = Path(model_path).with_name("aoa.json")
+        aoa = applicability.Applicability.from_json(aoa_json) if aoa_json.exists() else None
+        conf_json = Path(model_path).with_name("conformal.json")
+        conformal = json.loads(conf_json.read_text(encoding="utf8")) if conf_json.exists() else None
+        report = shiftmod.detect(ref, X, groups, proba, aoa=aoa, conformal=conformal,
+                                 metadata=options.get("metadata"), config=cfg,
+                                 seed=int(options.get("seed", 42)), sample_note=note)
+    target.write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf8")
+    return {"verdict": report["verdict"], "report": target.name, "policy": report["policy"],
+            "conformal_mode": report["conformal_mode"],
+            "conformal_coverage": shiftmod.coverage_statement(report, options.get("alpha", 0.1)),
+            "reasons": [r["message"] for r in report.get("reasons", [])]}
