@@ -29,3 +29,8 @@ venv/
 
 # Versioned download shipped with the static presentation.
 !website/assets/downloads/geocrop-qgis-0.1.0.zip
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+catboost_info/

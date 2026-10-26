@@ -5,3 +5,14 @@ outputs
 .pytest_cache
 .ruff_cache
 website/assets/downloads
+**/.geocrop-web
+.env
+*.env
+.venv
+venv
+.coverage
+coverage.xml
+htmlcov
+dist
+build
+*.egg-info

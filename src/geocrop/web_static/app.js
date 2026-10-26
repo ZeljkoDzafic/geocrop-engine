@@ -641,6 +641,8 @@ async function connect(event) {
     $("jobs").replaceChildren(...[1, 2, 3].map(() => h("li", { class: "skeleton-row" })));
     renderCommandList(); selectCommand(state.commands.some(c => c.name === "quicklook") ? "quicklook" : state.commands[0]?.name, { show: false });
     await refresh();
+    // --- terminal bridge (terminal.js) ---
+    document.dispatchEvent(new CustomEvent("geocrop:connected", { detail: { health, commands: state.commands } }));
     if (!state.selected) {
       const recent = state.jobs.find(j => j.status === "succeeded" && MAP_COMMANDS.has(j.argv[0]));
       if (recent) selectJob(recent.id);
@@ -650,6 +652,9 @@ async function connect(event) {
     $("token").focus(); $("token").select();
   } finally { button.disabled = false; button.textContent = "Connect"; }
 }
+
+/* ---------- Terminal bridge (terminal.js): authenticated API helper and job selection ---------- */
+window.GeoCropApp = { api, selectJob: (id) => selectJob(id) };
 
 /* ---------- Wiring ---------- */
 function bind() {

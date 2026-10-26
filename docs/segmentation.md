@@ -21,7 +21,7 @@ geocrop boundaries-to-parcels --raster boundary.tif --out candidates.gpkg --thre
 * Inference uses overlapping tiles (`--overlap` context pixels, centre written) to avoid edge artefacts.
 * Watershed on the distance transform of field interiors converts boundaries into candidate objects.
 * Training patches must come from areas spatially separate from the evaluation parcels. Pretrained global
-  field-boundary models (e.g. Fields of The World) can be used upstream; check their weight licences separately.
+  field-boundary models can be used instead: see [Fields of The World](field-boundaries.md) (`geocrop ftw-boundaries`).
 
 ## Evaluation
 * `geocrop evaluate-segments --segments candidates.gpkg --reference parcels_ref.gpkg --out seg.json`:

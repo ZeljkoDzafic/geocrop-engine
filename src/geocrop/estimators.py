@@ -9,7 +9,8 @@
     tempcnn       Temporal CNN (Pelletier et al., 2019) on `ts` features (pip install torch)
 
 Unknown keys for the chosen algorithm are ignored, so one YAML `model:` section can hold settings for
-several algorithms.
+several algorithms. Further algorithms come from plugins (entry-point group `geocrop.estimators`, see
+`geocrop.plugins`); `algorithm: <plugin name>` selects them like a built-in.
 """
 from __future__ import annotations
 
@@ -17,6 +18,9 @@ import inspect
 
 import numpy as np
 
+from . import plugins
+
+#: Built-in algorithm names. Plugins add more through `geocrop.plugins.estimators`; see `available_algorithms`.
 ALGORITHMS = ("rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn")
 
 
@@ -25,50 +29,92 @@ def _filtered(cls, params: dict, drop=("algorithm",)) -> dict:
     return {k: v for k, v in params.items() if k in accepted and k not in drop and v is not None}
 
 
+def accepted_params(cls, params: dict) -> dict:
+    """Subset of `params` that `cls.__init__` accepts (drops `algorithm` and None values); for plugin factories."""
+    return _filtered(cls, params)
+
+
+def _rf(p: dict, seed: int):
+    from sklearn.ensemble import RandomForestClassifier
+    return RandomForestClassifier(random_state=seed, **_filtered(RandomForestClassifier, p))
+
+
+def _extra_trees(p: dict, seed: int):
+    from sklearn.ensemble import ExtraTreesClassifier
+    return ExtraTreesClassifier(random_state=seed, **_filtered(ExtraTreesClassifier, p))
+
+
+def _hist_gb(p: dict, seed: int):
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    p.setdefault("class_weight", "balanced")
+    if p.get("class_weight") == "balanced_subsample":
+        p["class_weight"] = "balanced"
+    # Shared model configuration includes forest-only feature-count defaults.
+    # Histogram boosting uses a fraction instead; keep numeric overrides.
+    if p.get("max_features") in ("sqrt", "log2"):
+        p.pop("max_features")
+    n_iter = p.pop("n_estimators", 300)
+    p.setdefault("max_iter", n_iter)
+    return HistGradientBoostingClassifier(random_state=seed, **_filtered(HistGradientBoostingClassifier, p))
+
+
+def _lightgbm(p: dict, seed: int):
+    try:
+        from lightgbm import LGBMClassifier
+    except ImportError as exc:
+        raise RuntimeError("pip install lightgbm") from exc
+    if p.get("class_weight") == "balanced_subsample":
+        p["class_weight"] = "balanced"
+    p.setdefault("verbosity", -1)
+    p.pop("max_features", None)
+    return LGBMClassifier(random_state=seed, **{k: v for k, v in p.items() if k != "algorithm" and v is not None
+                                                and k not in ("min_samples_leaf", "max_samples")})
+
+
+def _catboost(p: dict, seed: int):
+    try:
+        from catboost import CatBoostClassifier
+    except ImportError as exc:
+        raise RuntimeError("pip install catboost") from exc
+    kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
+          "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
+          "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed,
+          "allow_writing_files": False}
+    return CatBoostClassifier(**{k: v for k, v in kw.items() if v is not None})
+
+
+def _tempcnn(p: dict, seed: int):
+    return TempCNNClassifier(seed=seed, **_filtered(TempCNNClassifier, p))
+
+
+for _name, _factory in zip(ALGORITHMS, (_rf, _extra_trees, _hist_gb, _lightgbm, _catboost, _tempcnn)):
+    plugins.estimators.register(_name, _factory, source=plugins.BUILTIN)
+
+
+def available_algorithms() -> tuple[str, ...]:
+    """Built-in algorithms followed by registered plugins (entry-point group `geocrop.estimators`)."""
+    return tuple(plugins.estimators.names())
+
+
 def make_estimator(params: dict, seed: int):
+    """Unfitted classifier for `params["algorithm"]` (default `rf`), built-in or plugin."""
     algo = (params or {}).get("algorithm", "rf")
     p = dict(params or {})
-    if algo == "rf":
-        from sklearn.ensemble import RandomForestClassifier
-        return RandomForestClassifier(random_state=seed, **_filtered(RandomForestClassifier, p))
-    if algo == "extra_trees":
-        from sklearn.ensemble import ExtraTreesClassifier
-        return ExtraTreesClassifier(random_state=seed, **_filtered(ExtraTreesClassifier, p))
-    if algo == "hist_gb":
-        from sklearn.ensemble import HistGradientBoostingClassifier
-        p.setdefault("class_weight", "balanced")
-        if p.get("class_weight") == "balanced_subsample":
-            p["class_weight"] = "balanced"
-        # Shared model configuration includes forest-only feature-count defaults.
-        # Histogram boosting uses a fraction instead; keep numeric overrides.
-        if p.get("max_features") in ("sqrt", "log2"):
-            p.pop("max_features")
-        n_iter = p.pop("n_estimators", 300)
-        p.setdefault("max_iter", n_iter)
-        return HistGradientBoostingClassifier(random_state=seed, **_filtered(HistGradientBoostingClassifier, p))
-    if algo == "lightgbm":
-        try:
-            from lightgbm import LGBMClassifier
-        except ImportError as exc:
-            raise RuntimeError("pip install lightgbm") from exc
-        if p.get("class_weight") == "balanced_subsample":
-            p["class_weight"] = "balanced"
-        p.setdefault("verbosity", -1)
-        p.pop("max_features", None)
-        return LGBMClassifier(random_state=seed, **{k: v for k, v in p.items() if k != "algorithm" and v is not None
-                                                    and k not in ("min_samples_leaf", "max_samples")})
-    if algo == "catboost":
-        try:
-            from catboost import CatBoostClassifier
-        except ImportError as exc:
-            raise RuntimeError("pip install catboost") from exc
-        kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
-              "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
-              "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed}
-        return CatBoostClassifier(**{k: v for k, v in kw.items() if v is not None})
-    if algo == "tempcnn":
-        return TempCNNClassifier(seed=seed, **_filtered(TempCNNClassifier, p))
-    raise ValueError(f"Unknown algorithm {algo!r}; choose from {ALGORITHMS}")
+    try:
+        factory = plugins.estimators.get(algo)
+    except KeyError:
+        raise ValueError(f"Unknown algorithm {algo!r}; choose from {available_algorithms()}") from None
+    estimator = factory(p, seed)
+    missing = [m for m in ("fit", "predict_proba") if not callable(getattr(estimator, m, None))]
+    if missing:
+        raise TypeError(f"Estimator plugin {algo!r} returned {type(estimator).__name__} without {missing}; "
+                        "estimators need fit(X, y), predict_proba(X) and classes_ after fitting")
+    return estimator
+
+
+def predict_labels(estimator, X) -> np.ndarray:
+    """Class labels as a 1-D array (CatBoost returns a column vector)."""
+    return np.asarray(estimator.predict(X)).ravel()
 
 
 def importances(model, n_features: int) -> np.ndarray:
