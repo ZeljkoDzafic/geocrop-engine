@@ -28,7 +28,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 LAYERS: dict[str, frozenset[str]] = {
     # Pure geospatial/ML logic. Reads and writes local files only; no network, no subprocesses.
     CORE: frozenset({
-        "applicability", "cbm", "clouds", "contracts", "estimators", "features", "fieldwork", "hashing",
+        "active_learning", "applicability", "cbm", "clouds", "contracts", "estimators", "features", "fieldwork", "hashing",
         "indices", "metrics", "model", "parcels", "plugins", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
@@ -60,6 +60,7 @@ WEB_IMPORTERS = frozenset({"cli"}) | WEB_MODULES
 CORE_THIRD_PARTY = frozenset({
     "numpy", "scipy", "pandas", "sklearn", "joblib", "rasterio", "geopandas", "shapely", "pyproj", "affine",
     "skimage", "torch", "lightgbm", "catboost", "omnicloudmask",
+    "matplotlib",   # optional, imported lazily for figures (active_learning.plot_curves)
 })
 
 #: Standard-library modules core must not use: network access and process execution belong in adapters.

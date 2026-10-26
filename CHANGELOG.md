@@ -2,6 +2,12 @@
 
 ## Unreleased
 ### Added
+- `geocrop active-learning select|ingest|simulate` (`geocrop.active_learning`, gap G9): batch selection among
+  top-uncertain parcels with k-center diversity in standardised feature space, per-predicted-class quotas,
+  minimum spacing and trip grouping; ingestion of field/analyst labels with per-round provenance, conflict
+  reporting and enforced validation separation; retrospective label-budget simulation (uncertainty+diversity vs
+  uncertainty vs random on one fixed spatial test set, seeded repeats, 95 % CIs, CSV + PNG). Docs in
+  `docs/active-learning.md`. `fieldwork.priority_scores` exposes the existing visit priority.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
