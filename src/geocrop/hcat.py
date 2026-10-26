@@ -141,7 +141,9 @@ def harmonise(codes: Iterable, rules: list[Rule]) -> pd.Series:
         except ValueError:
             return None
     lookup = {c: safe(c) for c in codes.dropna().unique()}
-    return codes.map(lambda c: lookup.get(c) if c is not None and c == c else None).astype(object)
+    # built as an object Series directly: Series.map infers a string dtype under pandas 3 and turns None into NaN
+    return pd.Series([lookup.get(c) if c is not None and c == c else None for c in codes], index=codes.index,
+                     dtype=object)
 
 
 def coverage_report(codes: Iterable, rules: list[Rule], names: Iterable | None = None) -> dict:

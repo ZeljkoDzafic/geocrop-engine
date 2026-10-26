@@ -1,0 +1,140 @@
+{
+  "contract": {
+    "builtin_callables": {
+      "exporters": {
+        "cog": "(src: 'str | Path', dst: 'str | Path', overview_resampling: 'str' = 'nearest') -> 'Path'",
+        "geoparquet": "(vector: 'str | Path', dst: 'str | Path') -> 'Path'"
+      },
+      "validators": {
+        "raster": "(path: 'str | Path') -> 'dict'",
+        "vector": "(path: 'str | Path', required=(), unique=(), label: 'str | None' = None) -> 'dict'"
+      }
+    },
+    "estimator_factory": "factory(params: dict, seed: int) -> estimator with fit, predict_proba, classes_",
+    "file_contracts": {
+      "key": "schema_version",
+      "versions": {
+        "evidence": 1,
+        "feature_manifest": 1,
+        "model": 1,
+        "run_manifest": 1,
+        "scene": 1,
+        "temporal_support": 1
+      }
+    },
+    "index_record": {
+      "compute": "(self, bands: 'dict[str, np.ndarray]') -> 'np.ndarray'",
+      "fields": [
+        "name",
+        "sensor",
+        "inputs",
+        "formula",
+        "reference",
+        "function"
+      ]
+    },
+    "module_api": {
+      "BUILTIN": "builtin",
+      "PluginWarning_bases": [
+        "UserWarning",
+        "Warning",
+        "Exception",
+        "BaseException",
+        "object"
+      ],
+      "describe": "() -> 'dict[str, dict[str, str]]'"
+    },
+    "registries": {
+      "estimators": {
+        "builtins": [
+          "catboost",
+          "extra_trees",
+          "hist_gb",
+          "lightgbm",
+          "ltae",
+          "rf",
+          "tempcnn"
+        ],
+        "group": "geocrop.estimators",
+        "kind": "estimator"
+      },
+      "exporters": {
+        "builtins": [
+          "cog",
+          "geoparquet"
+        ],
+        "group": "geocrop.exporters",
+        "kind": "exporter"
+      },
+      "feature_providers": {
+        "builtins": [
+          "alphaearth",
+          "anysat",
+          "galileo",
+          "presto",
+          "tessera"
+        ],
+        "group": "geocrop.feature_providers",
+        "kind": "feature provider"
+      },
+      "indices": {
+        "builtins": [
+          "BSI",
+          "EVI",
+          "EVI2",
+          "GCVI",
+          "MSAVI2",
+          "NDMI",
+          "NDRE",
+          "NDVI",
+          "NDWI",
+          "PSRI",
+          "RECI",
+          "RVI",
+          "VHVV_dB",
+          "VH_dB",
+          "VV_dB"
+        ],
+        "group": "geocrop.indices",
+        "kind": "index"
+      },
+      "segmenters": {
+        "builtins": [
+          "ftw",
+          "obia",
+          "unet_watershed"
+        ],
+        "group": "geocrop.segmenters",
+        "kind": "segmenter"
+      },
+      "validators": {
+        "builtins": [
+          "raster",
+          "vector"
+        ],
+        "group": "geocrop.validators",
+        "kind": "validator"
+      }
+    },
+    "registry_api": {
+      "declared_names": "(self) -> 'list[str]'",
+      "discover": "(self, force: 'bool' = False) -> 'None'",
+      "get": "(self, name: 'str') -> 'Any'",
+      "names": "(self) -> 'list[str]'",
+      "register": "(self, name: 'str', obj: 'Any' = None, *, replace: 'bool' = False, source: 'str' = 'code')",
+      "register_lazy": "(self, name: 'str', spec: 'str', *, source: 'str' = 'builtin') -> 'None'",
+      "source": "(self, name: 'str') -> 'str'",
+      "unregister": "(self, name: 'str') -> 'None'"
+    },
+    "segmenter_protocol": {
+      "attributes": [
+        "name"
+      ],
+      "runtime_checkable": true,
+      "segment": "(self, raster: 'str | Path', output: 'str | Path', **params: 'Any') -> 'dict'"
+    }
+  },
+  "schema": "geocrop-plugin-contracts/1",
+  "sha256": "66664e1a44aab95042ed3f23957f6f62a5014bd1c35f1cb9602667746fbcc56f",
+  "version": 2
+}
