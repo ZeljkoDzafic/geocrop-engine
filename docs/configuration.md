@@ -25,13 +25,14 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
 | | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md) |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
-| `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
+| `timeseries` | `enabled`, `start`, `end`, `temporal_support` | false, –, –, false | build time-series features from scene folders and merge them into the stack; `temporal_support` also writes the per-pixel observed-vs-interpolated raster ([temporal-quality.md](temporal-quality.md)) |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
 | | `step_days`, `output_step_days`, `lambda`, `envelope_iterations`, `harmonic_order` | 5, 15, 50, 0, 2 | grid, output sampling, smoothness, upper envelope, harmonics |
 | | `min_observed_fraction`, `max_gap_days` | 0, null | optional occupied-bin/gap policy for reconstructed features; separate QA products always emitted |
 | `cbm` | `enabled`, `index`, `calendar`, `min_coverage` | false, NDVI, –, 0.5 | parcel signatures + markers; crop-calendar YAML |
 | `cbm.events` | event-marker parameters (`abrupt_drop`, `s1_group_by`, ...) | see [markers.md](markers.md) | harvest/tillage/mowing/homogeneity markers |
 | `cbm.rules` | `enabled`, class lists, outcomes, `min_marker_confidence`, `mixed_class_share` | off | marker rules for the traffic light, reason codes ([markers.md](markers.md)) |
+| `cbm.temporal_support` | `enabled`, `tolerance_days`, `min_clear_observations`, `max_gap_days`, `max_gap_at_peak_days`, `max_interpolated_phenology`, `max_interpolated_feature_fraction`, `outcome`, `demote_red` | off | route weakly supported parcels to review (`LOW_OBS`, `LONG_GAP_AT_PEAK`, ...; [temporal-quality.md](temporal-quality.md)) |
 | `classes` | `label_field`, `id_field`, `targets` | `class_name`, `polygon_id`, [] | reference schema; target classes get extra columns in ablation tables |
 | `model` | `algorithm` | `rf` | `rf`, `extra_trees`, `hist_gb`, `lightgbm`, `catboost`, `tempcnn` |
 | | `n_estimators`, `max_features`, `min_samples_leaf`, `max_depth`, `class_weight`, `n_jobs`, `learning_rate` | 500, sqrt, 1, null, balanced_subsample, −1, null | estimator settings (keys unknown to an algorithm are ignored) |
