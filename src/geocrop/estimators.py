@@ -78,7 +78,8 @@ def _catboost(p: dict, seed: int):
         raise RuntimeError("pip install catboost") from exc
     kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
           "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
-          "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed}
+          "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed,
+          "allow_writing_files": False}
     return CatBoostClassifier(**{k: v for k, v in kw.items() if v is not None})
 
 
