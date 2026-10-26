@@ -44,8 +44,21 @@ def read(folder: str | Path) -> dict:
     path = Path(folder) / SIDE_CAR
     if not path.is_file():
         raise FileNotFoundError(f"{folder} has no {SIDE_CAR}; import scenes with geocrop s2-import / s1-import")
-    meta = json.loads(path.read_text(encoding="utf8"))
-    meta["date"] = datetime.fromisoformat(str(meta["datetime"]).replace("Z", "+00:00")).date()
+    try:
+        meta = json.loads(path.read_text(encoding="utf8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Corrupt scene metadata {path}: not valid JSON ({exc}); re-import the scene") from exc
+    if not isinstance(meta, dict):
+        raise ValueError(f"Corrupt scene metadata {path}: expected a JSON object, got {type(meta).__name__}")
+    missing = [k for k in ("sensor", "datetime") if not meta.get(k)]
+    if missing:
+        raise ValueError(f"Scene metadata {path} lacks required keys {missing}")
+    if meta["sensor"] not in ("S1", "S2"):
+        raise ValueError(f"Scene metadata {path}: unknown sensor {meta['sensor']!r} (expected S1 or S2)")
+    try:
+        meta["date"] = datetime.fromisoformat(str(meta["datetime"]).replace("Z", "+00:00")).date()
+    except ValueError as exc:
+        raise ValueError(f"Scene metadata {path}: invalid ISO-8601 datetime {meta['datetime']!r}") from exc
     meta["path"] = Path(folder)
     return meta
 

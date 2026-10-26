@@ -19,7 +19,7 @@
 | `scenes` | `scene.json` metadata, product-name parsing, assignment of scenes to windows, availability tables |
 | `s2` | SAFE import with metadata-driven radiometry; SCL/cloud-probability masking with dilation; same-day tile mosaicking; per-window median/percentile composites with `valid_count` |
 | `s1` | SNAP graph generation (σ⁰ or terrain-flattened γ⁰), `gpt` execution, scene import, linear-domain per-window composites (optionally per orbit direction) |
-| `raster` | reference grid, block iteration, aligned reads, GeoTIFF profiles |
+| `raster` | reference grid, block iteration, aligned reads, GeoTIFF profiles, checked input access (`RasterInputError` naming file and problem) |
 | `indices` | single registry of spectral/radar indices with formulas and references |
 | `features` | multi-temporal stack (bands, indices, radar, deltas, seasonal statistics) + feature manifest; feature selection for experiments |
 | `samples` | windowed extraction of reference pixels, cached `.npz` |
