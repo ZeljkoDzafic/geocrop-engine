@@ -5,12 +5,10 @@
 # with sudo (what a new VM or workstation gives you) and, as that user, follows the documented installation and
 # quick start LITERALLY, one numbered step per documented command block:
 #
-#   README.md "Install" -> "On Ubuntu with pip (pinned)"   apt prerequisites, Python 3.12, clone, venv, pip -c
-#   README.md "Quick start"                                  geocrop --version/--help, geocrop demo,
-#                                                            geocrop acceptance --offline, a small real
-#                                                            geocrop quicklook over Semberija (Earth Search)
-#   README.md "HTML workspace and Jupyter"                   geocrop serve with a generated token; curl
-#                                                            /api/v1/health (401 without, 200 with the token)
+#   README.md "Install" (Ubuntu commands)    apt prerequisites, Python 3.12 (apt or uv), clone, venv, pip -c
+#   README.md "Five-minute quick start"      geocrop demo, geocrop acceptance --offline, a small real
+#                                            geocrop quicklook over Semberija (Earth Search), geocrop serve
+#                                            with a generated token + curl /api/v1/health (401 without token)
 #
 # If a step here has to differ from the documents, the documents are wrong: fix them, not this script.
 # Requires Docker and network access (apt, PyPI, GitHub or the local repository, Earth Search STAC/COGs).
@@ -46,7 +44,7 @@ while [[ $# -gt 0 ]]; do
     --platform) PLATFORM=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
     --skip) SKIP="$SKIP $2"; shift 2 ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -103,7 +101,7 @@ step() {  # step <name> <commands...>: one documented command block, run in this
 { echo "== $(. /etc/os-release; echo "$PRETTY_NAME") $(uname -m), $(nproc) CPUs, $(free -m | awk '/Mem:/{print $2}') MiB,"
   echo "== image $IMAGE, source: $SOURCE, user $(id -un)"; } | tee -a "$LOG"
 
-# README.md, Install -> "On Ubuntu with pip (pinned)"
+# README.md, Install (Ubuntu commands)
 step apt 'sudo apt-get update && sudo apt-get install -y --no-install-recommends git curl ca-certificates libgomp1 libexpat1'
 step python312 'if apt-cache show python3.12-venv >/dev/null 2>&1; then
     sudo apt-get install -y --no-install-recommends python3.12 python3.12-venv
@@ -115,16 +113,16 @@ if [[ $CLONE == 1 ]]; then
 else  # the same tree as a clone of this commit, without needing it to be pushed
   step source 'tar -xf ~/source.tar && cd geocrop-engine'
 fi
-step venv 'python3.12 -m venv .venv && . .venv/bin/activate && python --version'
-step install "python -m pip install -c constraints/py312.txt -e '.[all,stac,web]'"
-# README.md, Quick start (synthetic data)
+step venv 'python3.12 -m venv .venv && source .venv/bin/activate && python --version'
+step install "python -m pip install -c constraints/py312.txt -e '.[all,web]'"
+# README.md, Five-minute quick start 1
 step help 'geocrop --version && geocrop --help | head -5'
 step demo 'geocrop demo --root outputs/demo && ls outputs/demo/prediction outputs/demo/parcels'
-# README.md, Quick start (docs/acceptance.md)
-step acceptance_offline 'geocrop acceptance --out outputs/acceptance-ci --offline'
-# README.md, Quick start: a small real Sentinel-2 quicklook (Earth Search, no account)
+# README.md, Five-minute quick start 2
+step acceptance_offline 'geocrop acceptance --offline --out outputs/acceptance'
+# README.md, Five-minute quick start 3: real Sentinel-2 (Earth Search, no account)
 step quicklook 'geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/semberija-2023 && ls outputs/semberija-2023'
-# README.md, HTML workspace and Jupyter (docs/web-interface.md, HTTP API)
+# README.md, Five-minute quick start 4 (+ docs/web-interface.md HTTP API)
 step serve 'export GEOCROP_WEB_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
   geocrop serve --workspace . --port 8765 > /report/serve.log 2>&1 & SERVE_PID=$!
   for i in $(seq 60); do curl -s -o /dev/null http://127.0.0.1:8765/ && break; sleep 1; done

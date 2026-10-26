@@ -220,3 +220,15 @@ def test_global_stretch_reads_a_regular_subsample_block_by_block(tmp_path):
     ok = (sub != -9999).all(axis=0)
     want = np.array([np.percentile(sub[b][ok], [2, 98]) for b in range(2)])
     np.testing.assert_allclose(got, want, rtol=1e-6)
+
+
+def test_missing_scikit_image_names_the_extra(monkeypatch, tmp_path):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "skimage", None)
+    monkeypatch.setitem(sys.modules, "skimage.segmentation", None)
+    monkeypatch.setitem(sys.modules, "skimage.measure", None)
+    with pytest.raises(RuntimeError, match=r"\.\[segmentation\]"):
+        segmentation.obia(tmp_path / "missing.tif", tmp_path / "out.gpkg")
+    with pytest.raises(RuntimeError, match=r"\.\[segmentation\]"):
+        segmentation.boundaries_to_parcels(tmp_path / "missing.tif", tmp_path / "out.gpkg")

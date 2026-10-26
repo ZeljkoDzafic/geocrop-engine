@@ -5,13 +5,16 @@
 ```bash
 git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
 cd geocrop-engine
-conda env create -f environment.yml && conda activate geocrop     # recommended (GDAL from conda-forge)
-pytest                       # ~1000 tests; tests of optional extras that are not installed are skipped
+python3.12 -m venv .venv && source .venv/bin/activate     # Python 3.10–3.12
+python -m pip install -e '.[all,web,dev]'                  # rasterio/GDAL come as wheels
+pytest                                                     # default test tier, a few minutes
 ```
-Alternatives: `pip install -e '.[all]'` in any Python ≥ 3.10 environment with working rasterio/GDAL wheels;
-`pip install -e '.[deep]'` adds PyTorch for the U-Net segmentation path. On a fresh Ubuntu 24.04/26.04 machine
-follow the pinned pip installation in the [README](../README.md#on-ubuntu-with-pip-pinned) (system packages,
-Python 3.12 via apt or uv, `pip install -c constraints/py312.txt`); `tools/fresh_user_check.sh` verifies it.
+Alternatives: `conda env create -f environment.yml && conda activate geocrop` (Python 3.11, GDAL stack from
+conda-forge), or the Docker image (see the [README](../README.md#install)). `pip install -e '.[deep]'` adds
+PyTorch for the U-Net segmentation path; the extras are listed in the README. On Ubuntu 26.04 the system
+`python3` is newer than 3.12: follow the README's [Ubuntu commands](../README.md#install) (system packages
+including `libexpat1`, Python 3.12 from uv, pinned `pip install -c constraints/py312.txt`), which
+`tools/fresh_user_check.sh` verifies in a pristine container.
 
 For Sentinel-1 install [ESA SNAP](https://step.esa.int/main/download/snap-download/) (9 or newer) and note the
 path of its `gpt` executable. Put SNAP's cache/temp directories on a local SSD.

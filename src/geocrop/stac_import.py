@@ -53,9 +53,10 @@ def cached_scene_valid(folder: Path, grid_id: str) -> bool:
     if not meta.exists():
         return False
     try:
-        recorded = json.loads(meta.read_text(encoding="utf8")).get("grid_id")
+        body = json.loads(meta.read_text(encoding="utf8"))
     except ValueError:
         return False
+    recorded = body.get("grid_id") if isinstance(body, dict) else None
     return recorded == grid_id and all((folder / f"{b}.tif").is_file() for b in (*S2_BANDS, "SCL"))
 
 

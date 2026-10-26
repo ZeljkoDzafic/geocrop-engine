@@ -22,6 +22,8 @@ from shapely.geometry import shape
 
 from .raster import blocks, expand, float_profile, valid_mask
 
+_SKIMAGE_HINT = 'segmentation needs scikit-image: pip install -e ".[segmentation]"'
+
 
 def _normalise(arr: np.ndarray, ok: np.ndarray) -> np.ndarray:
     out = arr.astype("float32").copy()
@@ -87,7 +89,10 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
     less than `merge_distance` (Euclidean, RMS per band); merging is transitive (union-find). Output segments
     carry stable global ids ordered north-to-south, west-to-east, the tiles they span and whether they were merged.
     """
-    from skimage.segmentation import slic
+    try:
+        from skimage.segmentation import slic
+    except ImportError as exc:
+        raise RuntimeError(_SKIMAGE_HINT) from exc
 
     pieces, means = [], []
     with rasterio.open(raster) as src:
@@ -175,8 +180,11 @@ def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, 
     pixels from the nearest boundary; lower both for narrow strip fields.
     """
     from scipy.ndimage import distance_transform_edt
-    from skimage.measure import label
-    from skimage.segmentation import watershed
+    try:
+        from skimage.measure import label
+        from skimage.segmentation import watershed
+    except ImportError as exc:
+        raise RuntimeError(_SKIMAGE_HINT) from exc
 
     with rasterio.open(boundary_probability) as src:
         if src.count != 1:

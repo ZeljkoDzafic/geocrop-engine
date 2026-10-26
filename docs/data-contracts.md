@@ -23,8 +23,9 @@ explicit nodata (`-9999` for float, `255` for class indices) and band descriptio
 {"schema_version": 1, "sensor": "S2", "datetime": "2023-06-12T09:30:41", "tile": "34TCQ", "relative_orbit": 36}
 ```
 
-Versioned contracts (`scene.json`, `model.joblib` payload, `run_manifest.json`) carry an integer
-`schema_version`; files without it are read as the original layout, files from a newer GeoCrop are refused
+Versioned contracts (`scene.json`, `model.joblib` payload, `run_manifest.json`, the feature manifest
+`<stack>.features.json`, the temporal-support sidecar `<stack>_temporal_support.json` and parcel evidence
+`<id>/evidence.json`; see `geocrop.contracts.SCHEMA_VERSIONS`) carry an integer `schema_version`; files without it are read as the original layout, files from a newer GeoCrop are refused
 with an upgrade hint. See [ADR 0003](adr/0003-file-contracts-and-schema-versions.md).
 
 ## Outputs

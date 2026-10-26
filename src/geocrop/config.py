@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from . import cbm_markers, indices, temporal_quality
+from . import cbm_markers, indices, shift, temporal_quality
 
 #: Defaults of the optional `parcel_classify` section (off: `geocrop run` outputs are unchanged).
 PARCEL_CLASSIFY_DEFAULTS: dict[str, Any] = {
@@ -144,6 +144,9 @@ DEFAULTS: dict[str, Any] = {
     "predict": {
         "smoothing": {"enabled": False, "window": 7, "smoothness": 10.0},
     },
+    # Domain-shift checks at prediction and shift-aware conformal sets (docs/domain-shift.md, geocrop.shift).
+    # Default: detect and report (shift_report.json, coverage "not established" under shift), warn only.
+    "uncertainty": copy.deepcopy(shift.DEFAULTS),
     # Optional parcel-level classifier on the cbm parcel signatures (docs/parcel-classification.md).
     "parcel_classify": copy.deepcopy(PARCEL_CLASSIFY_DEFAULTS),
     "experiments": {},
@@ -218,6 +221,8 @@ FINGERPRINT_NEUTRAL[("cbm", "temporal_support")] = copy.deepcopy(temporal_qualit
 # Training feature selection and the lost-class guard (release gate c091962), at their defaults.
 FINGERPRINT_NEUTRAL[("model", "feature_groups")] = None
 FINGERPRINT_NEUTRAL[("model", "allow_missing_classes")] = False
+# Domain-shift settings (docs/domain-shift.md) at their defaults.
+FINGERPRINT_NEUTRAL[("uncertainty",)] = copy.deepcopy(shift.DEFAULTS)
 
 
 class ConfigError(ValueError):
@@ -232,11 +237,11 @@ EMBEDDING_DEFAULTS: dict[str, Any] = {
     "resampling": "nearest",   # pre-computed sources: nearest | bilinear
     "mirror": "source.coop",   # AlphaEarth: source.coop | gcs
     "index": None,             # AlphaEarth: local/remote aef_index.parquet override
-    "monthly": None,           # Presto: monthly composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
-    "start": None,             # Presto: first month YYYY-MM (default <year>-01)
-    "months": 12,              # Presto: number of monthly timesteps (1..24)
-    "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
-    "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
+    "monthly": None,           # monthly providers: composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
+    "start": None,             # monthly providers: first month YYYY-MM (default <year>-01)
+    "months": 12,              # monthly providers: number of monthly timesteps (1..24)
+    "checkpoint": None,        # monthly provider (one source): local weights (default: pinned official download)
+    "parcels": False,          # also write parcel-level embeddings from paths.parcels
     "attach": True,            # append the embeddings raster to the feature stack
     "namespace": None,         # feature names emb_<source>_NN (true) / legacy emb_NN (false); default: new providers
                                # and lists of sources are namespaced, alphaearth/tessera/presto alone are legacy
@@ -368,6 +373,10 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("predict.smoothing.smoothness must be a positive number")
     _validate_model_params(cfg["model"])
     _validate_parcel_classify(cfg)
+    try:
+        shift.settings(cfg["uncertainty"])
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from None
     o = cfg["openeo"]
     unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
     if unknown:
@@ -458,6 +467,8 @@ def _validate_embeddings(raw) -> None:
         raise ConfigError("features.embeddings.namespace must be true, false or unset")
     if len(sources) > 1 and raw.get("namespace") is False:
         raise ConfigError("Several embedding sources need namespaced feature names (features.embeddings.namespace)")
+    if len(sources) > 1 and raw.get("checkpoint"):
+        raise ConfigError("features.embeddings.checkpoint applies to one source; list one source")
     allow = raw.get("allow_license", [])
     if not isinstance(allow, list) or not all(isinstance(x, str) for x in allow):
         raise ConfigError("features.embeddings.allow_license must be a list of licence ids")

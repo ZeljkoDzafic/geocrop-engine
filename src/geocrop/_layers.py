@@ -43,6 +43,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "galileo_encoder",    # Galileo encoder port (torch, optional)
         "anysat_encoder",     # AnySat encoder port (torch, optional)
         "temporal_quality",  # observed vs interpolated support, temporal-support routing rules
+        "shift",         # domain-shift detection at prediction time, shift-aware conformal thresholds
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
     ADAPTERS: frozenset({
