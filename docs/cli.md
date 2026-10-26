@@ -671,6 +671,36 @@ OBIA (with/without seam merging) vs U-Net against reference parcels
 | `--unet-bands` |  |  |  |
 | `--tile-size` |  | `1024` |  |
 | `--segments-per-km2` |  | `50` |  |
+| `--methods` |  |  | extra registry segmenters as JSON, e.g. '{"ftw": {"segmenter": "ftw", "model": "FTW_PRUE_EFNET_B3_CCBY"}}' |
+
+## `geocrop ftw-boundaries`
+
+Pretrained Fields of The World field boundaries (CC-BY checkpoints) -> parcels
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--window-a` |  |  | early-season composite/scene folder (B02..B08 reflectance) |
+| `--window-b` |  |  | late-season composite/scene folder |
+| `--stack` |  |  | existing 8-band FTW stack instead of --window-a/--window-b |
+| `--units` |  |  | scaling of --stack if it has no GeoCrop tag |
+| `--grid` |  |  | study grid raster (default: window A B04 grid) |
+| `--out` |  |  | output folder |
+| `--model` |  | `FTW_PRUE_EFNET_B3_CCBY` | FTW registry name (see --list-models) |
+| `--checkpoint` |  |  | local checkpoint file instead of a registry download |
+| `--allow-noncommercial` |  |  | permit FULL (non-commercial training data) checkpoints; prints a licence warning |
+| `--cache-dir` |  |  | checkpoint cache (default $GEOCROP_FTW_CACHE or ~/.cache/geocrop/ftw) |
+| `--no-download` |  |  | fail if the checkpoint is not cached |
+| `--download-only` |  |  |  |
+| `--list-models` |  |  |  |
+| `--patch` |  | `256` |  |
+| `--overlap` |  | `32` |  |
+| `--threads` |  |  |  |
+| `--threshold` |  | `0.5` | not-field probability below = field interior |
+| `--min-area-pixels` |  | `16` |  |
+| `--seed-percentile` |  |  |  |
+| `--min-seed-distance` |  | `1.0` | watershed seed distance from boundary (px) |
+| `--reference` |  |  | reference parcels: also write object-level segment metrics |
+| `--iou` |  | `0.5` |  |
 
 ## `geocrop manifest`
 

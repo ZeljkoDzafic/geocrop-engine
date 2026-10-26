@@ -20,6 +20,11 @@
 - Tag-driven `release` workflow (version consistency check, tests, sdist + wheel, GitHub Release with CHANGELOG
   notes and checksums); `tools/check_versions.py`; pinned `constraints/py312.txt`;
   [release and rollback policy](docs/release.md).
+- `geocrop ftw-boundaries` and the `ftw` segmenter: pretrained Fields of The World field-boundary models on
+  two-window GeoCrop composites (CC-BY checkpoints by default, non-commercial ones only with
+  `--allow-noncommercial`), SHA-256-pinned runtime download (`geocrop.ftw_weights`), seamless blockwise CPU
+  inference and watershed parcels; `benchmark-segmentation --methods` adds registry segmenters from the CLI;
+  `boundaries_to_parcels(min_seed_distance=...)`. See `docs/field-boundaries.md`.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
@@ -59,6 +64,8 @@
   subprocess-running code.
 
 ### Fixed
+- CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
+  flattened through `estimators.predict_labels`.
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
   (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
   now stop and ask for the upstream stage to be rerun.

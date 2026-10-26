@@ -57,7 +57,26 @@ class UNetWatershedSegmenter:
         return {**info, "boundary_probability": str(probability)}
 
 
-for _segmenter in (OBIASegmenter, UNetWatershedSegmenter):
+class FTWSegmenter:
+    """Pretrained Fields of The World boundary model (`geocrop.ftw`) followed by watershed objects.
+
+    `raster` is an 8-band FTW stack, or any raster on the study grid together with ``window_a``/``window_b``
+    (GeoCrop composite or scene folders). Parameters: ``model`` (registry name, default CC-BY B3) or
+    ``checkpoint`` (local file), ``allow_noncommercial``, ``cache_dir``, ``patch``, ``overlap``, ``device``,
+    ``units``, ``threads``, ``threshold``, ``min_area_pixels``, ``seed_percentile``, ``min_seed_distance``,
+    ``work_dir``. The
+    checkpoint must already be cached (`geocrop ftw-boundaries --download-only`); this segmenter never
+    downloads. Needs torch and segmentation-models-pytorch.
+    """
+
+    name = "ftw"
+
+    def segment(self, raster: str | Path, output: str | Path, **params: Any) -> dict:
+        from .ftw import segment
+        return segment(raster, output, **params)
+
+
+for _segmenter in (OBIASegmenter, UNetWatershedSegmenter, FTWSegmenter):
     plugins.segmenters.register(_segmenter.name, _segmenter, source=plugins.BUILTIN)
 
 

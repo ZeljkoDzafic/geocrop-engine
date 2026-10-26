@@ -22,7 +22,7 @@ from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
 from . import applicability, contracts, faultinject, metrics, uncertainty
-from .estimators import channels_from_names, importances, make_estimator
+from .estimators import channels_from_names, importances, make_estimator, predict_labels
 from .hashing import sha256
 from .raster import (
     NODATA,
@@ -138,7 +138,7 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
             y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
             spatial_buffer_m=spatial_buffer_m)):
         rf = make_rf(params, seed + k).fit(X[tr], y[tr])
-        oof[te] = rf.predict(X[te])
+        oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
         proba[:, np.searchsorted(classes, rf.classes_)] = rf.predict_proba(X[te])
         if oof_proba is None:
@@ -205,7 +205,7 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
         inner = tune(X[tr], y[tr], polygon[tr], groups[tr], base, grid, n_inner, seed + k,
                      coordinates=None if xy is None else xy[tr], crs=crs, spatial_buffer_m=spatial_buffer_m)
         params = {**base, **inner["best_params"]}
-        oof[te] = make_estimator(params, seed + k).fit(X[tr], y[tr]).predict(X[te])
+        oof[te] = predict_labels(make_estimator(params, seed + k).fit(X[tr], y[tr]), X[te])
         chosen.append({"fold": k, **inner["best_params"]})
     s = metrics.summary(y, oof.astype(str), labels=classes)
     s["selected_params_per_fold"] = chosen
