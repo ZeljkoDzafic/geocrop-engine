@@ -738,6 +738,83 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
 
+## `geocrop active-learning`
+
+Active-learning loop: batch selection, label ingestion, label-budget simulation
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `al_cmd` | yes |  |  |
+
+### `geocrop active-learning select`
+
+Select a diverse, spatially spread batch of uncertain parcels to label
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | output of geocrop parcels (entropy, p_<class>) |
+| `--out` | yes |  | selected parcels (.gpkg/.geojson); also writes *_label_form.csv |
+| `--budget` | yes |  | parcels to visit in this round |
+| `--features` |  |  | table keyed by parcel id (CSV/Parquet/GPKG) spanning the diversity space |
+| `--feature-columns` |  |  | columns of --features (or parcels) to use |
+| `--id-field` |  | `parcel_id` |  |
+| `--candidate-factor` |  | `3.0` | top-uncertain pool = factor x budget |
+| `--uncertainty-weight` |  | `0.3` | 0 = pure diversity, 1 = pure uncertainty |
+| `--min-spacing-m` |  | `1000` |  |
+| `--stratify` |  | `equal` | quota per predicted class |
+| `--trips` |  |  | group the batch into N field trips by area |
+| `--training` |  |  | current training polygons: their parcels are excluded and act as centres |
+| `--exclude` |  |  | parcels never to propose (e.g. validation sites): ids or geometries |
+| `--round` |  | `1` |  |
+| `--seed` |  | `42` |  |
+
+### `geocrop active-learning ingest`
+
+Merge field observations / analyst decisions into training with provenance
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--labels` | yes |  | CSV/GPKG: parcel_id, label, source, date, confidence[, purpose] |
+| `--parcels` | yes |  | parcel geometries with --id-field |
+| `--training` | yes |  | current training polygons (polygon_id, class_name) |
+| `--out` | yes |  | updated training polygons |
+| `--round` | yes |  |  |
+| `--validation` |  |  | validation observations kept out of training (points/polygons or ids) |
+| `--validation-buffer-m` |  |  |  |
+| `--provenance` |  |  | provenance CSV (default <out dir>/al_provenance.csv) |
+| `--min-confidence` |  |  |  |
+| `--conflict-policy` |  | `exclude` |  |
+| `--existing-policy` |  | `keep` |  |
+| `--inner-buffer-m` |  |  |  |
+| `--id-field` |  | `parcel_id` |  |
+| `--label-field` |  | `class_name` |  |
+
+### `geocrop active-learning simulate`
+
+Label-budget curves: uncertainty+diversity vs uncertainty vs random
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--samples` |  |  | samples.npz (aggregated to one unit per polygon); default SYNTHETIC pool |
+| `--strategies` |  | `['uncertainty_diversity', 'uncertainty', 'random']` |  |
+| `--initial` |  | `12` |  |
+| `--batch` |  | `12` |  |
+| `--rounds` |  | `8` |  |
+| `--repeats` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--block-m` |  | `1000` |  |
+| `--test-fraction` |  | `0.25` |  |
+| `--test-buffer-m` |  |  |  |
+| `--candidate-factor` |  | `3.0` |  |
+| `--uncertainty-weight` |  | `0.3` |  |
+| `--min-spacing-m` |  |  |  |
+| `--stratify` |  | `none` |  |
+| `--params` |  |  | classifier JSON, e.g. {"algorithm": "rf", "n_estimators": 200} |
+| `--synthetic-side` |  | `24` | SYNTHETIC pool: parcels per side |
+| `--synthetic-noise` |  | `0.1` |  |
+| `--no-figure` |  |  |  |
+
 ## `geocrop s1-signatures`
 
 Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry

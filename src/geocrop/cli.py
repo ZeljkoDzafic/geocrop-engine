@@ -504,6 +504,66 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--inputs", nargs="*", default=[])
     x.add_argument("--snap-gpt")
 
+    # --- active learning (gap G9): select | ingest | simulate ---
+    x = cmd("active-learning", "Active-learning loop: batch selection, label ingestion, label-budget simulation")
+    al = x.add_subparsers(dest="al_cmd", required=True, metavar="action")
+    y = al.add_parser("select", help="Select a diverse, spatially spread batch of uncertain parcels to label",
+                      description="Select a diverse, spatially spread batch of uncertain parcels to label")
+    y.add_argument("--parcels", required=True, help="output of geocrop parcels (entropy, p_<class>)")
+    y.add_argument("--out", required=True, help="selected parcels (.gpkg/.geojson); also writes *_label_form.csv")
+    y.add_argument("--budget", type=int, required=True, help="parcels to visit in this round")
+    y.add_argument("--features", help="table keyed by parcel id (CSV/Parquet/GPKG) spanning the diversity space")
+    y.add_argument("--feature-columns", nargs="*", help="columns of --features (or parcels) to use")
+    y.add_argument("--id-field", default="parcel_id")
+    y.add_argument("--candidate-factor", type=float, default=3.0, help="top-uncertain pool = factor x budget")
+    y.add_argument("--uncertainty-weight", type=float, default=0.3, help="0 = pure diversity, 1 = pure uncertainty")
+    y.add_argument("--min-spacing-m", type=float, default=1000)
+    y.add_argument("--stratify", choices=["equal", "proportional", "none"], default="equal",
+                   help="quota per predicted class")
+    y.add_argument("--trips", type=int, help="group the batch into N field trips by area")
+    y.add_argument("--training", help="current training polygons: their parcels are excluded and act as centres")
+    y.add_argument("--exclude", help="parcels never to propose (e.g. validation sites): ids or geometries")
+    y.add_argument("--round", type=int, default=1)
+    y.add_argument("--seed", type=int, default=42)
+    y = al.add_parser("ingest", help="Merge field observations / analyst decisions into training with provenance",
+                      description="Merge field observations / analyst decisions into training with provenance")
+    y.add_argument("--labels", required=True, help="CSV/GPKG: parcel_id, label, source, date, confidence[, purpose]")
+    y.add_argument("--parcels", required=True, help="parcel geometries with --id-field")
+    y.add_argument("--training", required=True, help="current training polygons (polygon_id, class_name)")
+    y.add_argument("--out", required=True, help="updated training polygons")
+    y.add_argument("--round", type=int, required=True)
+    y.add_argument("--validation", help="validation observations kept out of training (points/polygons or ids)")
+    y.add_argument("--validation-buffer-m", type=float, default=0.0)
+    y.add_argument("--provenance", help="provenance CSV (default <out dir>/al_provenance.csv)")
+    y.add_argument("--min-confidence", type=float, default=0.0)
+    y.add_argument("--conflict-policy", choices=["exclude", "highest_confidence", "latest", "majority"],
+                   default="exclude")
+    y.add_argument("--existing-policy", choices=["keep", "replace"], default="keep")
+    y.add_argument("--inner-buffer-m", type=float, default=0.0)
+    y.add_argument("--id-field", default="parcel_id")
+    y.add_argument("--label-field", default="class_name")
+    y = al.add_parser("simulate", help="Label-budget curves: uncertainty+diversity vs uncertainty vs random",
+                      description="Label-budget curves: uncertainty+diversity vs uncertainty vs random")
+    y.add_argument("--out", required=True)
+    y.add_argument("--samples", help="samples.npz (aggregated to one unit per polygon); default SYNTHETIC pool")
+    y.add_argument("--strategies", nargs="*", default=["uncertainty_diversity", "uncertainty", "random"])
+    y.add_argument("--initial", type=int, default=12)
+    y.add_argument("--batch", type=int, default=12)
+    y.add_argument("--rounds", type=int, default=8)
+    y.add_argument("--repeats", type=int, default=5)
+    y.add_argument("--seed", type=int, default=42)
+    y.add_argument("--block-m", type=float, default=1000)
+    y.add_argument("--test-fraction", type=float, default=0.25)
+    y.add_argument("--test-buffer-m", type=float, default=0.0)
+    y.add_argument("--candidate-factor", type=float, default=3.0)
+    y.add_argument("--uncertainty-weight", type=float, default=0.3)
+    y.add_argument("--min-spacing-m", type=float, default=0.0)
+    y.add_argument("--stratify", choices=["equal", "proportional", "none"], default="none")
+    y.add_argument("--params", type=_json_arg, help='classifier JSON, e.g. {"algorithm": "rf", "n_estimators": 200}')
+    y.add_argument("--synthetic-side", type=int, default=24, help="SYNTHETIC pool: parcels per side")
+    y.add_argument("--synthetic-noise", type=float, default=0.10)
+    y.add_argument("--no-figure", action="store_true")
+
     # --- CbM event markers (Sentinel-1 + Sentinel-2) --------------------------------------------------
     x = cmd("s1-signatures", "Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry")
     x.add_argument("--scenes", required=True, help="root of S1 scene folders (VV.tif, VH.tif, scene.json)")
@@ -1013,6 +1073,44 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             from .config import load
             cfg = load(a.config)
         print(run_manifest(a.out, cfg, a.inputs, a.snap_gpt))
+    elif c == "active-learning":
+        from . import active_learning as al
+        if a.al_cmd == "select":
+            labelled, excluded = (), ()
+            if a.training or a.exclude:
+                import geopandas as gpd
+                par = gpd.read_file(a.parcels)
+                par[a.id_field] = par[a.id_field].astype(str)
+                if a.training:
+                    tr = gpd.read_file(a.training)
+                    labelled = tuple(al.training_parcel_ids(tr, par, a.id_field).dropna())
+                if a.exclude:
+                    excluded = tuple(al.validation_parcel_ids(a.exclude, par, a.id_field, 0.0))
+            _, summary = al.select(a.parcels, a.budget, a.out, features=a.features, feature_columns=a.feature_columns,
+                                   id_field=a.id_field, candidate_factor=a.candidate_factor,
+                                   uncertainty_weight=a.uncertainty_weight, min_spacing_m=a.min_spacing_m,
+                                   stratify=a.stratify, trips=a.trips, labelled_ids=labelled, exclude_ids=excluded,
+                                   round_id=a.round, seed=a.seed)
+            _print(summary)
+        elif a.al_cmd == "ingest":
+            _print(al.ingest(a.labels, a.parcels, a.training, a.out, a.round, validation=a.validation,
+                             provenance=a.provenance, id_field=a.id_field, label_field=a.label_field,
+                             min_confidence=a.min_confidence, conflict_policy=a.conflict_policy,
+                             existing_policy=a.existing_policy, validation_buffer_m=a.validation_buffer_m,
+                             inner_buffer_m=a.inner_buffer_m))
+        else:
+            if a.samples:
+                from .samples import Samples
+                pool = al.pool_from_samples(Samples.load(a.samples))
+            else:
+                pool = al.synthetic_pool(a.synthetic_side, noise=a.synthetic_noise, seed=a.seed)
+            r = al.simulate(pool, a.out, strategies=a.strategies, initial=a.initial, batch=a.batch, rounds=a.rounds,
+                            repeats=a.repeats, seed=a.seed, params=a.params, block_m=a.block_m,
+                            test_fraction=a.test_fraction, test_buffer_m=a.test_buffer_m,
+                            candidate_factor=a.candidate_factor, uncertainty_weight=a.uncertainty_weight,
+                            min_spacing_m=a.min_spacing_m, stratify=a.stratify, figure=not a.no_figure)
+            _print({k: r[k] for k in ("mode", "test_units", "pool_units", "comparison", "outputs")})
+
     elif c == "s1-signatures":
         from datetime import date
 
