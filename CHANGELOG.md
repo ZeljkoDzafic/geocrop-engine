@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- Versioned REST API: every endpoint is also served under `/api/v1/...`, the documented stable contract;
+  unversioned `/api/...` paths remain as compatibility aliases. `EngineClient` uses `/api/v1` and falls back to
+  `/api` on older servers.
+- Security gate (`tests/test_security.py`), threat model ([docs/security.md](docs/security.md)) and `SECURITY.md`.
+- CI: branch coverage with `coverage.xml` artifact and a fail-under threshold, `pip-audit` of the pinned and the
+  latest dependency sets, test run on the pinned set, Docker image build; Dependabot for pip and GitHub Actions.
+- Tag-driven `release` workflow (version consistency check, tests, sdist + wheel, GitHub Release with CHANGELOG
+  notes and checksums); `tools/check_versions.py`; pinned `constraints/py312.txt`;
+  [release and rollback policy](docs/release.md).
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
@@ -22,6 +31,19 @@
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+
+### Security
+- Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
+  holder run an arbitrary executable; options are now checked after parsing.
+- Web API: every `/api` path requires the token before routing (including unknown paths); the Host allow-list
+  accepts `[::1]:port` independently of the Starlette version; all security headers (now also
+  `X-Frame-Options`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `Permissions-Policy`,
+  CSP `object-src 'none'`) are sent on rejections and errors too; `Sec-Fetch-Site: cross-site` API requests are
+  refused; request bodies are limited to 1 MiB and job arguments to 128 KiB in total.
+- Web API: unreadable or malformed `run` configurations return HTTP 400 without echoing file content (previously
+  HTTP 500); unexpected errors return a generic HTTP 500 that keeps the security headers.
+- Docker: job state, `.env` files and virtual environments are excluded from the build context.
+
 ### Changed
 - SNAP `gpt` execution moved to the adapter `geocrop.snap` (`geocrop.s1.run_snap` remains); `sha256` moved
   to `geocrop.hashing` (`geocrop.provenance.sha256` remains), so core modules no longer depend on
@@ -45,6 +67,8 @@
   unknown values as clear sky.
 - Run lock is acquired atomically, so two runs starting together cannot both take it. Stale locks with an
   empty or garbled pid are taken over. A damaged `.hashcache.json` is rebuilt instead of aborting the run.
+- Docker image build: the conda environment step tried to install the not-yet-copied checkout.
+- Packaging: SPDX license expression (`license = "Apache-2.0"`), removing setuptools deprecation warnings.
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
 - `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
 - `stac-import` reuses cached scenes only for the same study grid and with all bands present.

@@ -29,3 +29,41 @@ skips them for a quick local loop.
 environment variable `GEOCROP_FAULT_PAUSE` equals that name. Then it writes `"<name> <pid>"` to the file in
 `GEOCROP_FAULT_SIGNAL` (if set) and sleeps for `GEOCROP_FAULT_SECONDS` (default 600), so the test can kill the process at
 a known point. Never set these variables in production runs.
+
+## Security tests
+`tests/test_security.py` is the security gate for the local web API: authentication on every route (both
+`/api` and `/api/v1`), Host allow-list (DNS rebinding), cross-origin rejection, security headers on every
+response, path traversal and symbolic-link escapes in artifact downloads and output paths, blocked commands and
+options, shell metacharacters, argument/body/log size limits and the job queue limit. The threat model is in
+[security](security.md). `tests/test_api_v1.py` checks that the versioned and unversioned API paths share
+handlers, and `tests/test_check_versions.py` the release version check.
+
+## Coverage
+CI measures coverage of the default tier on every Python version:
+
+```bash
+python -m pytest --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
+```
+
+`coverage.xml` is uploaded as a workflow artifact. The build fails below the current total minus two points
+(`--cov-fail-under=77`); raise the threshold when coverage improves. Engine commands run by web jobs execute in
+subprocesses and are not counted; the CLI's own tests cover them in-process.
+
+Measured on 2026-10-26 (Python 3.12, default tier; statements + branches combined: **79.9 %**; statements
+82.7 %, branches 70.6 %):
+
+| Module | Statements | Branches | Module | Statements | Branches |
+|---|---|---|---|---|---|
+| `model` | 96.2 % | 85.1 % | `pipeline` | 92.6 % | 81.8 % |
+| `features` | 94.5 % | 85.0 % | `tsfeatures` | 92.7 % | 85.7 % |
+| `parcels` | 94.4 % | 84.3 % | `timeseries` | 96.3 % | 80.0 % |
+| `validation` | 94.8 % | 70.6 % | `uncertainty` | 94.9 % | 71.4 % |
+| `applicability` | 95.8 % | 70.0 % | `cbm` | 95.8 % | 86.0 % |
+| `metrics` | 96.6 % | 83.3 % | `audit` | 97.7 % | 98.1 % |
+| `web` | 98.1 % | 95.2 % | `web_jobs` | 92.9 % | 84.2 % |
+| `client` | 91.7 % | 88.5 % | `config` | 89.7 % | 88.0 % |
+
+**Goal for 1.0:** at least 90 % *branch* coverage for the core modules that determine results — `model`,
+`features`, `tsfeatures`, `pipeline`, `parcels`, `validation`, `uncertainty`, `applicability`, `metrics`,
+`cbm` — and for the web security surface (`web`, `web_jobs`, `client`). Data-access modules that need real
+services (`catalog`, `stac`, `stac_import`, `s1`) are covered by the `network` tier instead.
