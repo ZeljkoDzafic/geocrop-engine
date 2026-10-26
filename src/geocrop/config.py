@@ -14,7 +14,32 @@ from typing import Any
 
 import yaml
 
-from . import cbm_markers, indices
+from . import cbm_markers, indices, temporal_quality
+
+#: Defaults of the optional `parcel_classify` section (off: `geocrop run` outputs are unchanged).
+PARCEL_CLASSIFY_DEFAULTS: dict[str, Any] = {
+    "enabled": False,
+    "decision": "additional",          # additional: extra parcel_classify/ outputs | replace: parcels/ uses it
+    "label_field": None,               # independently verified class column of paths.parcels (never declarations)
+    "indices": None,                   # signature indices (default: [cbm.index])
+    "stats": ["mean", "std"],
+    "groups": ["ts", "stats", "windows", "shape"],
+    "step_days": 5,
+    "output_step_days": 15,
+    "window_days": 30,
+    "lambda": 20.0,
+    "bootstrap": 200,
+    "params": {},                      # estimator settings, e.g. {algorithm: rf, n_estimators: 300}
+}
+
+#: Keys added after configurations were first fingerprinted. While they hold these defaults they are left
+#: out of `fingerprint` (and of the resumable stage fingerprints, see `geocrop.pipeline`), so existing
+#: studies keep their fingerprints.
+FINGERPRINT_NEUTRAL: dict[tuple[str, ...], Any] = {
+    ("model", "params"): {},
+    ("cbm", "event_markers"): False,
+    ("parcel_classify",): PARCEL_CLASSIFY_DEFAULTS,
+}
 
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
@@ -62,6 +87,8 @@ DEFAULTS: dict[str, Any] = {
         "harmonic_order": 2,
         "min_observed_fraction": 0,
         "max_gap_days": None,
+        # per-pixel observed-vs-interpolated support raster next to the stack (geocrop.temporal_quality)
+        "temporal_support": False,
     },
     "cbm": {
         "enabled": False,
@@ -72,6 +99,11 @@ DEFAULTS: dict[str, Any] = {
         # (RULE_DEFAULTS); rules are off by default so existing outputs are unchanged.
         "events": copy.deepcopy(cbm_markers.EVENT_DEFAULTS),
         "rules": copy.deepcopy(cbm_markers.RULE_DEFAULTS),
+        # `geocrop run`: also compute Sentinel-1 parcel signatures and event/homogeneity markers in the cbm
+        # stage (implied by rules.enabled).
+        "event_markers": False,
+        # temporal-support routing (LOW_OBS, LONG_GAP_AT_PEAK, INTERPOLATED_PHENOLOGY ...); off by default
+        "temporal_support": copy.deepcopy(temporal_quality.RULE_DEFAULTS),
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -93,6 +125,9 @@ DEFAULTS: dict[str, Any] = {
         "calibration_fraction": 0.2,
         "holdout_fraction": 0.0,
         "inner_splits": 3,
+        # Estimator-specific hyperparameters passed through unchanged (e.g. for plugin estimators), validated
+        # against the parameters the selected estimator accepts; they override the shared keys above.
+        "params": {},
     },
     "cv": {
         "strategy": "spatial_blocks",   # spatial_blocks | region | year | region_year (transfer validation)
@@ -103,6 +138,8 @@ DEFAULTS: dict[str, Any] = {
     "predict": {
         "smoothing": {"enabled": False, "window": 7, "smoothness": 10.0},
     },
+    # Optional parcel-level classifier on the cbm parcel signatures (docs/parcel-classification.md).
+    "parcel_classify": copy.deepcopy(PARCEL_CLASSIFY_DEFAULTS),
     "experiments": {},
     "parcels": {
         "id_field": "parcel_id",
@@ -140,6 +177,15 @@ DEFAULTS: dict[str, Any] = {
         "job_options": None,
         "work_dir": "data/openeo",
     },
+    # Where Sentinel-2 scenes come from (docs/datacube.md). `geocrop cube load --config` reads this section;
+    # the pipeline itself always reads scene folders from paths.s2_scenes, whatever filled them.
+    "data": {
+        "source": "local",          # local (SAFE / stac-import scene folders) | odc-stac
+        "endpoint": "https://earth-search.aws.element84.com/v1",
+        "collection": "sentinel-2-l2a",
+        "max_cloud": 80,
+        "min_clear_fraction": 0.2,
+    },
     # Machine protection: free-space guard before heavy stages (see docs/preflight.md).
     "resources": {
         "disk_guard": True,
@@ -157,6 +203,13 @@ DEFAULTS: dict[str, Any] = {
     },
 }
 
+# `data:` (scene source for `geocrop cube load`) is not read by `geocrop run`; at its defaults it leaves the
+# configuration fingerprint as it was before the section existed.
+FINGERPRINT_NEUTRAL[("data",)] = copy.deepcopy(DEFAULTS["data"])
+# Temporal-support measurement/routing (docs/temporal-quality.md), off by default.
+FINGERPRINT_NEUTRAL[("timeseries", "temporal_support")] = False
+FINGERPRINT_NEUTRAL[("cbm", "temporal_support")] = copy.deepcopy(temporal_quality.RULE_DEFAULTS)
+
 
 class ConfigError(ValueError):
     pass
@@ -164,7 +217,7 @@ class ConfigError(ValueError):
 
 #: Keys of the optional ``features.embeddings`` mapping (docs/embeddings.md).
 EMBEDDING_DEFAULTS: dict[str, Any] = {
-    "source": None,            # alphaearth | tessera | presto
+    "source": None,            # a feature provider (alphaearth | tessera | presto | galileo | anysat | plugin) or a list
     "year": None,
     "dir": None,               # default: <paths.features parent>/embeddings
     "resampling": "nearest",   # pre-computed sources: nearest | bilinear
@@ -176,7 +229,21 @@ EMBEDDING_DEFAULTS: dict[str, Any] = {
     "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
     "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
     "attach": True,            # append the embeddings raster to the feature stack
+    "namespace": None,         # feature names emb_<source>_NN (true) / legacy emb_NN (false); default: new providers
+                               # and lists of sources are namespaced, alphaearth/tessera/presto alone are legacy
+    "allow_license": [],       # licence ids acknowledged for providers that are not permissive
 }
+
+
+def embedding_sources(opts: dict) -> list[str]:
+    """``features.embeddings.source`` as a list (one or several feature providers)."""
+    src = opts.get("source")
+    return [] if not src else [src] if isinstance(src, str) else list(src)
+
+
+def embedding_namespace(opts: dict) -> bool | None:
+    """Namespace option: several sources always need namespaced feature names."""
+    return True if len(embedding_sources(opts)) > 1 and opts.get("namespace") is None else opts.get("namespace")
 
 
 def embedding_options(cfg: dict, always: bool = False) -> dict | None:
@@ -239,6 +306,8 @@ def validate(cfg: dict) -> dict:
         if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                 or not 0 <= value <= upper):
             raise ConfigError(f"Invalid timeseries.{key}")
+    if not isinstance(t.get("temporal_support", False), bool):
+        raise ConfigError("timeseries.temporal_support must be true or false")
     buffer = cfg["model"]["spatial_buffer_m"]
     if isinstance(buffer, bool) or not isinstance(buffer, (int, float)) or not math.isfinite(buffer) or buffer < 0:
         raise ConfigError("model.spatial_buffer_m must be a finite nonnegative distance in metres")
@@ -259,9 +328,12 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    if not isinstance(cfg["cbm"]["event_markers"], bool):
+        raise ConfigError("cbm.event_markers must be true or false")
     try:
         cbm_markers.resolve_event_params(cfg["cbm"]["events"])
         cbm_markers.resolve_rules(cfg["cbm"]["rules"])
+        temporal_quality.resolve(cfg["cbm"]["temporal_support"])
     except ValueError as exc:
         raise ConfigError(f"cbm: {exc}") from exc
     from .splits import STRATEGIES
@@ -279,6 +351,8 @@ def validate(cfg: dict) -> dict:
     k = sm["smoothness"]
     if isinstance(k, bool) or not isinstance(k, (int, float)) or not math.isfinite(k) or k <= 0:
         raise ConfigError("predict.smoothing.smoothness must be a positive number")
+    _validate_model_params(cfg["model"])
+    _validate_parcel_classify(cfg)
     o = cfg["openeo"]
     unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
     if unknown:
@@ -286,10 +360,68 @@ def validate(cfg: dict) -> dict:
     if o["s1_coefficient"] not in ("sigma0-ellipsoid", "gamma0-terrain"):
         raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
     _validate_resources(cfg["resources"], cfg["preflight"])
+    _validate_data(cfg["data"])
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
     return cfg
+
+
+def _validate_model_params(m: dict) -> None:
+    if m["params"] is None:
+        m["params"] = {}
+    extra = m["params"]
+    if not isinstance(extra, dict) or not all(isinstance(k, str) and k for k in extra):
+        raise ConfigError("model.params must be a mapping of estimator parameter names to values")
+    if "algorithm" in extra:
+        raise ConfigError("Set the estimator with model.algorithm, not model.params.algorithm")
+    seeded = sorted({"random_state", "seed", "random_seed"} & set(extra))
+    if seeded:
+        raise ConfigError(f"model.params.{seeded[0]}: the estimator seed comes from the top-level seed key")
+
+
+def _validate_parcel_classify(cfg: dict) -> None:
+    pc = cfg["parcel_classify"]
+    if not isinstance(pc["enabled"], bool):
+        raise ConfigError("parcel_classify.enabled must be true or false")
+    if pc["decision"] not in ("additional", "replace"):
+        raise ConfigError("parcel_classify.decision must be additional or replace")
+    allowed = PARCEL_CLASSIFY_DEFAULTS["groups"]
+    if not isinstance(pc["groups"], list) or not pc["groups"] or set(pc["groups"]) - set(allowed):
+        raise ConfigError(f"parcel_classify.groups must be a non-empty subset of {allowed}")
+    for key in ("step_days", "output_step_days", "window_days", "bootstrap"):
+        low = 0 if key == "bootstrap" else 1
+        if isinstance(pc[key], bool) or not isinstance(pc[key], int) or pc[key] < low:
+            raise ConfigError(f"parcel_classify.{key} must be an integer >= {low}")
+    if not _number(pc["lambda"]) or pc["lambda"] <= 0:
+        raise ConfigError("parcel_classify.lambda must be a positive number")
+    if pc["params"] is None:
+        pc["params"] = {}
+    if not isinstance(pc["params"], dict):
+        raise ConfigError("parcel_classify.params must be a mapping of estimator settings")
+    if not pc["enabled"]:
+        return
+    if not cfg["cbm"]["enabled"]:
+        raise ConfigError("parcel_classify needs cbm.enabled: true (it classifies the cbm parcel signatures)")
+    if not pc["label_field"]:
+        raise ConfigError("parcel_classify.label_field must name an independently verified class column of "
+                          "paths.parcels")
+    if pc["label_field"] == cfg["parcels"]["declared_field"]:
+        raise ConfigError("parcel_classify.label_field must not be the declaration column being checked")
+
+
+def _validate_data(d: dict) -> None:
+    if d["source"] not in ("local", "odc-stac"):
+        raise ConfigError("data.source must be local or odc-stac")
+    for key in ("endpoint", "collection"):
+        if not isinstance(d[key], str) or not d[key]:
+            raise ConfigError(f"data.{key} must be a non-empty string")
+    mc = d["max_cloud"]
+    if mc is not None and (isinstance(mc, bool) or not isinstance(mc, (int, float)) or not 0 <= mc <= 100):
+        raise ConfigError("data.max_cloud must be a percentage in [0, 100] or null")
+    f = d["min_clear_fraction"]
+    if isinstance(f, bool) or not isinstance(f, (int, float)) or not 0 <= f <= 1:
+        raise ConfigError("data.min_clear_fraction must be in [0, 1]")
 
 
 def _validate_embeddings(raw) -> None:
@@ -300,8 +432,20 @@ def _validate_embeddings(raw) -> None:
     unknown = set(raw) - set(EMBEDDING_DEFAULTS)
     if unknown:
         raise ConfigError(f"Unknown configuration key: features.embeddings.{sorted(unknown)[0]}")
-    if raw.get("source") not in ("alphaearth", "tessera", "presto"):
-        raise ConfigError("features.embeddings.source must be alphaearth, tessera or presto")
+    from . import plugins
+    sources = embedding_sources(raw)
+    known = plugins.feature_providers.names()
+    if not sources or not all(isinstance(x, str) and x in plugins.feature_providers for x in sources):
+        raise ConfigError(f"features.embeddings.source must be one or a list of: {', '.join(known)}")
+    if len(set(sources)) != len(sources):
+        raise ConfigError("features.embeddings.source lists a provider twice")
+    if raw.get("namespace") not in (None, True, False):
+        raise ConfigError("features.embeddings.namespace must be true, false or unset")
+    if len(sources) > 1 and raw.get("namespace") is False:
+        raise ConfigError("Several embedding sources need namespaced feature names (features.embeddings.namespace)")
+    allow = raw.get("allow_license", [])
+    if not isinstance(allow, list) or not all(isinstance(x, str) for x in allow):
+        raise ConfigError("features.embeddings.allow_license must be a list of licence ids")
     year = raw.get("year")
     if isinstance(year, bool) or not isinstance(year, int) or not 2015 <= year <= 2100:
         raise ConfigError("features.embeddings.year must be a year, e.g. 2023")
@@ -354,7 +498,26 @@ def load(path: str | Path | None = None, overrides: dict | None = None) -> dict:
     return validate(cfg)
 
 
+def without_neutral_defaults(cfg: dict) -> dict:
+    """Copy of `cfg` without the `FINGERPRINT_NEUTRAL` keys that hold their default (sections copied shallowly)."""
+    out = dict(cfg)
+    for path, default in FINGERPRINT_NEUTRAL.items():
+        parent = out
+        for key in path[:-1]:
+            if not isinstance(parent.get(key), dict):
+                parent = None
+                break
+            parent[key] = dict(parent[key])
+            parent = parent[key]
+        if parent is not None and path[-1] in parent and parent[path[-1]] == default:
+            del parent[path[-1]]
+    return out
+
+
 def fingerprint(cfg: dict) -> str:
-    """Stable hash of a resolved configuration, recorded in every run manifest."""
-    body = json.dumps(cfg, sort_keys=True, default=str).encode()
+    """Stable hash of a resolved configuration, recorded in every run manifest.
+
+    `FINGERPRINT_NEUTRAL` keys are omitted while they hold their default, so adding an optional feature to
+    GeoCrop does not change the fingerprint of configurations that do not use it."""
+    body = json.dumps(without_neutral_defaults(cfg), sort_keys=True, default=str).encode()
     return hashlib.sha256(body).hexdigest()[:16]

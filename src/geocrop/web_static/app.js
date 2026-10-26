@@ -15,6 +15,7 @@ const VIEWS = {
   commands: ["Commands", "Every engine command as a form, generated from the CLI parser"],
   jobs: ["Jobs", "History, status and output of every run"],
   terminal: ["Terminal", "Engine commands, typed as in your shell"],
+  review: ["Review", "Walk the parcels of a finished job and record analyst decisions"],
   api: ["Python & API", "Use the same engine from Jupyter or over HTTP"],
 };
 const GROUPS = [
@@ -145,8 +146,14 @@ function setView(name) {
   document.title = `${VIEWS[name][0]} · GeoCrop Workspace`;
   const slot = $(name === "jobs" ? "detail-slot-jobs" : "detail-slot-map");
   if ($("job-detail").parentElement !== slot) slot.append($("job-detail"));
-  if (name === "map") GeoMap.invalidate();
   if (name !== "map" && $("map-shell").classList.contains("is-expanded")) toggleExpand(false);
+  // the one Leaflet map is shared: Review shows it inside the parcel card, every other view in its own place
+  const shell = $("map-shell"), home = $("map-home");
+  if (name === "review" && shell.parentElement !== $("review-map-slot")) $("review-map-slot").append(shell);
+  else if (name !== "review" && shell.parentElement === $("review-map-slot")) home.before(shell);
+  shell.classList.toggle("in-review", name === "review");
+  if (name === "map" || name === "review") GeoMap.invalidate();
+  document.dispatchEvent(new CustomEvent("geocrop:view", { detail: { view: name } }));
 }
 function toggleExpand(force) {
   const shell = $("map-shell"), on = force ?? !shell.classList.contains("is-expanded");
@@ -311,7 +318,9 @@ async function refresh() {
     const result = await api(`/api/jobs/${id}/logs?offset=${state.offset}`);
     const artifacts = await api(`/api/jobs/${id}/artifacts`);
     if (generation !== state.generation) return;
+    const statusChanged = !state.job || state.job.id !== job.id || state.job.status !== job.status;
     state.job = job;
+    if (statusChanged) document.dispatchEvent(new CustomEvent("geocrop:job", { detail: { job } }));
     const log = $("logs"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     state.log = (state.log + result.text).slice(-400000); state.offset = result.next_offset;
     log.textContent = state.log || (job.status === "queued" ? "Waiting for a free worker…" : terminal.has(job.status) ? "This job wrote no output." : "Waiting for command output…");
@@ -461,7 +470,8 @@ function paletteActions() {
     { title: "Go to Commands", icon: "command", kbd: "2", run: () => setView("commands") },
     { title: "Go to Jobs", icon: "jobs", kbd: "3", run: () => setView("jobs") },
     { title: "Go to Terminal", desc: "Type engine commands as in your shell", icon: "terminal", kbd: "4", run: () => setView("terminal") },
-    { title: "Go to Python & API", icon: "code", kbd: "5", run: () => setView("api") },
+    { title: "Go to Review", desc: "Walk the parcels of the selected job and record decisions", icon: "review", kbd: "5", run: () => setView("review") },
+    { title: "Go to Python & API", icon: "code", kbd: "6", run: () => setView("api") },
     { title: dark ? "Use light appearance" : "Use dark appearance", icon: dark ? "sun" : "moon", run: toggleTheme },
     { title: "Expand map", icon: "expand", kbd: "F", run: () => toggleExpand(true) },
     { title: "Keyboard shortcuts", icon: "keyboard", kbd: "?", run: () => $("shortcuts").showModal() },
@@ -655,6 +665,12 @@ async function connect(event) {
 
 /* ---------- Terminal bridge (terminal.js): authenticated API helper and job selection ---------- */
 window.GeoCropApp = { api, selectJob: (id) => selectJob(id) };
+/* ---------- Review bridge (review.js): helpers shared with the parcel review view ---------- */
+Object.assign(window.GeoCropApp, {
+  h, icon, toast, message, copy, download, runDemo, setView, showCommand,
+  current: () => (state.job && state.job.id === state.selected ? state.job : null),
+  jobs: () => state.jobs, view: () => state.view, token: () => state.token,
+});
 
 /* ---------- Wiring ---------- */
 function bind() {
@@ -749,11 +765,12 @@ function bind() {
     if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
     const keys = {
       n: openAnalysis, N: openAnalysis, "?": () => $("shortcuts").showModal(),
-      1: () => setView("map"), 2: () => setView("commands"), 3: () => setView("jobs"), 4: () => setView("terminal"), 5: () => setView("api"),
+      1: () => setView("map"), 2: () => setView("commands"), 3: () => setView("jobs"), 4: () => setView("terminal"), 5: () => setView("review"), 6: () => setView("api"),
       f: () => toggleExpand(), "[": () => GeoMap.step(-1), "]": () => GeoMap.step(1),
       j: () => moveSelection(1), k: () => moveSelection(-1),
       Escape: () => { if ($("map-shell").classList.contains("is-expanded")) toggleExpand(false); },
     };
+    if (state.view === "review" && window.GeoCropReview && window.GeoCropReview.key(e)) { e.preventDefault(); return; }
     if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
   });
 

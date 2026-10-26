@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-from . import faultinject, indices
+from . import contracts, faultinject, indices
 from .raster import (
     NODATA,
     RasterInputError,
@@ -58,11 +58,23 @@ def manifest_path(stack: str | Path) -> Path:
     return stack.with_name(stack.stem + ".features.json")
 
 
-def load_manifest(stack: str | Path) -> list[Feature]:
+def write_manifest(stack: str | Path, body: dict) -> Path:
+    """Write `<stack>.features.json` stamped with the feature-manifest `schema_version` (geocrop.contracts)."""
+    path = manifest_path(stack)
+    path.write_text(json.dumps(contracts.stamp("feature_manifest", body), indent=2, default=str), encoding="utf8")
+    return path
+
+
+def read_manifest(stack: str | Path) -> dict:
+    """The manifest body, validated against its `schema_version` (unversioned manifests are accepted)."""
     path = manifest_path(stack)
     if not path.is_file():
         raise FileNotFoundError(f"Feature manifest {path} missing; rebuild the stack with geocrop features")
-    body = json.loads(path.read_text(encoding="utf8"))
+    return contracts.check("feature_manifest", json.loads(path.read_text(encoding="utf8")), path)
+
+
+def load_manifest(stack: str | Path) -> list[Feature]:
+    body = read_manifest(stack)
     return [Feature(**{**f, "periods": tuple(f.get("periods", ()))}) for f in body["features"]]
 
 
@@ -225,14 +237,16 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
             out.unlink(missing_ok=True)
             raise RasterInputError(f"Composite bands without a single valid pixel (all nodata/NaN/inf): {empty[:10]}. "
                                    "Check the window's scenes, cloud masks and min_valid_observations.")
-    manifest_path(out).write_text(json.dumps({
-        "stack": out.name, "periods": periods, "nodata": NODATA,
-        "features": [asdict(f) for f in features]}, indent=2), encoding="utf8")
+    write_manifest(out, {"stack": out.name, "periods": periods, "nodata": NODATA,
+                         "features": [asdict(f) for f in features]})
     return out
 
 
 def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
-    """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place."""
+    """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place.
+
+    A raster with legacy names (``emb_NN``) that collide with features already in the stack (another embedding
+    source) is attached under namespaced names ``emb_<source>_NN`` (`geocrop.embeddings.namespaced_copy`)."""
     import shutil
     import tempfile
 
@@ -240,6 +254,10 @@ def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
 
     stack = Path(stack)
     with tempfile.TemporaryDirectory(dir=stack.parent) as tmp:
+        existing = {f.name for f in load_manifest(stack)}
+        if existing & {f.name for f in load_manifest(embeddings)}:
+            from .embeddings import namespaced_copy
+            embeddings = namespaced_copy(embeddings, Path(tmp) / "namespaced" / Path(embeddings).name)
         merged = merge_stacks([stack, embeddings], Path(tmp) / stack.name)
         shutil.move(merged, stack)
         shutil.move(manifest_path(merged), manifest_path(stack))

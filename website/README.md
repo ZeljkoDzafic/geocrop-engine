@@ -18,28 +18,37 @@ The separate engine workspace is started with `geocrop serve`; see `docs/web-int
 
 ## Contents
 
-* English overview, workflow and evidence/limitation sections.
-* Accessible interface tabs for the web workspace, CLI, QGIS and the Jupyter client.
-* Actual web, terminal and QGIS screenshots, with keyboard-accessible enlarged views.
-* Copyable main-branch setup commands and links to the existing documentation.
-* The self-contained QGIS plugin ZIP, including its license and notices.
-* Responsive desktop/mobile layout and reduced-motion support.
+* English overview: the processing chain, the web workspace, validation (spatial CV, locked holdout,
+  LORO/LOYO, conformal sets, AOA), reason-coded parcel decisions and S1+S2 markers, pretrained adapters,
+  active learning, preflight/acceptance/reliability, plugins and the layered architecture.
+* The design language of the web workspace (`src/geocrop/web_static/style.css`): the same colour tokens,
+  system font stack, hairlines, translucent surfaces, inline SVG icons, light and dark appearance with a
+  toggle (stored under the same `geocrop-theme` key), reduced motion and a phone layout.
+* Actual workspace captures (light and dark map, New analysis sheet, command palette, terminal, phone)
+  and the QGIS capture, with keyboard-accessible enlarged views.
+* Accessible interface tabs (web, QGIS, Jupyter, REST `/api/v1`) and copyable install commands.
+* The self-contained QGIS plugin ZIP, including its licence and notices.
+
+The public EuroCrops Slovenia benchmark is quoted exactly as in `docs/benchmarks/eurocrops-si-2021-pomurje.v1.md`,
+with its caveat: a public transfer task on declared labels, not Republic of Srpska data.
 
 ## Screenshot evidence
 
-`assets/screenshots.json` records the source commit, capture method, files, checksums and data status.
-Screenshots were taken from actual running applications, not generated UI mockups or fabricated logs:
+`assets/screenshots.json` records the source commit, capture method, files, checksums, data status and
+attribution. Screenshots were taken from actual running applications, not generated UI mockups:
 
-* **Web:** Chromium viewing an authenticated local engine server with an existing successful synthetic job.
-  The current localized web UI is shown as it runs; the presentation copy and captions are English.
-* **CLI:** an actual Xfce Terminal window running `geocrop --version` and `geocrop train --help`.
+* **Web and terminal:** headless Chromium (Playwright, 1440×900 at 2×, phone 390×844) driving an
+  authenticated local `geocrop serve` after a real `geocrop quicklook --bbox 19.10 44.72 19.16 44.76
+  --start 2023-06-01 --end 2023-08-31` job and a synthetic `geocrop demo`. The only alteration is that the
+  absolute workspace path label was replaced by `~/studies/semberija`. Images are lossy WebP.
+  Imagery: contains modified Copernicus Sentinel data 2023; basemap Sentinel-2 cloudless 2023 by EOX.
 * **QGIS:** the actual QGIS 3.40.6 desktop with the GeoCrop provider, synthetic class raster and parcel
   evidence GeoPackage. Normal native QGIS styles were configured for the demonstration.
 
-No credentials, personal parcel data or third-party satellite imagery are included. All mapped/results
-data shown are synthetic software checks. No external accuracy, model superiority, exchangeability
-or legal compliance is claimed. QGIS/Jupyter and other named projects retain their own licenses and
-trademarks; integration does not imply their endorsement.
+No credentials or personal parcel data are included. The quicklook shows imagery only, not a classification;
+no external accuracy, model superiority or legal compliance is claimed beyond the documented public benchmark.
+QGIS/Jupyter and other named projects retain their own licences and trademarks; integration does not imply
+their endorsement.
 
 ## Publish
 
@@ -47,7 +56,19 @@ The complete `website/` folder can be uploaded to any static host. Relative asse
 a domain root and a project subpath, including GitHub Pages. Source/docs links and installation
 commands target the public main branch.
 
-### GitHub Pages
+### Cloudflare (current deployment)
+
+The site is published as Cloudflare static assets at <https://geocrop.calm-silence-b9f5.workers.dev>.
+After `npx wrangler login` (or with `CLOUDFLARE_API_TOKEN` set), run:
+
+```bash
+tools/deploy_website.sh
+```
+
+It runs the site check and uploads `website/`; `website/_headers` sets the security headers. Deployment
+is manual and makes the page public.
+
+### GitHub Pages (alternative)
 
 1. Ensure `website/`, `tools/check_presentation_site.py` and `.github/workflows/pages.yml` are on `main`.
 2. Open the repository **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.

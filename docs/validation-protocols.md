@@ -71,8 +71,13 @@ geocrop ablation --samples all.npz --features stack_2024.tif --out out/ablation 
 
 In `geocrop train` the default outputs (spatial `cross_validation`, temperature, conformal thresholds, AOA)
 are computed exactly as before; the transfer strategy only adds `transfer_validation`. In YAML,
-`cv.strategy` is read by `geocrop ablation --config`; the `geocrop run` pipeline does not read the `cv`
-section yet.
+`cv.strategy` is read by `geocrop ablation --config` and by `geocrop run`: the samples stage stores
+`cv.region_field` / `cv.year_field` / `cv.year` as sample group ids, the train stage adds the transfer
+validation and writes `model/transfer_report.json` and `model/transfer_per_group.csv`, and the experiments
+stage adds the transfer columns to `ablation.csv`. A strategy without its group field stops with a
+configuration error. Note that one `geocrop run` extracts samples from one season's stack, so `year` and
+`region_year` need training polygons that carry several years in `cv.year_field`; for multi-season stores use
+`geocrop samples-merge` and `geocrop train --cv-strategy`.
 
 ## What is reported
 

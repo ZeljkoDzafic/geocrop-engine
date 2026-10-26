@@ -1,31 +1,90 @@
 {
   "schema": "geocrop-presentation-captures/1",
-  "recorded_utc": "2026-10-26T00:01:04.686862+00:00",
-  "note": "Actual application captures. Synthetic results demonstrate software behavior only; CLI image shows help/version without study data. No credentials are included.",
+  "recorded_utc": "2026-10-26T02:23:25.130656+00:00",
+  "note": "Actual application captures. Workspace images show a real Sentinel-2 quicklook (Semberija, June-August 2023); the QGIS image shows synthetic demonstration layers. No credentials are included.",
   "screenshots": [
     {
       "interface": "web",
-      "file": "assets/images/web.png",
-      "sha256": "f48832f3cd5a2e92ada62d61557f1425b529da249874a7999fa4e765adf03685",
-      "source_commit": "2aef995d9ef11964043bae353b078efd725f2a0d",
-      "capture_method": "Unmodified headless Chromium (Playwright) screenshot of the authenticated local GeoCrop web workspace, English interface; selected a succeeded synthetic demo job, map card with crop classes and parcels outlined by traffic light.",
+      "file": "assets/images/web.webp",
+      "sha256": "e90b0cb50f8e5324ddc71572a0014c51c9c8c9bc2fa41e64dba27555b3b98f05",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 1440x900 viewport at device scale 2, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). Light appearance; quicklook job shown on the map (August 2023 monthly true-colour composite), basemap Sentinel-2 cloudless 2023, zoomed in one level.",
       "commands_or_inputs": [
-        "geocrop serve --workspace <synthetic-demo-workspace> --port 8765",
-        "geocrop demo --root outputs/web-demo --quick"
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
       ],
-      "synthetic_data": true
+      "synthetic_data": false,
+      "attribution": "Contains modified Copernicus Sentinel data 2023 (quicklook from Sentinel-2 L2A via Earth Search); basemap Sentinel-2 cloudless 2023 by EOX IT Services GmbH."
+    },
+    {
+      "interface": "web",
+      "file": "assets/images/web-dark.webp",
+      "sha256": "05b031bec716f320511a5e382b864739e7d266549acfcf1932f1094f04a9ddaf",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 1440x900 viewport at device scale 2, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). Same view in dark appearance (prefers-color-scheme: dark).",
+      "commands_or_inputs": [
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
+      ],
+      "synthetic_data": false,
+      "attribution": "Contains modified Copernicus Sentinel data 2023 (quicklook from Sentinel-2 L2A via Earth Search); basemap Sentinel-2 cloudless 2023 by EOX IT Services GmbH."
     },
     {
       "interface": "cli",
-      "file": "assets/images/cli.png",
-      "sha256": "86d9723d38dc10095e7b4174b77145b01257d5bcf3e137842af3e72387991573",
-      "source_commit": "78709351d46934543627c4439eaef79f7c1dd60a",
-      "capture_method": "Captured the actual Xfce Terminal window through the X11/Qt screen API. A shell script printed the command labels and ran the real CLI; no command output was edited.",
+      "file": "assets/images/cli.webp",
+      "sha256": "bc0e64b55cd309fa2ade68dd7e8ddf2431dabb47024976158319b8807520347b",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 1440x900 viewport at device scale 2, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). Dark appearance; Terminal view after the built-in 'help quicklook', with a quicklook command typed live so the flag completion popup, ghost text and signature chips are open. The command was not submitted.",
       "commands_or_inputs": [
-        "geocrop --version",
-        "geocrop train --help"
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
       ],
       "synthetic_data": false
+    },
+    {
+      "interface": "web",
+      "file": "assets/images/analysis.webp",
+      "sha256": "afcec1d9df838d36f98b6cc62be17f0a090b772ecfe24f15e5842926e719e851",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 1440x900 viewport at device scale 2, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). New analysis sheet, Semberija example, period 2023-06-01 to 2023-08-31, run step with the command preview; not submitted.",
+      "commands_or_inputs": [
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
+      ],
+      "synthetic_data": false,
+      "attribution": "Contains modified Copernicus Sentinel data 2023 (quicklook from Sentinel-2 L2A via Earth Search); basemap Sentinel-2 cloudless 2023 by EOX IT Services GmbH."
+    },
+    {
+      "interface": "web",
+      "file": "assets/images/palette.webp",
+      "sha256": "afdc2e99a81e27eb1addd926cf08fed2981ffaeeb448a2a1b1f720b06f0f9e63",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 1440x900 viewport at device scale 2, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). Command palette opened with the search 'par'.",
+      "commands_or_inputs": [
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
+      ],
+      "synthetic_data": false,
+      "attribution": "Contains modified Copernicus Sentinel data 2023 (quicklook from Sentinel-2 L2A via Earth Search); basemap Sentinel-2 cloudless 2023 by EOX IT Services GmbH."
+    },
+    {
+      "interface": "web",
+      "file": "assets/images/phone.webp",
+      "sha256": "3258a3e1d8bfc0d25c3307cebb8ae01d95b90be51f8211fa957d875f3713d2cd",
+      "source_commit": "f1be9547be377db0e19f6ab7f5e27398de12c568",
+      "capture_method": "Headless Chromium (Playwright), 390x844 mobile viewport at device scale 3, resized to 780 px wide, reduced motion, of the authenticated local GeoCrop web workspace after real quicklook and demo jobs; UI driven only through its own controls. The only alteration is that the absolute workspace path label was replaced by '~/studies/semberija' for privacy. Encoded as WebP (lossy). Phone layout, light appearance, quicklook on the map.",
+      "commands_or_inputs": [
+        "GEOCROP_WEB_TOKEN=<random> geocrop serve --port 8821 --workspace <scratch workspace>",
+        "geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 --out outputs/ql",
+        "geocrop demo --root outputs/demo --quick"
+      ],
+      "synthetic_data": false,
+      "attribution": "Contains modified Copernicus Sentinel data 2023 (quicklook from Sentinel-2 L2A via Earth Search); basemap Sentinel-2 cloudless 2023 by EOX IT Services GmbH."
     },
     {
       "interface": "qgis",

@@ -1,45 +1,27 @@
 "use strict";
-const tabs = [...document.querySelectorAll("[data-interface]")];
-const platforms = [...document.querySelectorAll("[data-platform]")];
-for (const [index, tab] of platforms.entries()) {
-  const select = () => {
-    for (const item of platforms) {
-      const active = item === tab;
-      item.setAttribute("aria-selected", String(active)); item.tabIndex = active ? 0 : -1;
-      document.getElementById(item.getAttribute("aria-controls")).hidden = !active;
-    }
-  };
-  tab.addEventListener("click", select);
-  tab.addEventListener("keydown", event => {
-    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-      event.preventDefault();
-      const next = event.key === "Home" ? 0 : event.key === "End" ? platforms.length - 1 : (index + 1) % platforms.length;
-      platforms[next].click(); platforms[next].focus();
-    }
-  });
+const $ = id => document.getElementById(id);
+
+/* Appearance: system by default; the toggle stores an explicit choice (same key as the workspace). */
+const root = document.documentElement;
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : darkQuery.matches;
+function syncThemeButton() {
+  const dark = isDark();
+  $("theme-toggle").setAttribute("aria-pressed", String(dark));
+  $("theme-toggle").setAttribute("aria-label", dark ? "Switch to light appearance" : "Switch to dark appearance");
 }
-function selectTab(tab, focus = false) {
-  for (const item of tabs) {
-    const selected = item === tab;
-    item.setAttribute("aria-selected", String(selected));
-    item.tabIndex = selected ? 0 : -1;
-    document.getElementById(item.getAttribute("aria-controls")).hidden = !selected;
-  }
-  if (focus) tab.focus();
-}
-for (const [index, tab] of tabs.entries()) {
-  tab.addEventListener("click", () => selectTab(tab));
-  tab.addEventListener("keydown", event => {
-    let next;
-    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-    if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
-    if (event.key === "Home") next = 0;
-    if (event.key === "End") next = tabs.length - 1;
-    if (next !== undefined) { event.preventDefault(); selectTab(tabs[next], true); }
-  });
-}
-const menu = document.getElementById("menu-toggle");
-const nav = document.getElementById("main-nav");
+$("theme-toggle").addEventListener("click", () => {
+  const next = isDark() ? "light" : "dark";
+  root.dataset.theme = next;
+  try { localStorage.setItem("geocrop-theme", next); } catch { /* not persisted: fine */ }
+  syncThemeButton();
+});
+darkQuery.addEventListener("change", syncThemeButton);
+syncThemeButton();
+
+/* Menu on narrow screens */
+const menu = $("menu-toggle");
+const nav = $("main-nav");
 function closeMenu() { menu.setAttribute("aria-expanded", "false"); nav.classList.remove("open"); }
 menu.addEventListener("click", () => {
   const open = menu.getAttribute("aria-expanded") !== "true";
@@ -48,29 +30,57 @@ menu.addEventListener("click", () => {
 for (const link of nav.querySelectorAll("a")) link.addEventListener("click", closeMenu);
 document.addEventListener("keydown", event => { if (event.key === "Escape") closeMenu(); });
 
-const dialog = document.getElementById("image-dialog");
+/* Tab lists (interfaces, install platform) with arrow-key navigation */
+for (const list of document.querySelectorAll('[role="tablist"]')) {
+  const tabs = [...list.querySelectorAll('[role="tab"]')];
+  const select = (tab, focus) => {
+    for (const item of tabs) {
+      const active = item === tab;
+      item.setAttribute("aria-selected", String(active));
+      item.tabIndex = active ? 0 : -1;
+      $(item.getAttribute("aria-controls")).hidden = !active;
+    }
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => select(tab, false));
+    tab.addEventListener("keydown", event => {
+      const keys = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 };
+      if (!(event.key in keys)) return;
+      event.preventDefault();
+      select(tabs[(keys[event.key] + tabs.length) % tabs.length], true);
+    });
+  });
+}
+
+/* Screenshot viewer */
+const dialog = $("image-dialog");
 let opener;
 for (const button of document.querySelectorAll("[data-image]")) button.addEventListener("click", () => {
   opener = button;
-  const image = document.getElementById("dialog-image");
-  image.src = button.dataset.image; image.alt = button.dataset.caption;
-  document.getElementById("dialog-caption").textContent = button.dataset.caption;
-  dialog.showModal(); document.body.classList.add("modal-open"); document.getElementById("close-dialog").focus();
+  let src = button.dataset.image;
+  if (src.endsWith("web.webp") && isDark()) src = src.replace("web.webp", "web-dark.webp");
+  const image = $("dialog-image");
+  image.src = src;
+  image.alt = [...button.querySelectorAll("img")].find(img => img.offsetWidth > 0)?.alt || button.dataset.caption;
+  $("dialog-caption").textContent = button.dataset.caption;
+  dialog.showModal(); document.body.classList.add("modal-open");
 });
-document.getElementById("close-dialog").addEventListener("click", () => dialog.close());
+$("close-dialog").addEventListener("click", () => dialog.close());
 dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
 dialog.addEventListener("close", () => { document.body.classList.remove("modal-open"); if (opener) opener.focus(); });
 
-document.getElementById("copy-install").addEventListener("click", async () => {
-  const button = document.getElementById("copy-install");
-  const status = document.getElementById("copy-status");
+/* Copy install commands */
+for (const button of document.querySelectorAll("[data-copy]")) button.addEventListener("click", async () => {
+  const code = $(button.dataset.copy);
+  const label = button.querySelector("span");
   try {
-    await navigator.clipboard.writeText(document.getElementById("install-command").textContent.trim());
-    button.textContent = "Copied ✓"; status.textContent = "Commands copied to clipboard.";
-    setTimeout(() => { button.textContent = "Copy commands"; status.textContent = ""; }, 2500);
+    await navigator.clipboard.writeText(code.textContent.trim());
+    label.textContent = "Copied"; $("copy-status").textContent = "Commands copied to the clipboard.";
+    setTimeout(() => { label.textContent = "Copy"; $("copy-status").textContent = ""; }, 2000);
   } catch {
-    status.textContent = "Select the command block to copy it manually.";
-    const range = document.createRange(); range.selectNodeContents(document.getElementById("install-command"));
+    const range = document.createRange(); range.selectNodeContents(code);
     const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    $("copy-status").textContent = "Clipboard unavailable; the commands are selected for copying.";
   }
 });

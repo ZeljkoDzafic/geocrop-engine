@@ -282,6 +282,10 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
     def schema():
         return app.openapi()
 
+    # Analyst parcel review (gap G7): queue, evidence, chips and append-only decisions of finished parcel jobs.
+    from .web_review import register_review_routes
+    register_review_routes(app, jobs, authenticate)
+
     # Keep last: aliases every /api route registered above under the stable /api/v1 prefix.
     add_versioned_aliases(app)
     return app

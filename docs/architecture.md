@@ -38,7 +38,7 @@ enforced by `tests/test_architecture.py` ([ADR 0001](adr/0001-layered-architectu
  │               cbm · segmentation · segmenters · unet · segmentation_metrics ·         │
  │               plugins · contracts · hashing                                           │
  └──────────────────────────────────────────────────────────────────────────────────────┘
-        ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators)
+        ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators / feature_providers)
 ```
 
 Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture.md),
@@ -66,7 +66,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `clouds` | sun-angle shadow projection, external cloud masks (OmniCloudMask), multi-temporal outlier screening |
 | `timeseries`, `tsfeatures` | regular-grid binning, weighted Whittaker smoothing, phenology, harmonics; time-series feature stack, stack merging |
 | `estimators` | RF, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN and plugin classifiers behind one factory |
-| `plugins` | registries for estimators, indices, segmenters, exporters and validators; lazy entry-point discovery |
+| `plugins` | registries for estimators, indices, segmenters, exporters, validators and feature providers; lazy entry-point discovery |
 | `contracts`, `hashing` | `schema_version` stamping/validation/migration of JSON contracts; SHA-256 of files |
 | `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
@@ -92,6 +92,23 @@ grid ─────────────────────────
                                                                                               validate ─► area
 segment-obia │ segment-unet-train ─► segment-unet-infer ─► boundaries-to-parcels ─► evaluate-segments
 ```
+
+### `geocrop run` (resumable pipeline)
+
+```
+composite ─► [embeddings] ─► features ─► samples ─► train ─► predict ──────────────┐
+                                                                                   ▼
+             [cbm: signatures, markers, (S1 signatures, event markers)] ─► [parcel_classify] ─► parcels ─► validate
+                                                          samples + features ─► experiments
+```
+
+`pipeline.DEPENDS` lists the upstream stages whose fingerprints enter a stage's fingerprint;
+`pipeline.OPTIONAL_DEPENDS` marks the edges that exist only while an option is on (`features ← embeddings`
+with `features.embeddings.attach`, `parcels ← parcel_classify` with `parcel_classify.decision: replace`).
+Options inside a stage (`cv.strategy`, `predict.smoothing`, `cbm.event_markers`, `cbm.rules`, `model.params`)
+are added to that stage's fingerprint only when they differ from their default, and keys added to the
+configuration later are omitted from `config.fingerprint` while at their default
+(`config.FINGERPRINT_NEUTRAL`). Enabling an option therefore re-runs exactly the stages that depend on it.
 
 ## Extending
 Extensions never require changes to the core ([ADR 0002](adr/0002-plugin-entry-points.md);

@@ -53,6 +53,13 @@ cbm:
   enabled: false
   index: NDVI
   calendar: configs/crop_calendar.example.yaml
+  # event_markers: false     # geocrop run: also S1 signatures + harvest/tillage/mowing/homogeneity markers
+  # events: {abrupt_drop: 0.2, s1_group_by: orbit_direction}   # docs/markers.md
+  # temporal_support: {enabled: true, min_clear_observations: 6}   # route weak support to review
+  # rules:                   # traffic-light marker rules with reason codes (implies event_markers)
+  #   enabled: true
+  #   harvest_expected_classes: [maize, soybean, sunflower]
+  #   tillage_forbidden_classes: [grassland]
 
 s1:
   separate_orbits: true      # keep ASC and DESC apart until their comparability is assessed
@@ -64,6 +71,9 @@ features:
   s1: [VV_dB, VH_dB, VHVV_dB]
   deltas: [NDVI, NDRE, NDMI, VH_dB]
   seasonal: [NDVI]
+  # embeddings:              # optional `emb` group; geocrop run then has an embeddings stage (docs/embeddings.md)
+  #   source: alphaearth     # alphaearth | tessera | presto
+  #   year: 2023
 
 classes:
   label_field: class_name
@@ -71,7 +81,7 @@ classes:
   targets: [soybean, sunflower]
 
 model:
-  algorithm: rf              # rf | extra_trees | hist_gb | lightgbm | catboost | tempcnn
+  algorithm: rf              # rf | extra_trees | hist_gb | lightgbm | catboost | tempcnn | ltae | <plugin>
   calibrate: true            # temperature scaling of probabilities
   calibration_mode: oof      # oof diagnostics | holdout: keep calibration spatial groups out of fitting
   calibration_fraction: 0.2  # fraction of groups reserved only in holdout mode
@@ -84,6 +94,23 @@ model:
   spatial_block_m: 5000
   spatial_buffer_m: 0        # optional: purge whole training polygons within this distance of test samples
   tune_grid: null            # e.g. {max_features: [sqrt, 0.2, 0.4], min_samples_leaf: [1, 3]}
+  # params: {min_samples_split: 4}   # estimator-specific settings (e.g. of a plugin), checked against the estimator
+
+# Optional transfer validation (docs/validation-protocols.md); default spatial_blocks
+# cv:
+#   strategy: region         # spatial_blocks | region | year | region_year
+#   region_field: region     # training-polygon attribute copied into the samples
+
+# Optional edge-aware probability smoothing before argmax and parcel aggregation
+# predict:
+#   smoothing: {enabled: true, window: 7, smoothness: 10}
+
+# Optional parcel-level classifier on the cbm signatures (needs cbm.enabled; docs/parcel-classification.md)
+# parcel_classify:
+#   enabled: true
+#   label_field: verified_crop   # independently verified classes, never the declarations
+#   decision: additional         # additional | replace (parcels/ then holds its decisions)
+#   params: {algorithm: rf, n_estimators: 300}
 
 experiments:
   E0_S2_bands: {groups: [s2_band]}

@@ -1,6 +1,11 @@
 """Config-driven, resumable pipeline.
 
-    composite -> features (+ time series) -> samples -> train -> predict -> cbm -> parcels -> validate -> experiments
+    composite -> [embeddings] -> features (+ time series) -> samples -> train -> predict -> cbm
+              -> [parcel_classify] -> parcels -> validate -> experiments
+
+Stages in brackets, and the optional parts of the others (transfer validation, probability smoothing, event
+markers and marker rules, `model.params`), run only when their configuration enables them. While they are
+off they contribute nothing to any fingerprint, so existing configurations keep their stage fingerprints.
 
 Each stage records in `<output>/stages.json` its status and a fingerprint made of its configuration,
 the SHA-256 content digests of its inputs (cached per path/size/mtime, see `geocrop.cache`), the engine
@@ -23,12 +28,28 @@ from . import __version__, scenes
 from . import config as cfgmod
 from .cache import HashCache, RunLock
 
-STAGES = ("composite", "features", "samples", "train", "predict", "cbm", "parcels", "validate", "experiments")
+STAGES = ("composite", "embeddings", "features", "samples", "train", "predict", "cbm", "parcel_classify", "parcels",
+          "validate", "experiments")
 CACHE_SCHEMA = 3
 _HASHED_SUFFIXES = {".json", ".yaml", ".yml", ".csv", ".txt", ".py"}
-DEPENDS = {"composite": (), "features": ("composite",), "samples": ("features",), "train": ("samples",),
-           "predict": ("train", "features"), "cbm": (), "parcels": ("predict", "train", "cbm"),
-           "validate": ("predict",), "experiments": ("samples", "features")}
+DEPENDS = {"composite": (), "embeddings": (), "features": ("composite", "embeddings"), "samples": ("features",),
+           "train": ("samples",), "predict": ("train", "features"), "cbm": (), "parcel_classify": ("cbm",),
+           "parcels": ("predict", "train", "cbm", "parcel_classify"), "validate": ("predict",),
+           "experiments": ("samples", "features")}
+
+
+def _embeddings_attached(cfg: dict) -> bool:
+    opts = cfgmod.embedding_options(cfg)
+    return bool(opts and opts["attach"])
+
+
+#: Dependencies that exist only while a configuration option is on. When off they are left out of the
+#: upstream part of the fingerprint (as before they existed) and never block a stage.
+OPTIONAL_DEPENDS = {
+    ("features", "embeddings"): _embeddings_attached,
+    ("parcels", "parcel_classify"): lambda cfg: (cfg["parcel_classify"]["enabled"]
+                                                and cfg["parcel_classify"]["decision"] == "replace"),
+}
 _HASHER: HashCache | None = None   # content digests (SHA-256, cached by path/size/mtime) when a run is active
 
 
@@ -72,6 +93,19 @@ def _part_identity(part):
 def _fp(*parts) -> str:
     body = json.dumps([_part_identity(p) for p in parts], sort_keys=True, default=str).encode()
     return hashlib.sha256(body).hexdigest()[:16]
+
+
+def _fp_with(parts: tuple, extra: dict):
+    """Fingerprint of `parts`, plus `extra` only when it is non-empty: options that are off add nothing."""
+    return _fp(*parts, extra) if extra else _fp(*parts)
+
+
+def _grid_identity(path) -> dict:
+    """CRS, transform and shape of a grid raster: the grid, independent of the raster's pixel values."""
+    import rasterio
+    with rasterio.open(path) as ds:
+        return {"crs": ds.crs.to_wkt() if ds.crs else None, "transform": list(ds.transform)[:6],
+                "shape": [ds.height, ds.width]}
 
 
 def _output_identity(outputs) -> dict | None:
@@ -140,16 +174,21 @@ class Runner:
             self.state[stage]["error"] = {"type": type(error).__name__, "message": str(error)}
         self._save_state()
 
+    def depends(self, name) -> tuple[str, ...]:
+        """Upstream stages of `name` under this configuration (optional dependencies only while enabled)."""
+        return tuple(d for d in DEPENDS.get(name, ())
+                     if OPTIONAL_DEPENDS.get((name, d), lambda cfg: True)(self.cfg))
+
     def stage(self, name, fp, outputs, fn):
         # Never consume the possibly partial outputs of an upstream stage whose last run failed or was killed.
-        incomplete = {d: self.state[d].get("status") for d in DEPENDS.get(name, ())
+        incomplete = {d: self.state[d].get("status") for d in self.depends(name)
                       if self.state.get(d, {}).get("status") not in (None, "success")
                       and not (d == "cbm" and not self.cfg["cbm"]["enabled"])}
         if incomplete:
             raise RuntimeError(f"Stage {name} depends on {incomplete} whose last run did not complete, so their "
                                f"outputs may be partial; rerun them first (geocrop run --stages "
                                f"{' '.join(sorted(incomplete))} {name})")
-        upstream ={d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(name, ())}
+        upstream = {d: self.state.get(d, {}).get("fingerprint") for d in self.depends(name)}
         fp = _fp(CACHE_SCHEMA, self.code_fp, upstream, fp)
         if self._done(name, fp, outputs):
             self._note(f"[skip] {name} (unchanged)")
@@ -249,6 +288,62 @@ class Runner:
             return info
         return self.stage("composite", fp, outputs, run)
 
+    def _grid_reference(self, stage: str) -> Path:
+        ref = self.cfg["grid"].get("reference")
+        if ref:
+            return Path(ref)
+        found = sorted(self.paths["composites"].glob("*/B02.tif"))
+        if not found:
+            raise cfgmod.ConfigError(f"{stage} needs the study grid: set grid.reference or run the composite stage")
+        return found[0]
+
+    def embeddings(self):
+        """Optional foundation-model embeddings on the study grid (`features.embeddings`, docs/embeddings.md).
+
+        Network access (AlphaEarth/TESSERA reads, the pinned Presto checkpoint download) happens only here
+        and only when the section is configured."""
+        from . import embeddings as emb
+        from . import features
+        eo = cfgmod.embedding_options(self.cfg)
+        if not eo:
+            return None
+        raster = emb.output_path(eo["dir"], eo["source"], eo["year"])
+        outputs = [raster, features.manifest_path(raster)]
+        presto = eo["source"] == "presto"
+        parcels = self.paths["parcels"] if presto and eo["parcels"] else None
+        if parcels is not None:
+            outputs.append(raster.with_name(raster.stem + "_parcels.csv"))
+        reference = self._grid_reference("embeddings")
+        monthly = Path(eo["monthly"]) if eo["monthly"] else Path(eo["dir"]) / "monthly"
+        inputs = {}
+        if presto:
+            c = self.cfg["compositing"]
+            inputs = ({"monthly": monthly} if eo["monthly"] else
+                      {"s2_scenes": self.paths["s2_scenes"], "s1_scenes": self.paths["s1_scenes"],
+                       "compositing": {k: c[k] for k in ("statistic", "scl_invalid", "cloud_probability_max",
+                                                         "mask_dilation_px")}})
+            if parcels is not None:
+                inputs.update(parcels=parcels, id_field=self.cfg["parcels"]["id_field"])
+        # dir is where outputs go (part of their identity), not an input; monthly is hashed in `inputs`
+        fp = _fp({k: v for k, v in eo.items() if k not in ("attach", "monthly", "dir")}, _grid_identity(reference),
+                 inputs)
+
+        def run():
+            from .embedding_sources import extract  # adapter: imported only when embeddings are configured
+            start = eo["start"] or f"{eo['year']}-01"
+            if presto and not eo["monthly"]:
+                c = self.cfg["compositing"]
+                emb.monthly_composites(reference, monthly, start, eo["months"], self.paths["s2_scenes"],
+                                       self.paths["s1_scenes"], statistic=c["statistic"],
+                                       scl_invalid=c["scl_invalid"], cloud_probability_max=c["cloud_probability_max"],
+                                       mask_dilation_px=c["mask_dilation_px"])
+            r = extract(eo["source"], reference, eo["dir"], eo["year"], monthly=monthly if presto else None,
+                        start=eo["start"], months=eo["months"], parcels=parcels,
+                        id_field=self.cfg["parcels"]["id_field"], checkpoint=eo["checkpoint"], mirror=eo["mirror"],
+                        index=eo["index"], resampling=eo["resampling"])
+            return {k: r[k] for k in ("source", "year", "raster", "parcels") if k in r}
+        return self.stage("embeddings", fp, outputs, run)
+
     def features(self):
         from . import features
         f = self.cfg["features"]
@@ -269,9 +364,34 @@ class Runner:
                 outputs.extend([win, features.manifest_path(win)])
             ts_inputs = [self.paths["s2_scenes"], self.paths["s1_scenes"], self.cfg["grid"].get("reference"),
                          self.cfg["compositing"]["scl_invalid"], self.cfg["compositing"]["cloud_probability_max"]]
-        fp = _fp(f, t, periods, inputs, ts_inputs)
+        attach = None
+        if _embeddings_attached(self.cfg):
+            from .embeddings import output_path
+            eo = cfgmod.embedding_options(self.cfg)
+            attach = output_path(eo["dir"], eo["source"], eo["year"])
+            if not attach.is_file():
+                raise FileNotFoundError(f"{attach} missing; run the embeddings stage first "
+                                        "(geocrop run --stages embeddings features)")
+        # the embeddings options enter through the attached raster's identity (None = as before they existed)
+        support = t["enabled"] and t["temporal_support"]
+        tolerance = self.cfg["cbm"]["temporal_support"]["tolerance_days"]
+        if support:
+            from .tsfeatures import support_path
+            sp = support_path(target.with_name(target.stem + "_ts.tif"))
+            outputs.extend([sp, sp.with_suffix(".json")])
+        extra = {"embeddings": [attach, features.manifest_path(attach)]} if attach else {}
+        if support:
+            extra["support_tolerance_days"] = tolerance
+        fp = _fp_with(({**f, "embeddings": None}, self._section("timeseries"), periods, inputs, ts_inputs), extra)
 
         def run():
+            info = build()
+            if attach is not None:
+                features.attach_embeddings(target, attach)
+                info["embeddings"] = str(attach)
+            return info
+
+        def build():
             parts = []
             if periods and comp.exists():
                 win = target.with_name(target.stem + "_windows.tif") if t["enabled"] else target
@@ -291,7 +411,8 @@ class Runner:
                     t["s1_indices"], t["step_days"], t["output_step_days"], t["lambda"], t["envelope_iterations"],
                     t["harmonic_order"], self.cfg["compositing"]["scl_invalid"],
                     self.cfg["compositing"]["cloud_probability_max"],
-                    min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"])
+                    min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"],
+                    **({"temporal_support": True, "support_tolerance_days": tolerance} if support else {}))
                 parts.append(tsp)
                 if len(parts) > 1:
                     merge_stacks(parts, target)
@@ -309,12 +430,16 @@ class Runner:
         target = self.out / "samples.npz"
         m, cl = self.cfg["model"], self.cfg["classes"]
         from .features import manifest_path
-        fp = _fp(m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"],
-                 manifest_path(self.paths["features"]), self.paths["training"])
+        cv = self.cfg["cv"]
+        groups = {k: cv[k] for k in ("region_field", "year_field", "year") if cv[k] is not None}
+        fp = _fp_with((m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"],
+                       manifest_path(self.paths["features"]), self.paths["training"]),
+                      {"cv_groups": groups} if groups else {})
 
         def run():
             s = extract(self.paths["features"], self.paths["training"], label_field=cl["label_field"],
-                        id_field=cl["id_field"], max_per_polygon=m["max_samples_per_polygon"], seed=self.cfg["seed"])
+                        id_field=cl["id_field"], max_per_polygon=m["max_samples_per_polygon"], seed=self.cfg["seed"],
+                        **groups)
             s.save(target)
             return {"samples": int(len(s.y)), "polygons": int(len(set(s.polygon)))}
         return self.stage("samples", fp, [target], run)
@@ -331,19 +456,53 @@ class Runner:
             outputs.append(target.with_name("holdout_predictions.csv"))
         if m.get("calibration_mode") == "holdout":
             outputs.extend(target.with_name(name) for name in ("calibration_polygons.csv", "calibration_split.json"))
-        fp = _fp(m, self.cfg["seed"], self.out / "samples.npz")
+        strategy = self._cv_strategy()
+        if strategy != "spatial_blocks":
+            outputs.extend(target.with_name(name) for name in ("transfer_per_group.csv", "transfer_report.json"))
+        fp = _fp_with((self._model_section(), self.cfg["seed"], self.out / "samples.npz"),
+                      {"cv_strategy": strategy} if strategy != "spatial_blocks" else {})
 
         def run():
-            params = {k: m[k] for k in model.RF_KEYS if k in m}
+            params = model.config_params(m, keep_none=True)
+            extra = {"cv_strategy": strategy} if strategy != "spatial_blocks" else {}
             r = model.train(Samples.load(self.out / "samples.npz"), self.out / "model", params=params,
                             n_splits=m["cv_folds"], spatial_block_m=m["spatial_block_m"], seed=self.cfg["seed"],
                             tune_grid=m.get("tune_grid"), provenance={"config_fingerprint": cfgmod.fingerprint(self.cfg)},
                             calibrate=m["calibrate"], spatial_buffer_m=m["spatial_buffer_m"],
                             calibration_mode=m.get("calibration_mode", "oof"),
                             calibration_fraction=m.get("calibration_fraction", 0.2),
-                            holdout_fraction=m["holdout_fraction"], inner_splits=m["inner_splits"])
-            return {"cv_macro_f1": r["cross_validation"]["macro_f1"], "cv_oa": r["cross_validation"]["overall_accuracy"]}
+                            holdout_fraction=m["holdout_fraction"], inner_splits=m["inner_splits"], **extra)
+            info = {"cv_macro_f1": r["cross_validation"]["macro_f1"],
+                    "cv_oa": r["cross_validation"]["overall_accuracy"]}
+            if "transfer_validation" in r:
+                tv = r["transfer_validation"]
+                report = {"schema": "geocrop-transfer/1", "cv_strategy": strategy,
+                          **{k: tv[k] for k in tv if k != "nested"},
+                          "note": "Leave-one-group-out transfer validation of the training samples; "
+                                  "cross_validation, calibration and conformal thresholds keep spatial blocks."}
+                target.with_name("transfer_report.json").write_text(
+                    json.dumps(report, indent=2, default=str), encoding="utf8")
+                info["transfer_gap_macro_f1"] = tv["transfer_gap"].get("macro_f1")
+            return info
         return self.stage("train", fp, outputs, run)
+
+    def _section(self, name: str) -> dict:
+        """A config section for fingerprints, without keys added later that still hold their default
+        (`config.FINGERPRINT_NEUTRAL`)."""
+        return cfgmod.without_neutral_defaults(self.cfg)[name]
+
+    def _model_section(self) -> dict:
+        return self._section("model")
+
+    def _cv_strategy(self) -> str:
+        cv = self.cfg["cv"]
+        strategy = cv["strategy"]
+        if strategy in ("region", "region_year") and not cv["region_field"]:
+            raise cfgmod.ConfigError(f"cv.strategy {strategy} needs cv.region_field (a polygon attribute)")
+        if strategy in ("year", "region_year") and not (cv["year_field"] or cv["year"] is not None):
+            raise cfgmod.ConfigError(f"cv.strategy {strategy} needs cv.year_field or cv.year; leave-one-year-out "
+                                     "needs samples from at least two years")
+        return strategy
 
     def predict(self):
         from . import model
@@ -353,9 +512,18 @@ class Runner:
         aoa = self.out / "model" / "aoa.json"
         if aoa.exists():
             outputs.append(pred / "aoa.tif")
-        fp = _fp(self.paths["features"], self.out / "model" / "model.joblib", aoa)
-        return self.stage("predict", fp, outputs, lambda: model.predict(
-            self.paths["features"], self.out / "model" / "model.joblib", self.out / "prediction"))
+        smoothing = model.smoothing_settings(self.cfg["predict"]["smoothing"])
+        if smoothing is not None:
+            outputs.append(pred / "probabilities_unsmoothed.tif")
+        fp = _fp_with((self.paths["features"], self.out / "model" / "model.joblib", aoa),
+                      {"smoothing": smoothing} if smoothing is not None else {})
+
+        def run():
+            if smoothing is None:   # a previous smoothed run's raw probabilities no longer describe this map
+                (pred / "probabilities_unsmoothed.tif").unlink(missing_ok=True)
+            return model.predict(self.paths["features"], self.out / "model" / "model.joblib", pred,
+                                 smoothing=smoothing)
+        return self.stage("predict", fp, outputs, run)
 
     def cbm(self):
         from datetime import date
@@ -372,19 +540,167 @@ class Runner:
         start, end = date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"]))
         target = self.out / "cbm" / "markers.csv"
         ref = self.cfg["grid"].get("reference") or next(self.paths["composites"].glob("*/B02.tif"))
-        fp = _fp(c, t, self.paths["parcels"], self.paths["s2_scenes"], ref,
-                 self.cfg["parcels"]["id_field"], self.cfg["parcels"]["interior_buffer_px"])
+        events = self._event_markers_on()
+        outputs = [target, self.out / "cbm" / "signatures.csv"]
+        s1_period = []
+        if events:
+            outputs.append(self.out / "cbm" / "event_markers.csv")
+            if self.paths["s1_scenes"].exists():
+                s1_period = [m for m in scenes.discover(self.paths["s1_scenes"])
+                             if m.get("sensor") == "S1" and start <= m["date"] <= end]
+            if s1_period:
+                outputs.append(self.out / "cbm" / "s1_signatures.csv")
+        tq = self._temporal_rules()
+        if tq:
+            outputs.append(self.out / "cbm" / "temporal_support.csv")
+        fp = _fp_with((self._cbm_section(), self._section("timeseries"), self.paths["parcels"],
+                       self.paths["s2_scenes"], ref,
+                       self.cfg["parcels"]["id_field"], self.cfg["parcels"]["interior_buffer_px"]),
+                      {"event_markers": True, "s1_scenes": self.paths["s1_scenes"] if s1_period else None}
+                      if events else {})
 
         def run():
             idx = [c["index"], "BSI"] if c["index"] != "BSI" else ["BSI"]
+            if events and c["events"]["index"] not in idx:
+                idx.append(c["events"]["index"])
+            if tq and tq["index"] not in idx:
+                idx.append(tq["index"])
             sig = cbm.parcel_signatures(self.paths["s2_scenes"], self.paths["parcels"], ref,
                                         self.out / "cbm" / "signatures.csv", start, end, idx,
                                         id_field=self.cfg["parcels"]["id_field"],
-                                        interior_buffer_px=self.cfg["parcels"]["interior_buffer_px"])
+                                        interior_buffer_px=self.cfg["parcels"]["interior_buffer_px"],
+                                        **({"moments": True} if events else {}))
             m = cbm.markers(sig, start, end, index=c["index"], min_coverage=c["min_coverage"])
             m.to_csv(target, index=False)
-            return {"parcels": int(len(m))}
-        return self.stage("cbm", fp, [target, self.out / "cbm" / "signatures.csv"], run)
+            info = {"parcels": int(len(m))}
+            if tq:
+                from .temporal_quality import parcel_support
+                sup = parcel_support(sig, start, end, tq, markers=m)
+                sup.to_csv(self.out / "cbm" / "temporal_support.csv", index=False)
+                info["temporal_support_parcels"] = int(len(sup))
+            if events:
+                from .cbm_markers import event_markers
+                s1sig = None
+                if s1_period:
+                    s1sig = cbm.s1_signatures(self.paths["s1_scenes"], self.paths["parcels"], ref,
+                                              self.out / "cbm" / "s1_signatures.csv", start, end,
+                                              id_field=self.cfg["parcels"]["id_field"],
+                                              interior_buffer_px=self.cfg["parcels"]["interior_buffer_px"])
+                ev = event_markers(sig, start, end, s1sig, c["events"])
+                ev.to_csv(self.out / "cbm" / "event_markers.csv", index=False)
+                info.update({"event_markers": int(len(ev)), "s1_acquisitions": len(s1_period),
+                             "harvest_detected": int(ev.harvest_detected.sum())})
+            return info
+        return self.stage("cbm", fp, outputs, run)
+
+    def _event_markers_on(self) -> bool:
+        c = self.cfg["cbm"]
+        return bool(c["enabled"] and (c["event_markers"] or c["rules"]["enabled"]))
+
+    def _cbm_section(self) -> dict:
+        return self._section("cbm")
+
+    def _temporal_rules(self) -> dict | None:
+        """Enabled `cbm.temporal_support` (docs/temporal-quality.md), else None."""
+        rules = self.cfg["cbm"]["temporal_support"]
+        return rules if self.cfg["cbm"]["enabled"] and rules["enabled"] else None
+
+    def _temporal_support_table(self):
+        import pandas as pd
+        path = self.out / "cbm" / "temporal_support.csv"
+        return pd.read_csv(path, dtype={"parcel_id": str}) if self._temporal_rules() and path.exists() else None
+
+    def _marker_table(self):
+        """cbm phenology markers, joined with the event markers when they are computed (None without cbm)."""
+        import pandas as pd
+        markers_csv = self.out / "cbm" / "markers.csv"
+        if not (self.cfg["cbm"]["enabled"] and markers_csv.exists()):
+            return None
+        table = pd.read_csv(markers_csv)
+        events_csv = self.out / "cbm" / "event_markers.csv"
+        if self._event_markers_on() and events_csv.exists():
+            ev = pd.read_csv(events_csv, dtype={"parcel_id": str})
+            table = table.assign(parcel_id=table.parcel_id.astype(str)).merge(ev, on="parcel_id", how="outer")
+        return table
+
+    def _marker_rules(self) -> dict | None:
+        rules = self.cfg["cbm"]["rules"]
+        return rules if self.cfg["cbm"]["enabled"] and rules["enabled"] else None
+
+    def _calendar(self):
+        if not self.cfg["cbm"]["calendar"]:
+            return None
+        import yaml
+        return yaml.safe_load(Path(self.cfg["cbm"]["calendar"]).read_text(encoding="utf8"))
+
+    def _crop_mapping(self):
+        if not self.cfg["parcels"].get("crop_mapping"):
+            return None
+        from .adapters import read_mapping
+        return read_mapping(self.cfg["parcels"]["crop_mapping"])
+
+    def parcel_classify(self):
+        """Optional parcel-level classifier on the cbm signatures (`parcel_classify`, docs/parcel-classification.md)."""
+        from datetime import date
+
+        from . import parcel_classify as pc
+        q, p, m, t = self.cfg["parcel_classify"], self.cfg["parcels"], self.cfg["model"], self.cfg["timeseries"]
+        if not q["enabled"]:
+            return None
+        if not self.paths["parcels"].exists():
+            self.log("[skip] parcel_classify (no parcel layer)")
+            return None
+        root = self.out / "parcel_classify"
+        model_dir = root / "model"
+        target = root / "parcels.gpkg"
+        outputs = [model_dir / name for name in ("model.joblib", "train_report.json", "conformal.json", "aoa.json",
+                                                 "oof_polygons.csv", "parcel_features.csv")]
+        outputs += [target, target.with_suffix(".csv"), target.with_suffix(".summary.json")]
+        params = self._parcel_params()
+        signatures, rules = self.out / "cbm" / "signatures.csv", self._marker_rules()
+        events_csv = self.out / "cbm" / "event_markers.csv"
+        mapping, calendar = self._crop_mapping(), self._calendar()
+        cv = {k: m[k] for k in ("cv_folds", "spatial_block_m", "spatial_buffer_m", "holdout_fraction",
+                                "calibration_mode", "calibration_fraction")}
+        fp = _fp(q, params, cv, self.cfg["seed"], t["start"], t["end"], self.cfg["cbm"]["index"], p,
+                 self.paths["parcels"], signatures, self.out / "cbm" / "markers.csv", mapping, calendar,
+                 {"rules": rules, "events": events_csv} if rules else None,
+                 *([{"temporal_rules": self._temporal_rules(), "support": self.out / "cbm" / "temporal_support.csv"}]
+                   if self._temporal_rules() else []))
+
+        def run():
+            import geopandas as gpd
+            import pandas as pd
+            gdf = gpd.read_file(self.paths["parcels"])
+            start, end = date.fromisoformat(str(t["start"])), date.fromisoformat(str(t["end"]))
+            frame = pc.parcel_features(pd.read_csv(signatures), gdf, start, end, p["id_field"],
+                                       q["indices"] or [self.cfg["cbm"]["index"]], q["stats"], q["groups"],
+                                       q["step_days"], q["output_step_days"], q["window_days"], q["lambda"])
+            rep = pc.train(frame, gdf, q["label_field"], model_dir, params, q["groups"], p["id_field"],
+                           m["cv_folds"], m["spatial_block_m"], self.cfg["seed"], m["holdout_fraction"],
+                           m["calibration_mode"], m["calibration_fraction"], m["spatial_buffer_m"], q["bootstrap"])
+            summary = pc.predict(model_dir, frame, gdf, target, p["id_field"], p["declared_field"],
+                                 p["conformal_alpha"], p["min_valid_pixels"], p["min_confidence"], p["min_margin"],
+                                 p["min_aoa_fraction"], mapping, self._marker_table(), calendar)
+            if rules or self._temporal_rules():
+                summary = _apply_marker_rules(target, self._marker_table(), rules, p["id_field"],
+                                              self._temporal_support_table(), self._temporal_rules())
+            return {"cv_macro_f1": rep["cross_validation"]["macro_f1"], "parcels_trained": rep["samples"],
+                    "decision_counts": summary["decision_counts"]}
+        return self.stage("parcel_classify", fp, outputs, run)
+
+    def _parcel_params(self) -> dict:
+        from . import model
+        from .parcel_classify import DEFAULT_PARAMS
+        extra = dict(self.cfg["parcel_classify"]["params"] or {})
+        algorithm = extra.get("algorithm", "rf")
+        params = {**DEFAULT_PARAMS, "algorithm": algorithm} if algorithm in ("rf", "extra_trees") else \
+            {"algorithm": algorithm}
+        params.update(extra)
+        tunable = {k: v for k, v in extra.items() if k != "algorithm"}
+        if tunable:
+            model.check_params(params, tunable, where="parcel_classify.params")
+        return params
 
     def parcels(self):
         from . import parcels
@@ -394,20 +710,30 @@ class Runner:
             return None
         target = self.out / "parcels" / "parcels.gpkg"
         fp = _fp(p, self.paths["parcels"], self.out / "prediction" / "probabilities.tif")
-        mapping = None
-        if p.get("crop_mapping"):
-            from .adapters import read_mapping
-            mapping = read_mapping(p["crop_mapping"])
+        mapping = self._crop_mapping()
         conformal = self.out / "model" / "conformal.json"
         aoa = self.out / "prediction" / "aoa.tif"
         markers_csv = self.out / "cbm" / "markers.csv"
-        calendar = None
-        if self.cfg["cbm"]["calendar"]:
-            import yaml
-            calendar = yaml.safe_load(Path(self.cfg["cbm"]["calendar"]).read_text(encoding="utf8"))
+        calendar = self._calendar()
+        rules = self._marker_rules()
+        replace = self.cfg["parcel_classify"]["enabled"] and self.cfg["parcel_classify"]["decision"] == "replace"
+        extra = {}
+        if rules:
+            extra.update(rules=rules, events=self.out / "cbm" / "event_markers.csv")
+        temporal = self._temporal_rules()
+        if temporal:
+            extra.update(temporal_rules=temporal, temporal_support=self.out / "cbm" / "temporal_support.csv")
+        if replace:
+            extra["decision"] = "parcel_classifier"
 
         def run():
-            import pandas as pd
+            if replace:   # the parcel classifier's decisions are the parcel product (same schema)
+                import shutil
+                source = self.out / "parcel_classify" / "parcels.gpkg"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                for suffix in (".gpkg", ".csv", ".summary.json"):
+                    shutil.copyfile(source.with_suffix(suffix), target.with_suffix(suffix))
+                return json.loads(target.with_suffix(".summary.json").read_text(encoding="utf8"))
             return parcels.aggregate(
                 self.out / "prediction" / "probabilities.tif", self.paths["parcels"], target,
                 id_field=p["id_field"], declared_field=p["declared_field"], strategy=p["strategy"],
@@ -416,10 +742,11 @@ class Runner:
                 min_margin=p["min_margin"], crop_mapping=mapping,
                 conformal=conformal if conformal.exists() else None, alpha=p["conformal_alpha"],
                 aoa=aoa if aoa.exists() else None, min_aoa_fraction=p["min_aoa_fraction"],
-                markers=pd.read_csv(markers_csv) if self.cfg["cbm"]["enabled"] and markers_csv.exists() else None,
-                calendar=calendar)
-        fp = _fp(fp, mapping, conformal, aoa, markers_csv, calendar, self.cfg["cbm"]["enabled"],
-                 self.out / "prediction" / "prediction_manifest.json")
+                markers=self._marker_table(), calendar=calendar, **({"marker_rules": rules} if rules else {}),
+                **({"temporal_support": self._temporal_support_table(), "temporal_rules": temporal}
+                   if temporal else {}))
+        fp = _fp_with((fp, mapping, conformal, aoa, markers_csv, calendar, self.cfg["cbm"]["enabled"],
+                       self.out / "prediction" / "prediction_manifest.json"), extra)
         return self.stage("parcels", fp, [target, target.with_suffix(".csv"), target.with_suffix(".summary.json")], run)
 
     def validate(self):
@@ -451,20 +778,61 @@ class Runner:
         m = self.cfg["model"]
         exps = self.cfg["experiments"] or experiments.DEFAULT_EXPERIMENTS
         target = self.out / "experiments" / "ablation.csv"
-        fp = _fp(exps, m, self.cfg["seed"], self.cfg["classes"]["targets"], self.out / "samples.npz",
-                 features.manifest_path(self.paths["features"]))
+        strategy = self.cfg["cv"]["strategy"]
+        fp = _fp_with((exps, self._model_section(), self.cfg["seed"], self.cfg["classes"]["targets"],
+                       self.out / "samples.npz", features.manifest_path(self.paths["features"])),
+                      {"cv_strategy": strategy} if strategy != "spatial_blocks" else {})
 
         def run():
-            from .model import RF_KEYS
-            params = {k: m[k] for k in RF_KEYS if k in m and m[k] is not None}
+            from .model import config_params
+            params = config_params(m)
+            extra = {"cv_strategy": self._cv_strategy()} if strategy != "spatial_blocks" else {}
             t = experiments.run(Samples.load(self.out / "samples.npz"), features.load_manifest(self.paths["features"]),
                                 self.out / "experiments", exps, params, m["cv_folds"], m["spatial_block_m"],
                                 self.cfg["seed"], self.cfg["classes"]["targets"],
                                 spatial_buffer_m=m["spatial_buffer_m"], calibration_mode=m["calibration_mode"],
                                 calibration_fraction=m["calibration_fraction"],
-                                holdout_fraction=m["holdout_fraction"])
+                                holdout_fraction=m["holdout_fraction"], **extra)
             return {"rows": int(len(t))}
         return self.stage("experiments", fp, [target, target.with_suffix(".json")], run)
+
+
+def _apply_marker_rules(target: Path, markers, rules: dict | None, id_field: str, support=None,
+                        temporal_rules: dict | None = None) -> dict:
+    """Re-evaluate the traffic light of a parcel product with the event markers and `cbm.rules`, and/or the
+    temporal support and `cbm.temporal_support`."""
+    from collections import Counter
+
+    import geopandas as gpd
+
+    from .cbm import traffic_light_details
+    from .cbm_markers import EVENT_COLUMNS
+    gdf = gpd.read_file(target)
+    if markers is not None:
+        mk = markers.assign(parcel_id=markers.parcel_id.astype(str)).set_index("parcel_id")
+        mk = mk.reindex(gdf[id_field].astype(str))
+        for col in EVENT_COLUMNS:
+            if col in mk:
+                gdf[col] = mk[col].to_numpy()
+    if support is not None:
+        from .temporal_quality import attach
+        gdf = attach(gdf, support, id_field)
+    details = traffic_light_details(gdf, rules, temporal_rules)
+    gdf["traffic_light"] = details["traffic_light"].to_numpy()
+    gdf["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
+    target.unlink(missing_ok=True)
+    gdf.to_file(target, driver="GPKG")
+    gdf.drop(columns=gdf.geometry.name).to_csv(target.with_suffix(".csv"), index=False)
+    summary_path = target.with_suffix(".summary.json")
+    summary = json.loads(summary_path.read_text(encoding="utf8"))
+    summary["traffic_light_counts"] = gdf["traffic_light"].value_counts().to_dict()
+    summary["traffic_light_reason_counts"] = dict(sorted(Counter(
+        code for codes in gdf["traffic_light_reasons"] for code in str(codes).split(";") if code).items()))
+    summary["marker_rules"] = rules
+    if temporal_rules:
+        summary["temporal_rules"] = temporal_rules
+    summary_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
+    return summary
 
 
 def run(config_path: str | Path, stages=None, force: bool = False, log=print) -> dict:
@@ -474,6 +842,11 @@ def run(config_path: str | Path, stages=None, force: bool = False, log=print) ->
     unknown = set(chosen) - set(STAGES)
     if unknown:
         raise ValueError(f"Unknown stages {sorted(unknown)}; choose from {STAGES}")
+    if cfg["model"]["params"]:
+        from .model import config_params
+        config_params(cfg["model"])          # fail before hours of compositing, not at the train stage
+    if cfg["parcel_classify"]["enabled"]:
+        runner._parcel_params()
     results = {}
     global _HASHER
     try:

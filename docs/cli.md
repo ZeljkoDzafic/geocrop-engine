@@ -333,7 +333,7 @@ Spatial CV + final Random Forest
 | `--tune` |  |  | JSON grid, e.g. {"max_features": ["sqrt", 0.3]} |
 | `--groups` |  |  | restrict to feature groups |
 | `--manifest` |  |  | feature stack (for --groups) |
-| `--algorithm` |  |  |  |
+| `--algorithm` |  |  | built-in or registered plugin estimator |
 | `--no-calibrate` |  |  | skip temperature scaling |
 | `--holdout` |  |  | fraction of spatial blocks locked as final test |
 | `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |
@@ -369,6 +369,7 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--smooth` |  |  | edge-aware smoothing of probabilities before argmax |
 | `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
 | `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
+| `--registry` |  |  | registry directory for --model registry:<name>@<version/stage> |
 
 ## `geocrop ablation`
 
@@ -638,6 +639,8 @@ Time-series features (Whittaker, phenology, harmonics) from scene folders
 | `--envelope` |  |  | upper-envelope iterations |
 | `--min-observed-fraction` |  |  | minimum occupied temporal-bin fraction |
 | `--max-gap-days` |  |  | maximum consecutive empty-bin duration, including edges |
+| `--temporal-support` |  |  | also write <out>_temporal_support.tif: observed vs interpolated support per pixel |
+| `--support-tolerance-days` |  | `10` | a value farther than this from a clear acquisition counts as interpolated |
 
 ## `geocrop merge-stacks`
 
@@ -650,12 +653,12 @@ Concatenate feature stacks on one grid
 
 ## `geocrop embeddings`
 
-Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid
+Foundation-model embeddings (feature providers: AlphaEarth, TESSERA, on-VM Presto, Galileo, AnySat, plugins) on the study grid
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
 | `--config` |  |  | features.embeddings, grid.reference and paths sections |
-| `--source` |  |  | override features.embeddings.source |
+| `--source` |  |  | override features.embeddings.source: one or more feature providers (alphaearth, tessera, presto, galileo, anysat or a plugin; see --list) |
 | `--year` |  |  | override features.embeddings.year |
 | `--reference` |  |  | study grid GeoTIFF (default grid.reference) |
 | `--out` |  |  | output directory (default <features dir>/embeddings) |
@@ -666,6 +669,9 @@ Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study gri
 | `--id-field` |  |  | parcel id field (default parcels.id_field) |
 | `--checkpoint` |  |  | Presto: local checkpoint instead of the pinned download |
 | `--make-monthly` |  |  | Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes |
+| `--namespace, --no-namespace` |  |  | feature names emb_<provider>_NN (default for new providers and several sources) or legacy emb_NN |
+| `--allow-license` |  |  | acknowledge a licence id of a provider whose weights/data are not permissive (repeatable) |
+| `--list` |  |  | list the registered feature providers and exit |
 
 ## `geocrop signatures`
 
@@ -1028,3 +1034,225 @@ Export the configured GeoCrop recipe as openEO process graphs (no credentials ne
 | `--products` |  |  | default: openeo.products of the config |
 | `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
 | `--stdout` |  |  | print the openEO process objects as one JSON document |
+
+## `geocrop temporal-support`
+
+Per-parcel temporal support (observed vs interpolated) from signatures; optionally route a parcels layer with cbm.temporal_support rules
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` | yes |  | S2 signatures CSV/Parquet (geocrop signatures) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | per-parcel support CSV (tq_* columns) |
+| `--markers` |  |  | markers CSV (adds the harvest-date distance) |
+| `--config` |  |  | use the cbm.temporal_support (and cbm.rules) sections of a config |
+| `--params` |  |  | JSON overrides of cbm.temporal_support, e.g. '{"tolerance_days": 8, "max_gap_at_peak_days": 25}' |
+| `--parcels` |  |  | parcels.gpkg to re-evaluate (rules applied even when enabled is false) |
+| `--routed` |  |  | output .gpkg of the re-evaluated parcels layer (with --parcels) |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop evidence`
+
+Per-parcel evidence packages (JSON + HTML + PNG) with every rule, data source and model reference, plus a batch index
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | parcel decision table (.gpkg/.csv from parcels or parcel-classify) |
+| `--out` | yes |  | output directory |
+| `--ids` |  |  | parcel ids to package (default: all) |
+| `--signatures` |  |  | S2 signatures CSV/Parquet: series, observed/rejected acquisitions |
+| `--start` |  |  | season start (default: timeseries.start of --config) |
+| `--end` |  |  | season end (default: timeseries.end of --config) |
+| `--markers` |  |  | markers or event-markers CSV |
+| `--temporal-support` |  |  | per-parcel support CSV (default: computed from --signatures) |
+| `--config` |  |  | cbm.rules and cbm.temporal_support settings (applied when enabled) |
+| `--marker-rules` |  |  | JSON cbm.rules overrides |
+| `--temporal-rules` |  |  | JSON cbm.temporal_support overrides |
+| `--model` |  |  | model directory or model.joblib (sha256 recorded) |
+| `--run-manifest` |  |  | run_manifest.json to reference (geocrop manifest) |
+| `--scenes` |  |  | scene root: resolve acquisition dates to scene ids |
+| `--summary` |  |  | parcels summary JSON (default <parcels>.summary.json) |
+| `--id-field` |  |  | parcel id column (default parcels.id_field of --config or parcel_id) |
+| `--no-png` |  |  | skip the PNG chart (HTML keeps an inline SVG chart) |
+
+## `geocrop cube`
+
+External data cubes: load S2 via odc-stac, import xarray/Zarr/NetCDF cubes into scene or composite folders, export GeoCrop outputs as CF Zarr/NetCDF
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `cube_cmd` | yes |  |  |
+
+### `geocrop cube load`
+
+Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders (same masking/radiometry as stac-import; optional odc-stac extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` |  |  | defaults from data.*, grid.reference, paths.s2_scenes, compositing.scl_invalid |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference of --config) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` |  |  | scene root (default paths.s2_scenes of --config) |
+| `--endpoint` |  |  | STAC API (default data.endpoint, Earth Search) |
+| `--collection` |  |  | default data.collection, sentinel-2-l2a |
+| `--max-cloud` |  |  | tile cloud cover pre-filter (%%), default data.max_cloud |
+| `--min-clear` |  |  | minimum clear fraction inside the grid, default data.min_clear_fraction |
+| `--max-items` |  | `500` |  |
+| `--save-cube` |  |  | also write the loaded cube (.zarr or .nc) |
+| `--no-scenes` |  |  | only write --save-cube, no scene folders |
+
+### `geocrop cube import`
+
+Validate an external cube (dims time|window, y, x; bands as variables or a band dimension) and write GeoCrop scene folders or window composites
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--cube` | yes |  | .zarr store or .nc file |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference of --config) |
+| `--out` |  |  | scene root (--to scenes) or composite root (--to composites); default from config |
+| `--to` |  | `scenes` |  |
+| `--config` |  |  | windows and compositing parameters (needed for --to composites from time) |
+| `--units` |  | `auto` |  |
+| `--scale` |  |  | DN -> reflectance scale, e.g. 0.0001 |
+| `--offset` |  |  | additive offset after scaling, e.g. -0.1 (baseline >= 04.00) |
+| `--nodata` |  |  | no-data value of the band variables |
+| `--band-map` |  |  | JSON {"cube_variable": "B04", ...} for non-standard names |
+| `--crs` |  |  | CRS when the cube carries none, e.g. EPSG:32634 |
+| `--timezone` |  | `UTC` | time zone of naive timestamps (default UTC) |
+| `--assume-masked` |  |  | no SCL: NaN pixels are masked, others clear |
+| `--resample` |  |  | reproject a cube that is not on the grid lattice |
+| `--resampling` |  | `bilinear` |  |
+| `--min-clear` |  |  |  |
+| `--keep-scenes` |  |  | --to composites: keep the staged scene folders here |
+| `--overwrite` |  |  | re-write scene folders already imported |
+
+### `geocrop cube export`
+
+Write GeoCrop scene folders (time series), window composites or a feature stack as an xarray cube with CF-1.8 metadata (.zarr or .nc)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--kind` | yes |  |  |
+| `--src` |  |  | scene root, composite root or stack.tif (default from --config paths) |
+| `--out` | yes |  | .zarr or .nc |
+| `--config` |  |  | windows (composites) and default paths |
+| `--start` |  |  | scenes: first date |
+| `--end` |  |  | scenes: last date |
+| `--overwrite` |  |  |  |
+
+## `geocrop models`
+
+Local model registry: register, list, show, compare, promote and verify trained models
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `models_cmd` | yes |  |  |
+
+### `geocrop models register`
+
+Copy a trained model.joblib with immutable metadata into the registry
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `model` | yes |  | model.joblib written by geocrop train |
+| `--name` | yes |  |  |
+| `--tags` |  | `[]` |  |
+| `--description` |  |  |  |
+| `--samples` |  |  | samples.npz used for training (verifies the split fingerprints) |
+| `--features` |  |  | feature stack: records the input contract (CRS, resolution, windows) |
+| `--hcat` |  |  | CSV class_name,hcat_code,hcat_name for the taxonomy mapping |
+| `--taxonomy` |  |  | name of the class taxonomy, e.g. national LPIS 2024 |
+| `--licence` |  | `[]` | licence of a pretrained component, e.g. presto=MIT |
+| `--link` |  |  | hard-link instead of copying (same file system) |
+
+### `geocrop models list`
+
+List registered model versions and pinned pretrained checkpoints
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--kind` |  | `all` |  |
+
+### `geocrop models show`
+
+Show the full entry of name@version|stage|latest (or ftw/<model>, presto/default)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` | yes |  |  |
+
+### `geocrop models compare`
+
+Metric deltas of two models on identical splits only
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `a` | yes |  |  |
+| `b` | yes |  |  |
+| `--format` |  | `markdown` |  |
+
+### `geocrop models promote`
+
+Move a version to staging, production (archives the previous one) or archived
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` | yes |  | name@version |
+| `--stage` | yes |  |  |
+| `--note` |  |  |  |
+
+### `geocrop models verify`
+
+Recompute hashes of one entry or of the whole registry (exit 2 on mismatch)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` |  |  |  |
+
+## `geocrop benchmarks`
+
+Benchmark registry: recorded benchmark/ablation/transfer runs and leaderboards
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `benchmarks_cmd` | yes |  |  |
+
+### `geocrop benchmarks list`
+
+List recorded benchmark runs
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--task` |  |  |  |
+| `--kind` |  |  |  |
+
+### `geocrop benchmarks show`
+
+Show one recorded run (id or unique prefix/suffix)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `run` | yes |  |  |
+
+### `geocrop benchmarks leaderboard`
+
+Ranked table per task, only across runs with identical split fingerprints
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--task` | yes |  | e.g. crop-classification, crop-transfer/region, field-segmentation |
+| `--metric` |  |  | default: the runs' primary metric |
+| `--split` |  |  | restrict to one split fingerprint (prefix) |
+| `--format` |  | `markdown` |  |
+| `--out` |  |  | write the leaderboard to this file |

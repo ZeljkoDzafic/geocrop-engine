@@ -496,6 +496,10 @@ def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | Non
     report = _json_safe(json.loads(json.dumps(report, default=_json_default)))
     (work / "results.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf8")
     (work / "results.md").write_text(markdown(report), encoding="utf8")
+    from . import registry
+    registry.record_public(report, work, roles=_fingerprint(with_pixels["parcel_id"].astype(str).to_numpy(),
+                                                            with_pixels["role"].astype(str).to_numpy()),
+                           protocol_split=p["split"], evaluation=p["evaluation"])
     return report
 
 
