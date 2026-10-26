@@ -89,6 +89,15 @@ DEFAULTS: dict[str, Any] = {
         "holdout_fraction": 0.0,
         "inner_splits": 3,
     },
+    "cv": {
+        "strategy": "spatial_blocks",   # spatial_blocks | region | year | region_year (transfer validation)
+        "region_field": None,           # polygon attribute copied into sample region ids
+        "year_field": None,             # polygon attribute copied into sample year ids
+        "year": None,                   # constant year id for a single-season sample set
+    },
+    "predict": {
+        "smoothing": {"enabled": False, "window": 7, "smoothness": 10.0},
+    },
     "experiments": {},
     "parcels": {
         "id_field": "parcel_id",
@@ -216,6 +225,21 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    from .splits import STRATEGIES
+    cv = cfg["cv"]
+    if cv["strategy"] not in STRATEGIES:
+        raise ConfigError(f"cv.strategy must be one of {', '.join(STRATEGIES)}")
+    if cv["year_field"] and cv["year"] is not None:
+        raise ConfigError("Set cv.year_field or cv.year, not both")
+    sm = cfg["predict"]["smoothing"]
+    if not isinstance(sm["enabled"], bool):
+        raise ConfigError("predict.smoothing.enabled must be true or false")
+    w = sm["window"]
+    if isinstance(w, bool) or not isinstance(w, int) or w < 3 or w % 2 == 0:
+        raise ConfigError("predict.smoothing.window must be an odd integer >= 3")
+    k = sm["smoothness"]
+    if isinstance(k, bool) or not isinstance(k, (int, float)) or not math.isfinite(k) or k <= 0:
+        raise ConfigError("predict.smoothing.smoothness must be a positive number")
     o = cfg["openeo"]
     unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
     if unknown:

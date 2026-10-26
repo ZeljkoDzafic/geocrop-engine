@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- Transfer validation (gap G8): leave-one-region-out, leave-one-year-out and region-year CV
+  (`cv_strategy` in `model.cross_validate` / `nested_cross_validate` / `train`, `experiments.run`;
+  `geocrop train|ablation --cv-strategy`, `geocrop transfer`) with per-held-out-group metrics and the transfer
+  gap to spatial-block CV; sample region/year ids (`geocrop samples --region-field/--year-field/--year`) and a
+  multi-year sample store (`geocrop samples-merge`) that refuses mismatched feature manifests; config sections
+  `cv` and `predict`; docs/validation-protocols.md.
+- Optional edge-aware probability smoothing before argmax and parcel aggregation (gap G15,
+  `geocrop predict --smooth`, `predict.smoothing`) and a synthetic accuracy/conformal-coverage comparison
+  (`geocrop smoothing-experiment`).
 - Optional openEO back-end (`geocrop.openeo_adapter`, gap G10): `geocrop openeo-extract` runs Sentinel-2/-1 window
   composites, scene extraction or parcel signatures on CDSE openEO and writes them in GeoCrop's composite/scene/
   signature contracts on the study grid; `geocrop openeo-graph` (and `--dry-run`) exports the recipe as openEO
@@ -94,6 +103,7 @@
   subprocess-running code.
 
 ### Fixed
+- Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
   flattened through `estimators.predict_labels`.
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed

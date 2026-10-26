@@ -314,6 +314,9 @@ Extract training samples from a stack and reference polygons
 | `--id-field` |  | `polygon_id` |  |
 | `--max-per-polygon` |  | `250` |  |
 | `--inner-buffer-m` |  |  |  |
+| `--region-field` |  |  | polygon attribute stored as sample region id (leave-one-region-out) |
+| `--year-field` |  |  | polygon attribute stored as sample year id (leave-one-year-out) |
+| `--year` |  |  | constant year id for all samples of this single-season stack |
 
 ## `geocrop train`
 
@@ -335,6 +338,7 @@ Spatial CV + final Random Forest
 | `--holdout` |  |  | fraction of spatial blocks locked as final test |
 | `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |
 | `--calibration-fraction` |  | `0.2` | fraction of spatial groups held out |
+| `--cv-strategy` |  | `spatial_blocks` | add leave-one-region/year-out transfer validation to the report |
 
 ## `geocrop benchmark`
 
@@ -361,6 +365,10 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--features` | yes |  |  |
 | `--model` | yes |  |  |
 | `--out` | yes |  |  |
+| `--config` |  |  | use the predict.smoothing section |
+| `--smooth` |  |  | edge-aware smoothing of probabilities before argmax |
+| `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
+| `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
 
 ## `geocrop ablation`
 
@@ -377,6 +385,7 @@ Feature-group ablation experiments on identical folds
 | `--folds` |  |  | override config model.cv_folds (default 5) |
 | `--buffer-m` |  |  | override config model.spatial_buffer_m (default 0) |
 | `--seed` |  |  | override config seed (default 42) |
+| `--cv-strategy` |  |  | override config cv.strategy: add leave-one-group-out transfer columns |
 
 ## `geocrop reduce-features`
 
@@ -727,6 +736,43 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--config` |  |  |  |
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
+
+## `geocrop samples-merge`
+
+Combine per-season sample files into one multi-year sample store
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--inputs` | yes |  | samples .npz files, one per season |
+| `--years` |  |  | year id per input (default: year metadata stored in each file) |
+| `--stacks` |  |  | feature stack per input; their feature manifests must match |
+| `--out` | yes |  |  |
+
+## `geocrop transfer`
+
+Leave-one-region-out / leave-one-year-out validation vs spatial CV
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  |  |
+| `--strategies` |  | `['region', 'year']` |  |
+| `--config` |  |  | inherit model settings |
+| `--params` |  |  | JSON estimator settings |
+| `--block-m` |  |  |  |
+| `--buffer-m` |  |  |  |
+| `--folds` |  |  |  |
+| `--seed` |  |  |  |
+
+## `geocrop smoothing-experiment`
+
+SYNTHETIC comparison of accuracy and conformal coverage with/without smoothing
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--seed` |  | `42` |  |
+| `--alpha` |  | `0.1` |  |
 
 ## `geocrop openeo-extract`
 
