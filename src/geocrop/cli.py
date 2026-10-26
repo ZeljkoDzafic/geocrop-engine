@@ -261,6 +261,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--smooth", action="store_true", help="edge-aware smoothing of probabilities before argmax")
     x.add_argument("--smooth-window", type=int, help="odd neighbourhood size in pixels (default 7)")
     x.add_argument("--smoothness", type=float, help="smoothing strength; larger smooths more (default 10)")
+    x.add_argument("--registry", help="registry directory for --model registry:<name>@<version|stage>")
 
     x = cmd("ablation", "Feature-group ablation experiments on identical folds")
     x.add_argument("--samples", required=True)
@@ -725,6 +726,107 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
     x.add_argument("--out", help="output directory; default <openeo.work_dir>/graphs")
     x.add_argument("--stdout", action="store_true", help="print the openEO process objects as one JSON document")
+
+    # --- external data cubes (xarray / Zarr / NetCDF, optional odc-stac): load | import | export ---
+    x = cmd("cube", "External data cubes: load S2 via odc-stac, import xarray/Zarr/NetCDF cubes into scene or "
+                    "composite folders, export GeoCrop outputs as CF Zarr/NetCDF")
+    cu = x.add_subparsers(dest="cube_cmd", required=True, metavar="action")
+    y = cu.add_parser("load", help="Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders",
+                      description="Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders "
+                                  "(same masking/radiometry as stac-import; optional odc-stac extra)")
+    y.add_argument("--config", help="defaults from data.*, grid.reference, paths.s2_scenes, compositing.scl_invalid")
+    y.add_argument("--reference", help="study grid GeoTIFF (default grid.reference of --config)")
+    y.add_argument("--start", required=True)
+    y.add_argument("--end", required=True)
+    y.add_argument("--out", help="scene root (default paths.s2_scenes of --config)")
+    y.add_argument("--endpoint", help="STAC API (default data.endpoint, Earth Search)")
+    y.add_argument("--collection", help="default data.collection, sentinel-2-l2a")
+    y.add_argument("--max-cloud", type=float, help="tile cloud cover pre-filter (%%), default data.max_cloud")
+    y.add_argument("--min-clear", type=float, help="minimum clear fraction inside the grid, default "
+                                                   "data.min_clear_fraction")
+    y.add_argument("--max-items", type=int, default=500)
+    y.add_argument("--save-cube", help="also write the loaded cube (.zarr or .nc)")
+    y.add_argument("--no-scenes", action="store_true", help="only write --save-cube, no scene folders")
+    y = cu.add_parser("import", help="Validate an xarray/Zarr/NetCDF cube and write scene or composite folders",
+                      description="Validate an external cube (dims time|window, y, x; bands as variables or a band "
+                                  "dimension) and write GeoCrop scene folders or window composites")
+    y.add_argument("--cube", required=True, help=".zarr store or .nc file")
+    y.add_argument("--reference", help="study grid GeoTIFF (default grid.reference of --config)")
+    y.add_argument("--out", help="scene root (--to scenes) or composite root (--to composites); default from config")
+    y.add_argument("--to", choices=["scenes", "composites"], default="scenes")
+    y.add_argument("--config", help="windows and compositing parameters (needed for --to composites from time)")
+    y.add_argument("--units", choices=["auto", "reflectance", "dn"], default="auto")
+    y.add_argument("--scale", type=float, help="DN -> reflectance scale, e.g. 0.0001")
+    y.add_argument("--offset", type=float, help="additive offset after scaling, e.g. -0.1 (baseline >= 04.00)")
+    y.add_argument("--nodata", type=float, help="no-data value of the band variables")
+    y.add_argument("--band-map", type=_json_arg, help='JSON {"cube_variable": "B04", ...} for non-standard names')
+    y.add_argument("--crs", help="CRS when the cube carries none, e.g. EPSG:32634")
+    y.add_argument("--timezone", default="UTC", help="time zone of naive timestamps (default UTC)")
+    y.add_argument("--assume-masked", action="store_true", help="no SCL: NaN pixels are masked, others clear")
+    y.add_argument("--resample", action="store_true", help="reproject a cube that is not on the grid lattice")
+    y.add_argument("--resampling", default="bilinear", choices=["nearest", "bilinear", "cubic", "average"])
+    y.add_argument("--min-clear", type=float, default=0.0)
+    y.add_argument("--keep-scenes", help="--to composites: keep the staged scene folders here")
+    y.add_argument("--overwrite", action="store_true", help="re-write scene folders already imported")
+    y = cu.add_parser("export", help="Write GeoCrop scenes, composites or a feature stack as a CF Zarr/NetCDF cube",
+                      description="Write GeoCrop scene folders (time series), window composites or a feature stack "
+                                  "as an xarray cube with CF-1.8 metadata (.zarr or .nc)")
+    y.add_argument("--kind", choices=["scenes", "composites", "stack"], required=True)
+    y.add_argument("--src", help="scene root, composite root or stack.tif (default from --config paths)")
+    y.add_argument("--out", required=True, help=".zarr or .nc")
+    y.add_argument("--config", help="windows (composites) and default paths")
+    y.add_argument("--start", help="scenes: first date")
+    y.add_argument("--end", help="scenes: last date")
+    y.add_argument("--overwrite", action="store_true")
+
+    # --- local model and benchmark registry: models list|show|register|compare|promote|verify, benchmarks ... ---
+    def reg_parser(group, name, help_):
+        y = group.add_parser(name, help=help_, description=help_)
+        y.add_argument("--registry", help="registry directory (default $GEOCROP_REGISTRY or ./registry)")
+        return y
+
+    x = cmd("models", "Local model registry: register, list, show, compare, promote and verify trained models")
+    mr = x.add_subparsers(dest="models_cmd", required=True, metavar="action")
+    y = reg_parser(mr, "register", "Copy a trained model.joblib with immutable metadata into the registry")
+    y.add_argument("model", help="model.joblib written by geocrop train")
+    y.add_argument("--name", required=True)
+    y.add_argument("--tags", nargs="*", default=[])
+    y.add_argument("--description")
+    y.add_argument("--samples", help="samples.npz used for training (verifies the split fingerprints)")
+    y.add_argument("--features", help="feature stack: records the input contract (CRS, resolution, windows)")
+    y.add_argument("--hcat", help="CSV class_name,hcat_code,hcat_name for the taxonomy mapping")
+    y.add_argument("--taxonomy", help="name of the class taxonomy, e.g. national LPIS 2024")
+    y.add_argument("--licence", nargs="*", default=[], metavar="COMPONENT=LICENCE",
+                   help="licence of a pretrained component, e.g. presto=MIT")
+    y.add_argument("--link", action="store_true", help="hard-link instead of copying (same file system)")
+    y = reg_parser(mr, "list", "List registered model versions and pinned pretrained checkpoints")
+    y.add_argument("--kind", choices=["all", "model", "pretrained"], default="all")
+    y = reg_parser(mr, "show", "Show the full entry of name@version|stage|latest (or ftw/<model>, presto/default)")
+    y.add_argument("ref")
+    y = reg_parser(mr, "compare", "Metric deltas of two models on identical splits only")
+    y.add_argument("a")
+    y.add_argument("b")
+    y.add_argument("--format", choices=["json", "markdown"], default="markdown")
+    y = reg_parser(mr, "promote", "Move a version to staging, production (archives the previous one) or archived")
+    y.add_argument("ref", help="name@version")
+    y.add_argument("--stage", required=True, choices=["staging", "production", "archived"])
+    y.add_argument("--note")
+    y = reg_parser(mr, "verify", "Recompute hashes of one entry or of the whole registry (exit 2 on mismatch)")
+    y.add_argument("ref", nargs="?")
+
+    x = cmd("benchmarks", "Benchmark registry: recorded benchmark/ablation/transfer runs and leaderboards")
+    br = x.add_subparsers(dest="benchmarks_cmd", required=True, metavar="action")
+    y = reg_parser(br, "list", "List recorded benchmark runs")
+    y.add_argument("--task")
+    y.add_argument("--kind")
+    y = reg_parser(br, "show", "Show one recorded run (id or unique prefix/suffix)")
+    y.add_argument("run")
+    y = reg_parser(br, "leaderboard", "Ranked table per task, only across runs with identical split fingerprints")
+    y.add_argument("--task", required=True, help="e.g. crop-classification, crop-transfer/region, field-segmentation")
+    y.add_argument("--metric", help="default: the runs' primary metric")
+    y.add_argument("--split", help="restrict to one split fingerprint (prefix)")
+    y.add_argument("--format", choices=["markdown", "csv", "json"], default="markdown")
+    y.add_argument("--out", help="write the leaderboard to this file")
     return p
 
 
@@ -1043,7 +1145,19 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                 smoothing["window"] = a.smooth_window
             if a.smoothness is not None:
                 smoothing["smoothness"] = a.smoothness
-        _print(predict(a.features, a.model, a.out, smoothing=smoothing))
+        model_path, resolved = a.model, None
+        if a.model.startswith("registry:"):
+            from . import registry
+            try:
+                resolved = registry.resolve_for_predict(a.model, a.features, a.registry)
+            except registry.RegistryError as exc:
+                raise SystemExit(f"geocrop predict: {exc}") from exc
+            model_path = resolved["path"]
+        result = predict(a.features, model_path, a.out, smoothing=smoothing)
+        if resolved:
+            registry.annotate_prediction(result["manifest"], resolved)
+            result["registry"] = {k: resolved[k] for k in ("name", "version", "stage", "sha256")}
+        _print(result)
     elif c == "ablation":
         from . import experiments
         from .config import load
@@ -1410,6 +1524,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .experiments import smoothing_comparison
         r = smoothing_comparison(a.out, seed=a.seed, alpha=a.alpha)
         print(pd.DataFrame(r["rows"]).to_string(index=False))
+    elif c in ("models", "benchmarks"):
+        _registry_command(a)
     elif c in ("openeo-extract", "openeo-graph"):
         from . import openeo_adapter
         from .config import load
@@ -1425,6 +1541,79 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             conn = openeo_adapter.connect(cfg["openeo"]["url"], a.auth)
             _print({**written, "results": openeo_adapter.execute(recipe, conn, cfg["openeo"]["work_dir"],
                                                                  cfg["openeo"]["job_options"])})
+    elif c == "cube":
+        _cube(a)
+
+
+def _cube(a):
+    """`geocrop cube load|import|export` (external data cubes; xarray, odc-stac, zarr are optional)."""
+    from . import datacube as dc
+    from .config import load, parse_windows
+    cfg = load(a.config) if getattr(a, "config", None) else None
+    d = cfg["data"] if cfg else {}
+    reference = getattr(a, "reference", None) or (cfg["grid"]["reference"] if cfg else None)
+    if a.cube_cmd in ("load", "import") and not reference:
+        raise SystemExit("--reference (or grid.reference in --config) is required")
+    try:
+        if a.cube_cmd == "load":
+            out = a.out or (cfg["paths"]["s2_scenes"] if cfg else None)
+            if not out and not a.no_scenes:
+                raise SystemExit("--out (or paths.s2_scenes in --config) is required")
+            scl_invalid = cfg["compositing"]["scl_invalid"] if cfg else dc.DEFAULT_SCL_INVALID
+            cube = dc.load_stac_cube(
+                reference, a.start, a.end, endpoint=a.endpoint or d.get("endpoint") or dc.EARTH_SEARCH,
+                collection=a.collection or d.get("collection") or "sentinel-2-l2a",
+                max_cloud=a.max_cloud if a.max_cloud is not None else d.get("max_cloud", 80),
+                min_clear_fraction=a.min_clear if a.min_clear is not None else d.get("min_clear_fraction", 0.2),
+                max_items=a.max_items, scl_invalid=scl_invalid)
+            items = json.loads(cube.attrs["geocrop:items"])
+            result = {"items": len(items), "loaded": cube.sizes["time"]}
+            if a.save_cube:
+                result["cube"] = str(dc.write_cube(cube, a.save_cube, overwrite=True))
+            if not a.no_scenes:
+                scenes = dc.cube_to_scenes(cube, reference, out, scl_invalid=scl_invalid)
+                counts = {}
+                for r in [*scenes, *(i for i in items if i["status"] != "loaded")]:
+                    counts[r["status"].split(":")[0]] = counts.get(r["status"].split(":")[0], 0) + 1
+                result.update(status=counts, out=out)
+            _print(result)
+        elif a.cube_cmd == "import":
+            kw = dict(units=a.units, scale=a.scale, offset=a.offset, nodata=a.nodata, band_map=a.band_map,
+                      crs=a.crs, assume_tz=a.timezone, assume_masked=a.assume_masked, resample=a.resample,
+                      resampling=a.resampling)
+            if a.to == "scenes":
+                out = a.out or (cfg["paths"]["s2_scenes"] if cfg else None)
+                if not out:
+                    raise SystemExit("--out (or paths.s2_scenes in --config) is required")
+                scl_invalid = cfg["compositing"]["scl_invalid"] if cfg else dc.DEFAULT_SCL_INVALID
+                res = dc.cube_to_scenes(a.cube, reference, out, min_clear_fraction=a.min_clear,
+                                        scl_invalid=scl_invalid, overwrite=a.overwrite, **kw)
+                _print({"scenes": res, "out": out})
+            else:
+                out = a.out or (cfg["paths"]["composites"] if cfg else None)
+                if not out:
+                    raise SystemExit("--out (or paths.composites in --config) is required")
+                c = cfg["compositing"] if cfg else {}
+                windows = parse_windows(cfg["windows"]) if cfg else None
+                opts = {k: c[k] for k in ("statistic", "scl_invalid", "mask_dilation_px", "min_valid_observations",
+                                          "temporal_screening") if k in c}
+                res = dc.cube_to_composites(a.cube, reference, out, windows, scenes_dir=a.keep_scenes, **opts, **kw)
+                _print({"windows": res["windows"], "out": out})
+        else:
+            paths = cfg["paths"] if cfg else {}
+            src = a.src or paths.get({"scenes": "s2_scenes", "composites": "composites", "stack": "features"}[a.kind])
+            if not src:
+                raise SystemExit("--src (or the matching paths.* entry in --config) is required")
+            if a.kind == "scenes":
+                ds = dc.scenes_to_cube(src, a.start, a.end)
+            elif a.kind == "composites":
+                ds = dc.composites_to_cube(src, parse_windows(cfg["windows"]) if cfg else None)
+            else:
+                ds = dc.stack_to_cube(src)
+            path = dc.write_cube(ds, a.out, overwrite=a.overwrite)
+            _print({"kind": a.kind, "out": str(path), "dims": dict(ds.sizes), "variables": list(ds.data_vars)})
+    except (dc.CubeError, FileExistsError) as exc:
+        raise SystemExit(str(exc)) from None
 
 
 def _parcel_classify(a):
@@ -1483,6 +1672,59 @@ def _parcel_classify(a):
                                 for m, r in cmp["cross_validation"].items()}
         result["comparison"]["fold_fingerprint"] = cmp["fold_fingerprint"]
     _print(result)
+
+
+
+def _registry_command(a):
+    """`geocrop models ...` and `geocrop benchmarks ...` (exit 2 on refused or failed operations)."""
+    from . import registry
+    try:
+        if a.cmd == "models":
+            action = a.models_cmd
+            if action == "register":
+                if any("=" not in item for item in a.licence):
+                    raise registry.RegistryError("--licence expects COMPONENT=LICENCE, e.g. presto=MIT")
+                licences = dict(item.split("=", 1) for item in a.licence)
+                e = registry.register(a.model, a.name, root=a.registry, tags=a.tags, samples=a.samples,
+                                      features=a.features, hcat=a.hcat, taxonomy=a.taxonomy, licences=licences,
+                                      description=a.description, link=a.link)
+                _print({"registered": f"{e['name']}@{e['version']}", "sha256": e["artifact"]["sha256"],
+                        "fingerprints_verified": e["fingerprints"].get("verified"),
+                        "fingerprints_note": e["fingerprints"].get("reason"), "notes": e["notes"]})
+            elif action == "list":
+                _print(registry.list_models(a.registry, a.kind))
+            elif action == "show":
+                _print(registry.get(a.ref, a.registry))
+            elif action == "compare":
+                r = registry.compare(a.a, a.b, a.registry)
+                if a.format == "markdown":
+                    print(registry.compare_markdown(r), end="")
+                else:
+                    _print(r)
+            elif action == "promote":
+                _print(registry.promote(a.ref, a.stage, a.registry, a.note))
+            elif action == "verify":
+                results = registry.verify(a.ref, a.registry)
+                _print(results)
+                if not all(r["ok"] for r in results):
+                    sys.exit(2)
+        else:
+            action = a.benchmarks_cmd
+            if action == "list":
+                _print([registry.benchmark_summary(e) for e in registry.list_benchmarks(a.registry, a.task, a.kind)])
+            elif action == "show":
+                _print(registry.get_benchmark(a.run, a.registry))
+            elif action == "leaderboard":
+                groups = registry.leaderboard(a.task, a.registry, a.metric, a.split)
+                text = {"markdown": registry.leaderboard_markdown, "csv": registry.leaderboard_csv,
+                        "json": lambda g: json.dumps(g, indent=2) + "\n"}[a.format](groups)
+                if a.out:
+                    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+                    Path(a.out).write_text(text, encoding="utf8")
+                print(text, end="")
+    except registry.RegistryError as exc:
+        print(f"geocrop {a.cmd}: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
