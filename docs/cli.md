@@ -369,6 +369,7 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--smooth` |  |  | edge-aware smoothing of probabilities before argmax |
 | `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
 | `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
+| `--registry` |  |  | registry directory for --model registry:<name>@<version/stage> |
 
 ## `geocrop ablation`
 
@@ -1028,3 +1029,118 @@ Export the configured GeoCrop recipe as openEO process graphs (no credentials ne
 | `--products` |  |  | default: openeo.products of the config |
 | `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
 | `--stdout` |  |  | print the openEO process objects as one JSON document |
+
+## `geocrop models`
+
+Local model registry: register, list, show, compare, promote and verify trained models
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `models_cmd` | yes |  |  |
+
+### `geocrop models register`
+
+Copy a trained model.joblib with immutable metadata into the registry
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `model` | yes |  | model.joblib written by geocrop train |
+| `--name` | yes |  |  |
+| `--tags` |  | `[]` |  |
+| `--description` |  |  |  |
+| `--samples` |  |  | samples.npz used for training (verifies the split fingerprints) |
+| `--features` |  |  | feature stack: records the input contract (CRS, resolution, windows) |
+| `--hcat` |  |  | CSV class_name,hcat_code,hcat_name for the taxonomy mapping |
+| `--taxonomy` |  |  | name of the class taxonomy, e.g. national LPIS 2024 |
+| `--licence` |  | `[]` | licence of a pretrained component, e.g. presto=MIT |
+| `--link` |  |  | hard-link instead of copying (same file system) |
+
+### `geocrop models list`
+
+List registered model versions and pinned pretrained checkpoints
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--kind` |  | `all` |  |
+
+### `geocrop models show`
+
+Show the full entry of name@version|stage|latest (or ftw/<model>, presto/default)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` | yes |  |  |
+
+### `geocrop models compare`
+
+Metric deltas of two models on identical splits only
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `a` | yes |  |  |
+| `b` | yes |  |  |
+| `--format` |  | `markdown` |  |
+
+### `geocrop models promote`
+
+Move a version to staging, production (archives the previous one) or archived
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` | yes |  | name@version |
+| `--stage` | yes |  |  |
+| `--note` |  |  |  |
+
+### `geocrop models verify`
+
+Recompute hashes of one entry or of the whole registry (exit 2 on mismatch)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `ref` |  |  |  |
+
+## `geocrop benchmarks`
+
+Benchmark registry: recorded benchmark/ablation/transfer runs and leaderboards
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `benchmarks_cmd` | yes |  |  |
+
+### `geocrop benchmarks list`
+
+List recorded benchmark runs
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--task` |  |  |  |
+| `--kind` |  |  |  |
+
+### `geocrop benchmarks show`
+
+Show one recorded run (id or unique prefix/suffix)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `run` | yes |  |  |
+
+### `geocrop benchmarks leaderboard`
+
+Ranked table per task, only across runs with identical split fingerprints
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--registry` |  |  | registry directory (default $GEOCROP_REGISTRY or ./registry) |
+| `--task` | yes |  | e.g. crop-classification, crop-transfer/region, field-segmentation |
+| `--metric` |  |  | default: the runs' primary metric |
+| `--split` |  |  | restrict to one split fingerprint (prefix) |
+| `--format` |  | `markdown` |  |
+| `--out` |  |  | write the leaderboard to this file |
