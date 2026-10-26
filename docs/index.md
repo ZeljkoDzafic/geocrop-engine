@@ -11,6 +11,7 @@
 9. [Uncertainty, calibration and applicability](uncertainty.md)
 10. [Checks-by-Monitoring: signatures, markers, traffic light](cbm.md)
 11. [Segmentation](segmentation.md)
+    - [Pretrained field boundaries (Fields of The World)](field-boundaries.md)
 12. [Interoperability and related systems](interoperability.md)
 13. [Configuration](configuration.md)
 14. [CLI reference](cli.md)
