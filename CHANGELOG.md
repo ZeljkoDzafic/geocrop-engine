@@ -2,6 +2,10 @@
 
 ## Unreleased
 ### Added
+- Optional openEO back-end (`geocrop.openeo_adapter`, gap G10): `geocrop openeo-extract` runs Sentinel-2/-1 window
+  composites, scene extraction or parcel signatures on CDSE openEO and writes them in GeoCrop's composite/scene/
+  signature contracts on the study grid; `geocrop openeo-graph` (and `--dry-run`) exports the recipe as openEO
+  process graphs without credentials. New optional `openeo:` configuration section; see `docs/openeo.md`.
 - `geocrop acceptance`: one versioned, automatically executable acceptance run of the whole chain on a ~2 × 2 km
   real area in Semberija (2023, June–September), with real Sentinel-2 and Sentinel-1 data; 21 pass/fail checks
   (grid identity, radiometry and backscatter plausibility, S1/S2 co-registration, coverage, no-data leakage,

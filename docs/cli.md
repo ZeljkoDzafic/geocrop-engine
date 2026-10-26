@@ -727,3 +727,26 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--config` |  |  |  |
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
+
+## `geocrop openeo-extract`
+
+Run composites, scenes or parcel signatures on an openEO back-end (CDSE) and write them in GeoCrop's file contracts (optional openeo extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--dry-run` |  |  | only write the process graphs; needs no credentials |
+| `--graphs` |  |  | directory for the process graph JSON; default <openeo.work_dir>/graphs |
+| `--auth` |  | `auto` | auto: CDSE_OPENEO_CLIENT_ID/SECRET if set, else the OIDC device flow |
+
+## `geocrop openeo-graph`
+
+Export the configured GeoCrop recipe as openEO process graphs (no credentials needed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
+| `--stdout` |  |  | print the openEO process objects as one JSON document |

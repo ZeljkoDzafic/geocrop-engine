@@ -491,6 +491,22 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--config")
     x.add_argument("--inputs", nargs="*", default=[])
     x.add_argument("--snap-gpt")
+
+    # optional openEO back-end (CDSE); local processing stays the default
+    openeo_products = ["s2_composites", "s1_composites", "s2_scenes", "signatures"]
+    x = cmd("openeo-extract", "Run composites, scenes or parcel signatures on an openEO back-end (CDSE) and write "
+                              "them in GeoCrop's file contracts (optional openeo extra)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
+    x.add_argument("--dry-run", action="store_true", help="only write the process graphs; needs no credentials")
+    x.add_argument("--graphs", help="directory for the process graph JSON; default <openeo.work_dir>/graphs")
+    x.add_argument("--auth", choices=["auto", "client-credentials", "device"], default="auto",
+                   help="auto: CDSE_OPENEO_CLIENT_ID/SECRET if set, else the OIDC device flow")
+    x = cmd("openeo-graph", "Export the configured GeoCrop recipe as openEO process graphs (no credentials needed)")
+    x.add_argument("--config", required=True)
+    x.add_argument("--products", nargs="+", choices=openeo_products, help="default: openeo.products of the config")
+    x.add_argument("--out", help="output directory; default <openeo.work_dir>/graphs")
+    x.add_argument("--stdout", action="store_true", help="print the openEO process objects as one JSON document")
     return p
 
 
@@ -921,6 +937,21 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             from .config import load
             cfg = load(a.config)
         print(run_manifest(a.out, cfg, a.inputs, a.snap_gpt))
+    elif c in ("openeo-extract", "openeo-graph"):
+        from . import openeo_adapter
+        from .config import load
+        cfg = load(a.config)
+        recipe = openeo_adapter.build_recipe(cfg, a.products)
+        graphs = (a.graphs if c == "openeo-extract" else a.out) or Path(cfg["openeo"]["work_dir"]) / "graphs"
+        written = openeo_adapter.write_recipe(recipe, graphs)
+        if c == "openeo-graph" and a.stdout:
+            _print({i["name"]: i["process"] for i in recipe["graphs"]})
+        elif c == "openeo-graph" or a.dry_run:
+            _print({**written, "dry_run": c == "openeo-extract", "differences": recipe["differences"]})
+        else:
+            conn = openeo_adapter.connect(cfg["openeo"]["url"], a.auth)
+            _print({**written, "results": openeo_adapter.execute(recipe, conn, cfg["openeo"]["work_dir"],
+                                                                 cfg["openeo"]["job_options"])})
 
 
 if __name__ == "__main__":

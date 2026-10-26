@@ -1,0 +1,1105 @@
+{
+  "description": "GeoCrop Engine recipe exported as an openEO process graph; see docs/openeo.md for differences from local processing.",
+  "id": "geocrop_s2_composite_spring",
+  "process_graph": {
+    "apply1": {
+      "arguments": {
+        "data": {
+          "from_node": "applykernel1"
+        },
+        "process": {
+          "process_graph": {
+            "gt1": {
+              "arguments": {
+                "x": {
+                  "from_parameter": "x"
+                },
+                "y": 0
+              },
+              "process_id": "gt",
+              "result": true
+            }
+          }
+        }
+      },
+      "process_id": "apply"
+    },
+    "applykernel1": {
+      "arguments": {
+        "border": 0,
+        "data": {
+          "from_node": "reducedimension2"
+        },
+        "factor": 1,
+        "kernel": [
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ],
+        "replace_invalid": 0
+      },
+      "process_id": "apply_kernel"
+    },
+    "filterbands1": {
+      "arguments": {
+        "bands": [
+          "B02",
+          "B03",
+          "B04",
+          "B05",
+          "B06",
+          "B07",
+          "B08",
+          "B8A",
+          "B11",
+          "B12"
+        ],
+        "data": {
+          "from_node": "resamplespatial1"
+        }
+      },
+      "process_id": "filter_bands"
+    },
+    "filterbands2": {
+      "arguments": {
+        "bands": [
+          "B02"
+        ],
+        "data": {
+          "from_node": "mask1"
+        }
+      },
+      "process_id": "filter_bands"
+    },
+    "loadcollection1": {
+      "arguments": {
+        "bands": [
+          "B02",
+          "B03",
+          "B04",
+          "B05",
+          "B06",
+          "B07",
+          "B08",
+          "B8A",
+          "B11",
+          "B12",
+          "SCL",
+          "CLD"
+        ],
+        "id": "SENTINEL2_L2A",
+        "spatial_extent": {
+          "crs": 32634,
+          "east": 500100.0,
+          "north": 5000080.0,
+          "south": 4999980.0,
+          "west": 499980.0
+        },
+        "temporal_extent": [
+          "2023-04-01",
+          "2023-05-01"
+        ]
+      },
+      "process_id": "load_collection"
+    },
+    "mask1": {
+      "arguments": {
+        "data": {
+          "from_node": "filterbands1"
+        },
+        "mask": {
+          "from_node": "mergecubes1"
+        }
+      },
+      "process_id": "mask"
+    },
+    "mergecubes1": {
+      "arguments": {
+        "cube1": {
+          "from_node": "reducedimension1"
+        },
+        "cube2": {
+          "from_node": "apply1"
+        },
+        "overlap_resolver": {
+          "process_graph": {
+            "or1": {
+              "arguments": {
+                "x": {
+                  "from_parameter": "x"
+                },
+                "y": {
+                  "from_parameter": "y"
+                }
+              },
+              "process_id": "or",
+              "result": true
+            }
+          }
+        }
+      },
+      "process_id": "merge_cubes"
+    },
+    "mergecubes2": {
+      "arguments": {
+        "cube1": {
+          "from_node": "reducedimension3"
+        },
+        "cube2": {
+          "from_node": "renamelabels1"
+        }
+      },
+      "process_id": "merge_cubes"
+    },
+    "reducedimension1": {
+      "arguments": {
+        "data": {
+          "from_node": "resamplespatial1"
+        },
+        "dimension": "bands",
+        "reducer": {
+          "process_graph": {
+            "arrayelement1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "SCL"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement10": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B8A"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement11": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B11"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement12": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B12"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement2": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "CLD"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement3": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B02"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement4": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B03"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement5": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B04"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement6": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B05"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement7": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B06"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement8": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B07"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement9": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "B08"
+              },
+              "process_id": "array_element"
+            },
+            "eq1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 0
+              },
+              "process_id": "eq"
+            },
+            "eq2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 1
+              },
+              "process_id": "eq"
+            },
+            "eq3": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 3
+              },
+              "process_id": "eq"
+            },
+            "eq4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 8
+              },
+              "process_id": "eq"
+            },
+            "eq5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 9
+              },
+              "process_id": "eq"
+            },
+            "eq6": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 10
+              },
+              "process_id": "eq"
+            },
+            "eq7": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 11
+              },
+              "process_id": "eq"
+            },
+            "gt1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement2"
+                },
+                "y": 40
+              },
+              "process_id": "gt"
+            },
+            "gt10": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement11"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt11": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement12"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement3"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt3": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement4"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement5"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement6"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt6": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement7"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt7": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement8"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt8": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement9"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "gt9": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement10"
+                },
+                "y": 15000
+              },
+              "process_id": "gt"
+            },
+            "lte1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement3"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte10": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement12"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement4"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte3": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement5"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement6"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement7"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte6": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement8"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte7": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement9"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte8": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement10"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "lte9": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement11"
+                },
+                "y": 0
+              },
+              "process_id": "lte"
+            },
+            "or1": {
+              "arguments": {
+                "x": {
+                  "from_node": "eq1"
+                },
+                "y": {
+                  "from_node": "eq2"
+                }
+              },
+              "process_id": "or"
+            },
+            "or10": {
+              "arguments": {
+                "x": {
+                  "from_node": "or9"
+                },
+                "y": {
+                  "from_node": "lte2"
+                }
+              },
+              "process_id": "or"
+            },
+            "or11": {
+              "arguments": {
+                "x": {
+                  "from_node": "or10"
+                },
+                "y": {
+                  "from_node": "gt3"
+                }
+              },
+              "process_id": "or"
+            },
+            "or12": {
+              "arguments": {
+                "x": {
+                  "from_node": "or11"
+                },
+                "y": {
+                  "from_node": "lte3"
+                }
+              },
+              "process_id": "or"
+            },
+            "or13": {
+              "arguments": {
+                "x": {
+                  "from_node": "or12"
+                },
+                "y": {
+                  "from_node": "gt4"
+                }
+              },
+              "process_id": "or"
+            },
+            "or14": {
+              "arguments": {
+                "x": {
+                  "from_node": "or13"
+                },
+                "y": {
+                  "from_node": "lte4"
+                }
+              },
+              "process_id": "or"
+            },
+            "or15": {
+              "arguments": {
+                "x": {
+                  "from_node": "or14"
+                },
+                "y": {
+                  "from_node": "gt5"
+                }
+              },
+              "process_id": "or"
+            },
+            "or16": {
+              "arguments": {
+                "x": {
+                  "from_node": "or15"
+                },
+                "y": {
+                  "from_node": "lte5"
+                }
+              },
+              "process_id": "or"
+            },
+            "or17": {
+              "arguments": {
+                "x": {
+                  "from_node": "or16"
+                },
+                "y": {
+                  "from_node": "gt6"
+                }
+              },
+              "process_id": "or"
+            },
+            "or18": {
+              "arguments": {
+                "x": {
+                  "from_node": "or17"
+                },
+                "y": {
+                  "from_node": "lte6"
+                }
+              },
+              "process_id": "or"
+            },
+            "or19": {
+              "arguments": {
+                "x": {
+                  "from_node": "or18"
+                },
+                "y": {
+                  "from_node": "gt7"
+                }
+              },
+              "process_id": "or"
+            },
+            "or2": {
+              "arguments": {
+                "x": {
+                  "from_node": "or1"
+                },
+                "y": {
+                  "from_node": "eq3"
+                }
+              },
+              "process_id": "or"
+            },
+            "or20": {
+              "arguments": {
+                "x": {
+                  "from_node": "or19"
+                },
+                "y": {
+                  "from_node": "lte7"
+                }
+              },
+              "process_id": "or"
+            },
+            "or21": {
+              "arguments": {
+                "x": {
+                  "from_node": "or20"
+                },
+                "y": {
+                  "from_node": "gt8"
+                }
+              },
+              "process_id": "or"
+            },
+            "or22": {
+              "arguments": {
+                "x": {
+                  "from_node": "or21"
+                },
+                "y": {
+                  "from_node": "lte8"
+                }
+              },
+              "process_id": "or"
+            },
+            "or23": {
+              "arguments": {
+                "x": {
+                  "from_node": "or22"
+                },
+                "y": {
+                  "from_node": "gt9"
+                }
+              },
+              "process_id": "or"
+            },
+            "or24": {
+              "arguments": {
+                "x": {
+                  "from_node": "or23"
+                },
+                "y": {
+                  "from_node": "lte9"
+                }
+              },
+              "process_id": "or"
+            },
+            "or25": {
+              "arguments": {
+                "x": {
+                  "from_node": "or24"
+                },
+                "y": {
+                  "from_node": "gt10"
+                }
+              },
+              "process_id": "or"
+            },
+            "or26": {
+              "arguments": {
+                "x": {
+                  "from_node": "or25"
+                },
+                "y": {
+                  "from_node": "lte10"
+                }
+              },
+              "process_id": "or"
+            },
+            "or27": {
+              "arguments": {
+                "x": {
+                  "from_node": "or26"
+                },
+                "y": {
+                  "from_node": "gt11"
+                }
+              },
+              "process_id": "or",
+              "result": true
+            },
+            "or3": {
+              "arguments": {
+                "x": {
+                  "from_node": "or2"
+                },
+                "y": {
+                  "from_node": "eq4"
+                }
+              },
+              "process_id": "or"
+            },
+            "or4": {
+              "arguments": {
+                "x": {
+                  "from_node": "or3"
+                },
+                "y": {
+                  "from_node": "eq5"
+                }
+              },
+              "process_id": "or"
+            },
+            "or5": {
+              "arguments": {
+                "x": {
+                  "from_node": "or4"
+                },
+                "y": {
+                  "from_node": "eq6"
+                }
+              },
+              "process_id": "or"
+            },
+            "or6": {
+              "arguments": {
+                "x": {
+                  "from_node": "or5"
+                },
+                "y": {
+                  "from_node": "eq7"
+                }
+              },
+              "process_id": "or"
+            },
+            "or7": {
+              "arguments": {
+                "x": {
+                  "from_node": "or6"
+                },
+                "y": {
+                  "from_node": "gt1"
+                }
+              },
+              "process_id": "or"
+            },
+            "or8": {
+              "arguments": {
+                "x": {
+                  "from_node": "or7"
+                },
+                "y": {
+                  "from_node": "lte1"
+                }
+              },
+              "process_id": "or"
+            },
+            "or9": {
+              "arguments": {
+                "x": {
+                  "from_node": "or8"
+                },
+                "y": {
+                  "from_node": "gt2"
+                }
+              },
+              "process_id": "or"
+            }
+          }
+        }
+      },
+      "process_id": "reduce_dimension"
+    },
+    "reducedimension2": {
+      "arguments": {
+        "data": {
+          "from_node": "resamplespatial1"
+        },
+        "dimension": "bands",
+        "reducer": {
+          "process_graph": {
+            "arrayelement1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "SCL"
+              },
+              "process_id": "array_element"
+            },
+            "arrayelement2": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "label": "CLD"
+              },
+              "process_id": "array_element"
+            },
+            "eq1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 1
+              },
+              "process_id": "eq"
+            },
+            "eq2": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 3
+              },
+              "process_id": "eq"
+            },
+            "eq3": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 8
+              },
+              "process_id": "eq"
+            },
+            "eq4": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 9
+              },
+              "process_id": "eq"
+            },
+            "eq5": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 10
+              },
+              "process_id": "eq"
+            },
+            "eq6": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement1"
+                },
+                "y": 11
+              },
+              "process_id": "eq"
+            },
+            "gt1": {
+              "arguments": {
+                "x": {
+                  "from_node": "arrayelement2"
+                },
+                "y": 40
+              },
+              "process_id": "gt"
+            },
+            "if1": {
+              "arguments": {
+                "accept": 1,
+                "reject": 0,
+                "value": {
+                  "from_node": "or6"
+                }
+              },
+              "process_id": "if",
+              "result": true
+            },
+            "or1": {
+              "arguments": {
+                "x": {
+                  "from_node": "eq1"
+                },
+                "y": {
+                  "from_node": "eq2"
+                }
+              },
+              "process_id": "or"
+            },
+            "or2": {
+              "arguments": {
+                "x": {
+                  "from_node": "or1"
+                },
+                "y": {
+                  "from_node": "eq3"
+                }
+              },
+              "process_id": "or"
+            },
+            "or3": {
+              "arguments": {
+                "x": {
+                  "from_node": "or2"
+                },
+                "y": {
+                  "from_node": "eq4"
+                }
+              },
+              "process_id": "or"
+            },
+            "or4": {
+              "arguments": {
+                "x": {
+                  "from_node": "or3"
+                },
+                "y": {
+                  "from_node": "eq5"
+                }
+              },
+              "process_id": "or"
+            },
+            "or5": {
+              "arguments": {
+                "x": {
+                  "from_node": "or4"
+                },
+                "y": {
+                  "from_node": "eq6"
+                }
+              },
+              "process_id": "or"
+            },
+            "or6": {
+              "arguments": {
+                "x": {
+                  "from_node": "or5"
+                },
+                "y": {
+                  "from_node": "gt1"
+                }
+              },
+              "process_id": "or"
+            }
+          }
+        }
+      },
+      "process_id": "reduce_dimension"
+    },
+    "reducedimension3": {
+      "arguments": {
+        "data": {
+          "from_node": "mask1"
+        },
+        "dimension": "t",
+        "reducer": {
+          "process_graph": {
+            "arrayelement1": {
+              "arguments": {
+                "data": {
+                  "from_node": "quantiles1"
+                },
+                "index": 0
+              },
+              "process_id": "array_element",
+              "result": true
+            },
+            "quantiles1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                },
+                "ignore_nodata": true,
+                "probabilities": [
+                  0.75
+                ]
+              },
+              "process_id": "quantiles"
+            }
+          }
+        }
+      },
+      "process_id": "reduce_dimension"
+    },
+    "reducedimension4": {
+      "arguments": {
+        "data": {
+          "from_node": "filterbands2"
+        },
+        "dimension": "t",
+        "reducer": {
+          "process_graph": {
+            "count1": {
+              "arguments": {
+                "data": {
+                  "from_parameter": "data"
+                }
+              },
+              "process_id": "count",
+              "result": true
+            }
+          }
+        }
+      },
+      "process_id": "reduce_dimension"
+    },
+    "renamelabels1": {
+      "arguments": {
+        "data": {
+          "from_node": "reducedimension4"
+        },
+        "dimension": "bands",
+        "source": [
+          "B02"
+        ],
+        "target": [
+          "valid_count"
+        ]
+      },
+      "process_id": "rename_labels"
+    },
+    "resamplespatial1": {
+      "arguments": {
+        "align": "upper-left",
+        "data": {
+          "from_node": "loadcollection1"
+        },
+        "method": "near",
+        "projection": 32634,
+        "resolution": 10.0
+      },
+      "process_id": "resample_spatial"
+    },
+    "saveresult1": {
+      "arguments": {
+        "data": {
+          "from_node": "mergecubes2"
+        },
+        "format": "GTiff",
+        "options": {}
+      },
+      "process_id": "save_result",
+      "result": true
+    }
+  },
+  "summary": "Sentinel-2 p75 composite, window spring"
+}
