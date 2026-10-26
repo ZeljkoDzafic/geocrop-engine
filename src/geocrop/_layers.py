@@ -55,11 +55,13 @@ LAYERS: dict[str, frozenset[str]] = {
         "stac_import",   # STAC COG import
         "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
         "public_data",   # runtime download of public reference datasets (EuroCrops, WorldCereal calendars)
+        "datacube",      # external xarray/Zarr/NetCDF cubes and optional odc-stac loading <-> file contracts
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
+        "registry",      # local file-based model and benchmark registry
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),
