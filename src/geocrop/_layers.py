@@ -36,6 +36,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "calendars",     # data-driven crop calendars and phenological windows
         "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
+        "review",        # analyst parcel review: queue, evidence, append-only decisions, label export
         "feature_providers",  # foundation-model feature-provider protocol + built-in providers (no network)
         "galileo_encoder",    # Galileo encoder port (torch, optional)
         "anysat_encoder",     # AnySat encoder port (torch, optional)
@@ -66,11 +67,11 @@ LAYERS: dict[str, frozenset[str]] = {
         "registry",      # local file-based model and benchmark registry
     }),
     # Entry points. Nothing below this layer may import it.
-    INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),
+    INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map", "web_review"}),
 }
 
 #: Web modules may only be imported by the CLI (``geocrop serve``) and by each other.
-WEB_MODULES = frozenset({"web", "web_jobs", "web_map"})
+WEB_MODULES = frozenset({"web", "web_jobs", "web_map", "web_review"})
 WEB_IMPORTERS = frozenset({"cli"}) | WEB_MODULES
 
 #: Third-party libraries core modules may use: the scientific/geospatial stack and optional ML backends.
@@ -78,6 +79,7 @@ CORE_THIRD_PARTY = frozenset({
     "numpy", "scipy", "pandas", "sklearn", "joblib", "rasterio", "geopandas", "shapely", "pyproj", "affine",
     "skimage", "torch", "lightgbm", "catboost", "omnicloudmask", "segmentation_models_pytorch",
     "matplotlib",   # optional, imported lazily for figures (active_learning.plot_curves)
+    "pyarrow",      # Parquet schema reads without loading rows (review.discover)
 })
 
 #: Standard-library modules core must not use: network access and process execution belong in adapters.

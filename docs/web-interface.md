@@ -52,6 +52,8 @@ the legend. The expand button (or <kbd>F</kbd>) shows the map full-window.
 * **Jobs** — the persistent job history with status, relative start time, duration and exit code;
   queued/running/succeeded/failed/cancelled/interrupted states, incremental logs and cancellation.
 * **Terminal** — a macOS-style engine console with syntax colouring, completion and history (see below).
+* **Review** — walk the parcels of a finished parcel job one by one and record analyst decisions (see
+  [Review](#review-analyst-parcel-decisions) below).
 * **Python & API** — Jupyter/Python and HTTP examples and an authenticated OpenAPI schema download.
 
 The sidebar lists recent jobs; on a phone the views move to a bottom tab bar. Light and dark appearance follow the
@@ -63,10 +65,11 @@ system; the moon/sun button overrides it (remembered in this browser only).
 |---|---|
 | <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> | command palette: search commands and actions |
 | <kbd>N</kbd> | new analysis |
-| <kbd>1</kbd>–<kbd>5</kbd> | Map, Commands, Jobs, Terminal, Python & API |
+| <kbd>1</kbd>–<kbd>6</kbd> | Map, Commands, Jobs, Terminal, Review, Python & API |
 | <kbd>F</kbd> | expand or restore the map |
 | <kbd>[</kbd> / <kbd>]</kbd> | previous / next imagery date |
-| <kbd>J</kbd> / <kbd>K</kbd> | next / previous job |
+| <kbd>J</kbd> / <kbd>K</kbd> | next / previous job; in Review: next / previous parcel |
+| <kbd>A</kbd> / <kbd>D</kbd> / <kbd>U</kbd> | Review: agree, disagree (then pick the class, <kbd>↵</kbd> saves), can't tell |
 | <kbd>?</kbd> | shortcut overview |
 | <kbd>Esc</kbd> | close a sheet, cancel area drawing or leave the expanded map |
 
@@ -101,6 +104,98 @@ cross-origin browser requests are rejected and every response carries a strict c
 related headers (see [security](security.md)). Artifact downloads are attachments, and listings are
 limited to the first 200 files within a job's declared output locations. Use local filesystem tools
 for larger output inventories.
+
+## Review: analyst parcel decisions
+
+The **Review** view (<kbd>5</kbd>) turns a finished parcel job into a review queue, in the spirit of the
+expert-judgement tools used in checks by monitoring (ideas only; no code from those projects is used). Select the
+job in the sidebar — `geocrop demo`, `geocrop run` with parcels, `geocrop parcels` or `geocrop traffic-light` —
+and open Review. Jobs without a parcel layer (for example a quicklook, which holds imagery only) show what is needed
+instead.
+
+* **Queue** — filter by traffic light, review state (to review / reviewed / all), declared class, reason code,
+  uncertainty (ambiguous conformal set, confidence below 0.6 or 0.8) and, when the layer has several values, the
+  model decision; sort by priority (red → yellow → grey → green, then lowest confidence), confidence, entropy,
+  margin, area or id; search by parcel id. <kbd>J</kbd>/<kbd>K</kbd> move through the queue.
+* **Parcel card** — declared vs predicted class, confidence and conformal prediction set, reason codes as pills
+  (declaration, traffic-light, model-decision and evidence codes), mean class probabilities, the parcel outlined on
+  the map (the same Leaflet map and basemaps as the Map view; clicking another parcel on the map opens it), the
+  markers (`cbm` phenology and `cbm_markers` event columns found in the layer or in marker tables of the job) and
+  every attribute.
+* **Time series** — inline SVG, one panel per sensor (Sentinel-2 indices; Sentinel-1 VV/VH/VH−VV in dB) with
+  observed points, ±1 standard deviation for a single series, ticks for acquisitions without valid pixels and a
+  hover read-out. The series come from signature tables (`geocrop signatures` / `s1-signatures`, CSV or Parquet)
+  found in the job's outputs, else from an evidence package; without either the view computes parcel means of NDVI and S1 backscatter from the job's
+  composites or scene folders. Signatures produced by another job can be passed as evidence
+  (`evidence=<job id>` on the API).
+* **Image chips** — true colour or NDVI crops around the parcel for every composite window or scene date, with the
+  parcel outline. One percentile stretch is shared by all dates of a parcel so brightness is comparable; dates with
+  little valid data are dimmed and labelled. Chips are downsampled (at most 256 px) and cached in the web state
+  directory (`<state>/review-cache/<job id>/`), never in the job's outputs.
+* **Evidence packages** — when the job's outputs (or an evidence job) contain `geocrop evidence` packages
+  (`<parcel>/evidence.json` with schema `geocrop-parcel-evidence`), the card adds the rules the package records as
+  triggered to the reason pills and offers the package page as a download (it is never rendered inside the
+  workspace). Without signature tables, the package's observed and rejected acquisitions and its interpolated curve
+  become the time series.
+
+### Decisions
+
+<kbd>A</kbd> agrees with the predicted class, <kbd>D</kbd> opens the class picker (the declared class is
+preselected when it differs from the prediction; *Other class…* accepts a new name) and <kbd>U</kbd> records
+*can't tell*. Each decision states its **purpose** — *Training* or *Validation* — explicitly; the choice and the
+analyst name are remembered in this browser only. Decisions are appended to `<job output>/review/decisions.csv`
+(beside a single-file output: `<stem>_review/decisions.csv`); earlier rows are never edited and the latest row per
+parcel counts:
+
+| column | content |
+|---|---|
+| `timestamp_utc` | ISO 8601 time in UTC |
+| `parcel_id`, `decision`, `label` | `agree` (label = predicted class), `disagree` (label = corrected class), `unsure` (empty label) |
+| `predicted_class`, `declared_class` | as shown when the decision was made |
+| `analyst`, `comment` | free text, one line; values starting with `=`, `+`, `-`, `@` are prefixed with `'` so spreadsheets do not run them |
+| `purpose` | `training` or `validation` |
+| `confidence` | optional analyst confidence 0–1 (API) |
+| `model_sha256` | the model hash from `prediction_manifest.json` (or the conformal calibration record) |
+| `parcels_layer` | workspace-relative path of the reviewed layer |
+
+**Export labels** writes `review/labels_<purpose>[_round<k>].csv` with exactly the columns read by
+[`geocrop active-learning ingest`](active-learning.md) (`parcel_id, label, source, date, confidence, purpose,
+observer, notes, al_round`; `source=analyst`, one row per parcel and analyst) and shows the next command:
+
+```bash
+geocrop active-learning ingest --labels outputs/demo/review/labels_training_round1.csv \
+    --parcels outputs/demo/parcels/parcels.gpkg --training data/reference/training.gpkg \
+    --out data/reference/training_r1.gpkg --round 1
+```
+
+Validation exports are kept apart for the accuracy assessment and are never offered for training. Analyst
+decisions concentrate on doubtful parcels: they are labels for the active-learning loop, **not** a probability
+sample, and must not be used to estimate map accuracy or area.
+
+### Review API
+
+All routes need the Bearer token and are also served under `/api/v1`. Clients never send file paths: a layer is
+chosen by its workspace-relative name among the layers found in the job, extra evidence by job id, and downloads
+by fixed file names inside the review folder. Every file read comes from the job's declared outputs after
+resolving symbolic links; the review folder and the decision log are refused when they are symbolic links or
+resolve outside the workspace.
+
+| route | purpose |
+|---|---|
+| `GET /api/v1/jobs/{id}/review` | layers, facets (filter values with counts), progress, model hash, evidence sources |
+| `GET /api/v1/jobs/{id}/review/parcels` | queue page: `traffic_light`, `declared_class`, `decision`, `reason` (comma-separated), `max_confidence`, `min_set_size`, `review=all\|pending\|done`, `q`, `sort`, `order`, `offset`, `limit` |
+| `GET /api/v1/jobs/{id}/review/parcel?id=` | parcel detail, markers, reason codes, series, WGS 84 outline, decision history |
+| `GET /api/v1/jobs/{id}/review/chips?id=&kind=true\|ndvi&size=` | chips as PNG data URLs with outline and valid share |
+| `POST /api/v1/jobs/{id}/review/decisions` | `{parcel_id, decision, purpose, label?, analyst?, comment?, confidence?}` |
+| `GET /api/v1/jobs/{id}/review/evidence?id=&format=html\|json` | download the parcel's evidence package page or record |
+| `GET /api/v1/jobs/{id}/review/decisions` | latest decision per parcel |
+| `POST /api/v1/jobs/{id}/review/export` | `{purpose, round?}` → label table in the review folder |
+| `GET /api/v1/jobs/{id}/review/file?name=` | download `decisions.csv` or an exported `labels_*.csv` |
+
+Limitations: one parcel layer is loaded into memory per request cache (fine for tens of thousands of parcels;
+national layers should be reviewed in subsets); chips need S2 bands `B02`, `B03`, `B04`, `B08` in composite or scene
+folders of the job; the screenshots in the tests use the synthetic demo, which is a software check, not evidence of
+accuracy.
 
 ## CLI console (terminal)
 
