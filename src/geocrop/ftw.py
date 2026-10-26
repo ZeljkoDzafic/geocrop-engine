@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -128,11 +127,9 @@ def check_licence(name: str, allow_noncommercial: bool = False) -> FTWModel:
 
 
 def default_cache_dir() -> Path:
-    """``$GEOCROP_FTW_CACHE``, else ``$XDG_CACHE_HOME/geocrop/ftw`` (default ``~/.cache/geocrop/ftw``)."""
-    if os.environ.get("GEOCROP_FTW_CACHE"):
-        return Path(os.environ["GEOCROP_FTW_CACHE"])
-    base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    return base / "geocrop" / "ftw"
+    """``$GEOCROP_CACHE/ftw`` (see `geocrop.cachedirs`; ``$GEOCROP_FTW_CACHE`` is a deprecated alias)."""
+    from .cachedirs import cache_dir
+    return cache_dir("ftw")
 
 
 def checkpoint_path(name: str, cache_dir: str | Path | None = None) -> Path:
@@ -226,7 +223,7 @@ def _torch():
     try:
         import torch
     except ImportError as exc:  # pragma: no cover - depends on the environment
-        raise RuntimeError("FTW inference needs PyTorch: pip install torch segmentation-models-pytorch") from exc
+        raise RuntimeError('FTW inference needs PyTorch: pip install -e ".[ftw]" (torch, segmentation-models-pytorch)') from exc
     return torch
 
 
@@ -241,7 +238,7 @@ def load_checkpoint(path: str | Path):
         import segmentation_models_pytorch as smp
     except ImportError as exc:
         raise RuntimeError("FTW checkpoints need segmentation-models-pytorch (MIT): "
-                           "pip install segmentation-models-pytorch") from exc
+                           'pip install -e ".[ftw]" (or pip install segmentation-models-pytorch)') from exc
     ckpt = torch.load(path, map_location="cpu", weights_only=True)
     hp = dict(ckpt["hyper_parameters"])
     kind = hp.get("model")

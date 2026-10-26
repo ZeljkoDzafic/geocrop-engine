@@ -107,8 +107,10 @@ def test_remote_npy_reads_row_ranges():
 
 def test_download_rejects_wrong_checksum(tmp_path):
     class Session:
-        def get(self, url, stream=True, timeout=None):
+        def get(self, url, stream=True, timeout=None, **kw):
             class R:
+                status_code, headers = 200, {}
+
                 def __enter__(self):
                     return self
 
@@ -122,7 +124,7 @@ def test_download_rejects_wrong_checksum(tmp_path):
                     yield b"not a checkpoint"
             return R()
 
-    with pytest.raises(ValueError, match="SHA-256"):
+    with pytest.raises(ValueError, match="Checksum mismatch"):
         embedding_sources.download("https://example.org/x.pt", tmp_path / "x.pt", "0" * 64, Session())
     assert not (tmp_path / "x.pt").exists()
 

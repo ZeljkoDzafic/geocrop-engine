@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-from . import contracts, faultinject, indices
+from . import attribution, contracts, faultinject, indices
 from .raster import (
     NODATA,
     RasterInputError,
@@ -187,6 +187,7 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
         with rasterio.open(out, "w", **float_profile(first, count=len(names))) as sink:
             for i, n in enumerate(names, 1):
                 sink.set_band_description(i, n)
+            attribution.propagate([ds.name for ds in sources.values()], sink)
             for w in blocks(first.width, first.height, block_size):
                 values: dict[str, np.ndarray] = {}
                 for p in periods:

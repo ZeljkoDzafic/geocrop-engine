@@ -13,11 +13,14 @@ from pathlib import Path
 import rasterio
 from rasterio.shutil import copy as rio_copy
 
+from . import attribution
+
 
 def to_cog(src: str | Path, dst: str | Path, overview_resampling: str = "nearest") -> Path:
     """Copy a GeoTIFF as a Cloud-Optimised GeoTIFF (GDAL COG driver, deflate, internal overviews).
 
-    Use `nearest`/`mode` for class rasters and `average` for continuous layers."""
+    Use `nearest`/`mode` for class rasters and `average` for continuous layers. Dataset tags, including the
+    Copernicus attribution (``GEOCROP_ATTRIBUTION``), are copied into the COG."""
     dst = Path(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     rio_copy(str(src), str(dst), driver="COG", COMPRESS="DEFLATE", OVERVIEW_RESAMPLING=overview_resampling.upper(),
@@ -198,6 +201,18 @@ def stac_item(prediction_dir: str | Path, item_id: str, start: str, end: str, ou
                       "processing:software": {"geocrop-engine": _ver()}}
         if properties["proj:epsg"] is None:
             properties["proj:wkt2"] = ds.crs.to_wkt(version="WKT2_2019")
+        credit = ds.tags().get(attribution.TAG)
+    links = []
+    if credit:          # derived from Copernicus Sentinel data: attribution, licence link and providers
+        properties.update({
+            "license": "other", "attribution": credit,
+            "providers": [{"name": "European Union Copernicus programme / ESA (Sentinel data)",
+                           "roles": ["producer", "licensor"], "url": "https://www.copernicus.eu",
+                           "description": credit},
+                          {"name": "GeoCrop Engine", "roles": ["processor"],
+                           "url": "https://github.com/ZeljkoDzafic/geocrop-engine"}]})
+        links.append({"rel": "license", "href": attribution.COPERNICUS_LICENCE.rsplit(" ", 1)[-1],
+                      "title": "Copernicus Sentinel data legal notice"})
     for key, filename in (("class_legend", "class_legend.json"), ("run_manifest", "run_manifest.json"),
                           ("train_report", "train_report.json"), ("model_card", "model_card.json")):
         path = pred / filename
@@ -215,7 +230,7 @@ def stac_item(prediction_dir: str | Path, item_id: str, start: str, end: str, ou
         inputs.append(path)
     item = {"type": "Feature", "stac_version": "1.0.0", "id": item_id,
             "stac_extensions": [CLASSIFICATION_SCHEMA, PROJECTION_SCHEMA, RASTER_SCHEMA],
-            "bbox": bbox, "geometry": geometry, "properties": properties, "assets": assets, "links": []}
+            "bbox": bbox, "geometry": geometry, "properties": properties, "assets": assets, "links": links}
     if target is not None:
         if any(target.resolve() == source.resolve() or (target.exists() and target.samefile(source)) for source in inputs):
             raise ValueError("STAC Item output must not overwrite an input asset")

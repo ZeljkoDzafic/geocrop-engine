@@ -593,8 +593,9 @@ LIMITATIONS = [
     "Docker is a clean-machine proxy only: the image reuses its base layers and runs on the gate host's kernel/CPU "
     "architecture. A real fresh-VM run (deploy/vm_acceptance.sh on the target Ubuntu 24.04 machine, e.g. the "
     "Telelink VM provisioned with deploy/setup_ubuntu.sh) is still required before a production release.",
-    "The Docker image installs from environment.yml (conda-forge, Python 3.11, unpinned) and not from "
-    "constraints/py312.txt; the clean venv is the pinned path.",
+    "The Docker image (python:3.12-slim-bookworm) installs the default extras all,stac,web from "
+    "constraints/py312.txt; the torch/boost/cloud extras are exercised in the clean venv only, and the base "
+    "image and its Debian packages are not pinned by digest.",
     "Network checks depend on public services (Earth Search, Planetary Computer, Zenodo, model hosts); a service "
     "outage is recorded as a failure or skip with the error, not hidden.",
 ]

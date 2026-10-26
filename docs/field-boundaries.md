@@ -17,8 +17,9 @@ It is an alternative to training the small GeoCrop U-Net when no local boundary 
 | segmentation-models-pytorch | MIT | optional runtime dependency to build the network |
 | Delineate Anything weights | AGPL-3.0 | not supported (would only be acceptable as an external process) |
 
-Checkpoints are downloaded at runtime from the official FTW GitHub releases into a cache
-(`$GEOCROP_FTW_CACHE`, else `$XDG_CACHE_HOME/geocrop/ftw` or `~/.cache/geocrop/ftw`); they are never bundled.
+Checkpoints are downloaded at runtime from the official FTW GitHub releases into `$GEOCROP_CACHE/ftw` (default
+`~/.cache/geocrop/ftw`; the former `$GEOCROP_FTW_CACHE` still works with a deprecation warning), with retries,
+resume and checksum verification; they are never bundled.
 Each one is pinned by URL, size and SHA-256 in `geocrop.ftw.MODELS` (GitHub release-asset digests for v2, v3 and
 v3.1; for v1, which publishes no digest, computed from the downloaded file) and loaded with
 `torch.load(weights_only=True)`, so no pickled code is executed.
@@ -117,4 +118,5 @@ be measured against reference parcels.
   supported; siamese (`fcsiam*`), single-window, PlanetScope (FTP) and instance-segmentation models are not.
 * CPU inference is practical for municipalities; a whole country needs a GPU (`device` parameter) or patience.
 
-Optional dependencies: `torch` and `segmentation-models-pytorch` (both installed lazily, MIT/BSD licensed).
+Optional dependencies: `torch` and `segmentation-models-pytorch` (both imported lazily, MIT/BSD licensed):
+`pip install -e '.[ftw]'`.

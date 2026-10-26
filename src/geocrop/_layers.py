@@ -34,6 +34,8 @@ LAYERS: dict[str, frozenset[str]] = {
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
         "calendars",     # data-driven crop calendars and phenological windows
+        "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
+        "cachedirs",     # download cache root and subfolders (environment variables only)
         "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
         "review",        # analyst parcel review: queue, evidence, append-only decisions, label export
@@ -57,6 +59,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "stac_import",   # STAC COG import
         "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
         "public_data",   # runtime download of public reference datasets (EuroCrops, WorldCereal calendars)
+        "downloads",     # retry/backoff + HTTP Range resume + checksum verification for run-time downloads
         "datacube",      # external xarray/Zarr/NetCDF cubes and optional odc-stac loading <-> file contracts
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.

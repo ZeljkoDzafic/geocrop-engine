@@ -33,6 +33,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling, transform_bounds
 
+from . import attribution
 from . import scenes as scene_meta
 from .indices import S1_POLARISATIONS
 from .raster import NODATA, float_profile
@@ -132,10 +133,13 @@ def write_scene(arrays: dict[str, np.ndarray], items: list, reference: str | Pat
     out.mkdir(parents=True, exist_ok=True)
     with rasterio.open(reference) as ref:
         profile = float_profile(ref)
+    atags = attribution.tags([items[0].properties.get("datetime")])
     for pol in S1_POLARISATIONS:
         with rasterio.open(out / f"{pol}.tif", "w", **profile) as dst:
             dst.write(np.where(np.isfinite(arrays[pol]), arrays[pol], NODATA).astype("float32"), 1)
             dst.set_band_description(1, f"gamma0_{pol}_linear")
+            dst.update_tags(**atags, licence=LICENCE,
+                            attribution=ATTRIBUTION.format(year=str(items[0].properties.get("datetime", ""))[:4]))
     p = items[0].properties
     coverage = float((np.isfinite(arrays["VV"]) & np.isfinite(arrays["VH"])).mean())
     year = str(p.get("datetime", ""))[:4]
@@ -368,6 +372,7 @@ def apply_offsets(scene_dirs, offsets: dict, out_root: str | Path, min_offset_px
                 v = nd_shift(v, (-dy, -dx), order=1, mode="constant", cval=np.nan)
             with rasterio.open(target / f"{pol}.tif", "w", **profile) as dst:
                 dst.write(np.where(np.isfinite(v) & (v > 0), v, NODATA).astype("float32"), 1)
+                attribution.propagate([d / f"{pol}.tif"], dst)
                 if desc:
                     dst.set_band_description(1, desc)
         body = {k: v for k, v in meta.items() if k not in ("date", "path")}

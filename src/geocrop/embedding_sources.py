@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import io
 import math
-import os
 import warnings
 from pathlib import Path
 
@@ -57,8 +56,9 @@ PRESTO_CHECKPOINT = {
 
 
 def cache_dir() -> Path:
-    """Download cache: $GEOCROP_CACHE, else ~/.cache/geocrop."""
-    return Path(os.environ.get("GEOCROP_CACHE") or Path.home() / ".cache" / "geocrop")
+    """Download cache root (`geocrop.cachedirs.cache_root`: $GEOCROP_CACHE, else ~/.cache/geocrop)."""
+    from .cachedirs import cache_root
+    return cache_root()
 
 
 def _session() -> requests.Session:
@@ -67,25 +67,13 @@ def _session() -> requests.Session:
     return s
 
 
-def download(url: str, target: str | Path, sha256: str | None = None, session: requests.Session | None = None) -> Path:
-    """Download once into ``target`` (atomic rename) and verify the SHA-256 when given."""
-    from .hashing import sha256 as file_sha256
-
-    target = Path(target)
-    if target.exists() and (sha256 is None or file_sha256(target) == sha256):
-        return target
-    target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(target.name + ".part")
-    with (session or _session()).get(url, stream=True, timeout=120) as r:
-        r.raise_for_status()
-        with open(tmp, "wb") as fh:
-            for chunk in r.iter_content(1 << 20):
-                fh.write(chunk)
-    if sha256 is not None and file_sha256(tmp) != sha256:
-        tmp.unlink()
-        raise ValueError(f"SHA-256 mismatch for {url}; refusing to use it")
-    tmp.replace(target)
-    return target
+def download(url: str, target: str | Path, sha256: str | None = None, session: requests.Session | None = None,
+             size: int | None = None) -> Path:
+    """Download once into ``target`` (`geocrop.downloads.fetch`: retry/backoff, resume, atomic rename) and
+    verify the SHA-256 (and size) when given."""
+    from .downloads import fetch
+    return fetch(url, target, f"sha256:{sha256}" if sha256 else None, size=size, timeout=120,
+                 session=session or _session())
 
 
 def presto_checkpoint(directory: str | Path | None = None) -> Path:
@@ -302,7 +290,7 @@ def fetch_weights(provider, directory: str | Path | None = None) -> Path | list[
     if not provider.weights:
         raise ValueError(f"Feature provider {provider.name!r} has no weights to download")
     root = Path(directory or cache_dir() / provider.name)
-    paths = [download(w.url, root / w.name, w.sha256) for w in provider.weights]
+    paths = [download(w.url, root / w.name, w.sha256, size=w.size) for w in provider.weights]
     return paths[0] if len(paths) == 1 else paths
 
 

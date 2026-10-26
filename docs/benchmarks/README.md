@@ -29,8 +29,8 @@ geocrop benchmark-public --protocol configs/benchmarks/eurocrops_si_2021_pomurje
     --work outputs/benchmarks/eurocrops-si-2021-pomurje-v1 --publish docs/benchmarks
 ```
 
-* EuroCrops `SI_2021.zip` (213 MB) is downloaded from Zenodo record 14094196 into `$GEOCROP_DATA_CACHE`
-  (default `~/.cache/geocrop/public`) and verified against the md5 in the protocol; only the parcels of the tiles
+* EuroCrops `SI_2021.zip` (213 MB) is downloaded from Zenodo record 14094196 into `$GEOCROP_CACHE/public`
+  (default `~/.cache/geocrop/public`; retried, resumed) and verified against the md5 in the protocol; only the parcels of the tiles
   are read. Nothing derived from it is committed except aggregate scores.
 * Sentinel-2 COGs are read window-wise for each 10 x 10 km tile (69 tile-acquisitions x 11 bands in the v1 run; ~4 GB
   of scenes, composites and stacks in `--work`). The run is resumable: imported scenes, composites and stacks are reused.

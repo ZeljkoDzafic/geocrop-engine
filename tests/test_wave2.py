@@ -121,8 +121,10 @@ def test_tempcnn(ts_stack, scenes):
     pytest.importorskip("torch")
     from geocrop.features import select
     from geocrop.samples import extract
-    s = extract(ts_stack, scenes["training"], max_per_polygon=20)
     names = select(load_manifest(ts_stack), groups=["ts"])
+    # only the `ts` features must be valid: phenology is NaN for winter crops (season starts before the series)
+    s = extract(ts_stack, scenes["training"], max_per_polygon=20, features=names)
+    assert not s.missing_classes()
     rep = model.train(s, Path(scenes["root"]) / "tcnn", features=names,
                       params={"algorithm": "tempcnn", "epochs": 3, "batch_size": 64},
                       n_splits=2, spatial_block_m=500, bootstrap=0)
@@ -239,9 +241,12 @@ def test_pipeline_from_scenes_with_timeseries_and_cbm(scenes, tmp_path):
         "timeseries": {"enabled": True, "start": "2023-03-15", "end": "2023-10-31", "s2_indices": ["NDVI"],
                        "s1_indices": [], "output_step_days": 30},
         "cbm": {"enabled": True, "calendar": str(cal)},
-        "model": {"n_estimators": 30, "cv_folds": 2, "spatial_block_m": 500, "max_samples_per_polygon": 30},
+        # Phenology metrics are NaN for winter crops (their season starts before the series): train on every
+        # other group, otherwise the samples stage would lose the class and train refuses to run.
+        "model": {"n_estimators": 30, "cv_folds": 2, "spatial_block_m": 500, "max_samples_per_polygon": 30,
+                  "feature_groups": ["s2_band", "s2_index", "s1", "delta", "seasonal", "ts", "harmonic"]},
         "validation": {"year": 2023, "bootstrap": 0},
-        "experiments": {"windows": {"groups": ["s2_band", "s2_index"]}, "timeseries": {"groups": ["ts", "phenology"]}},
+        "experiments": {"windows": {"groups": ["s2_band", "s2_index"]}, "timeseries": {"groups": ["ts", "harmonic"]}},
     }
     path = tmp_path / "cfg.yaml"
     path.write_text(yaml.safe_dump(cfg))

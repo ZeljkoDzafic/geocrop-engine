@@ -5,6 +5,8 @@ The pins are imported from the engine itself, never duplicated here:
 
 * ``geocrop.ftw.MODELS``                        - Fields of The World checkpoints (URL, size, SHA-256)
 * ``geocrop.embedding_sources.PRESTO_CHECKPOINT`` - Presto ``default_model.pt`` (URL, SHA-256)
+* ``geocrop.feature_providers`` ``weights``       - Galileo / AnySat (and any other provider) weight files
+* ``geocrop.clouds.omnicloudmask_files()``        - OmniCloudMask weights (Hugging Face revision, SHA-256)
 * ``geocrop.public_data.WORLDCEREAL_CHECKSUMS``   - WorldCereal crop-calendar GeoTIFFs on PANGAEA (SHA-256)
 * ``configs/benchmarks/*.yaml`` ``dataset``       - EuroCrops archives on Zenodo (checksum as pinned, e.g. md5)
 
@@ -48,6 +50,16 @@ def pins() -> list[dict]:
     out.append({"name": "presto:default_model.pt", "url": PRESTO_CHECKPOINT["url"],
                 "checksum": f"sha256:{PRESTO_CHECKPOINT['sha256']}", "size": None,
                 "licence": PRESTO_CHECKPOINT.get("licence")})
+    from geocrop import clouds, feature_providers
+    for name in feature_providers.names():
+        provider = feature_providers.get(name)
+        for w in getattr(provider, "weights", ()) or ():
+            if w.url == PRESTO_CHECKPOINT["url"]:
+                continue                       # listed above
+            out.append({"name": f"{name}:{w.name}", "url": w.url, "checksum": f"sha256:{w.sha256}",
+                        "size": w.size, "licence": getattr(provider, "licence", None)})
+    out += [{"name": f"omnicloudmask:{f['name']}", "url": f["url"], "checksum": f"sha256:{f['sha256']}",
+             "size": f["size"], "licence": clouds.OMNICLOUDMASK_LICENCE} for f in clouds.omnicloudmask_files()]
     out += [{"name": f"worldcereal:{name}", "url": f"{public_data.PANGAEA_FILES}/{name}", "checksum": checksum,
              "size": None, "licence": "CC-BY-SA-4.0"}
             for name, checksum in public_data.WORLDCEREAL_CHECKSUMS.items()]

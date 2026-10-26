@@ -270,6 +270,17 @@ def test_cli_preflight_and_clean(study, tmp_path, capsys):
     assert out["dry_run"] is True and "would_remove" in out
 
 
+def test_unloadable_estimator_backend_blocks_preflight(study, monkeypatch):
+    """Same rule as train/benchmark: a missing or unloadable optional backend is reported, never a crash."""
+    from geocrop import estimators
+    monkeypatch.setattr(estimators, "backend_error",
+                        lambda algo: "lightgbm is installed but cannot load its native library (dlopen)"
+                        if algo == "lightgbm" else None)
+    report = preflight.run(_cfg(study, model={"algorithm": "lightgbm"}))
+    assert "model.backend" in codes(report, "error") and report["verdict"] == "blocked"
+    assert "model.backend" in codes(preflight.run(_cfg(study)), "pass")
+
+
 def test_estimate_is_calibrated_against_the_measured_500_km2_run(study):
     """Coefficients recalibrated from tools/scale_benchmark.py (docs/performance.md): a 5 Mpx grid with 97
     features, 100 trees and 551 450 training samples measured 741 s prediction (AOA map dominates), 181 s

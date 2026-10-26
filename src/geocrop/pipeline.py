@@ -432,14 +432,20 @@ class Runner:
         from .features import manifest_path
         cv = self.cfg["cv"]
         groups = {k: cv[k] for k in ("region_field", "year_field", "year") if cv[k] is not None}
+        extra = {"cv_groups": groups} if groups else {}
+        if m.get("feature_groups"):
+            extra["feature_groups"] = list(m["feature_groups"])
         fp = _fp_with((m["max_samples_per_polygon"], cl, self.cfg["seed"], self.paths["features"],
-                       manifest_path(self.paths["features"]), self.paths["training"]),
-                      {"cv_groups": groups} if groups else {})
+                       manifest_path(self.paths["features"]), self.paths["training"]), extra)
 
         def run():
+            selected = None
+            if m.get("feature_groups"):
+                from .features import load_manifest, select
+                selected = select(load_manifest(self.paths["features"]), groups=m["feature_groups"])
             s = extract(self.paths["features"], self.paths["training"], label_field=cl["label_field"],
                         id_field=cl["id_field"], max_per_polygon=m["max_samples_per_polygon"], seed=self.cfg["seed"],
-                        **groups)
+                        features=selected, **groups)
             s.save(target)
             return {"samples": int(len(s.y)), "polygons": int(len(set(s.polygon)))}
         return self.stage("samples", fp, [target], run)
@@ -471,7 +477,8 @@ class Runner:
                             calibrate=m["calibrate"], spatial_buffer_m=m["spatial_buffer_m"],
                             calibration_mode=m.get("calibration_mode", "oof"),
                             calibration_fraction=m.get("calibration_fraction", 0.2),
-                            holdout_fraction=m["holdout_fraction"], inner_splits=m["inner_splits"], **extra)
+                            holdout_fraction=m["holdout_fraction"], inner_splits=m["inner_splits"],
+                            allow_missing_classes=m.get("allow_missing_classes", False), **extra)
             info = {"cv_macro_f1": r["cross_validation"]["macro_f1"],
                     "cv_oa": r["cross_validation"]["overall_accuracy"]}
             if "transfer_validation" in r:

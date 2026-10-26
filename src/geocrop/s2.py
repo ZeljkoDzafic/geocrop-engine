@@ -18,7 +18,7 @@ import rasterio
 from rasterio.warp import Resampling
 from scipy.ndimage import binary_dilation
 
-from . import clouds
+from . import attribution, clouds
 from . import scenes as scene_meta
 from .indices import S2_BANDS
 from .raster import (
@@ -90,6 +90,7 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shado
     safe, out = Path(safe), Path(out)
     out.mkdir(parents=True, exist_ok=True)
     quant, offsets = safe_metadata(safe)
+    atags = attribution.tags([scene_meta.parse_product_name(safe.name).get("datetime")])
     with rasterio.open(reference or _locate(safe, "B02")) as ref:
         if ref.crs is None:
             raise ValueError("Missing raster CRS")
@@ -97,6 +98,7 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shado
         for band in S2_BANDS:
             method = Resampling.nearest if band in ("B02", "B03", "B04", "B08") else Resampling.bilinear
             with rasterio.open(_locate(safe, band)) as src, rasterio.open(out / f"{band}.tif", "w", **profile) as dst:
+                dst.update_tags(**atags)
                 for w in blocks(ref.width, ref.height, block_size):
                     dn = read_aligned(src, ref.window_transform(w), ref.crs, (int(w.height), int(w.width)),
                                       method, dtype="float32", fill=0, src_nodata=0)
@@ -108,6 +110,7 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shado
             if path is None:
                 continue
             with rasterio.open(path) as src, rasterio.open(out / f"{name}.tif", "w", **uint8) as dst:
+                dst.update_tags(**atags)
                 for w in blocks(ref.width, ref.height, block_size):
                     a = read_aligned(src, ref.window_transform(w), ref.crs, (int(w.height), int(w.width)),
                                      Resampling.nearest, dtype="uint8", fill=0)
@@ -227,6 +230,9 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
             count_profile = gtiff_profile(ref, count=1, dtype="uint16", nodata=None)
             sinks = {b: rasterio.open(out_dir / f"{b}.tif", "w", **profile) for b in S2_BANDS}
             counter = rasterio.open(out_dir / "valid_count.tif", "w", **count_profile)
+            credit = attribution.read([d / "B02.tif" for d in dirs])   # Copernicus attribution of the scenes
+            for sink in (*sinks.values(), counter) if credit else ():
+                sink.update_tags(**{attribution.TAG: credit, attribution.LICENCE_TAG: attribution.COPERNICUS_LICENCE})
             halo = int(mask_dilation_px)
             try:
                 for w in blocks(ref.width, ref.height, block_size):

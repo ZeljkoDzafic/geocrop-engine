@@ -317,6 +317,8 @@ Extract training samples from a stack and reference polygons
 | `--region-field` |  |  | polygon attribute stored as sample region id (leave-one-region-out) |
 | `--year-field` |  |  | polygon attribute stored as sample year id (leave-one-year-out) |
 | `--year` |  |  | constant year id for all samples of this single-season stack |
+| `--groups` |  |  | extract only these feature groups of the stack manifest (e.g. ts); a pixel then needs valid values for these features only |
+| `--feature-names` |  |  | extract only these features (combined with --groups: AND) |
 
 ## `geocrop train`
 
@@ -339,6 +341,7 @@ Spatial CV + final Random Forest
 | `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |
 | `--calibration-fraction` |  | `0.2` | fraction of spatial groups held out |
 | `--cv-strategy` |  | `spatial_blocks` | add leave-one-region/year-out transfer validation to the report |
+| `--allow-missing-classes` |  |  | train although a class of the reference polygons has no sample (default: refuse) |
 
 ## `geocrop benchmark`
 
@@ -355,6 +358,7 @@ Compare classifiers on identical spatial folds; internal model selection only
 | `--buffer-m` |  |  |  |
 | `--folds` |  |  |  |
 | `--seed` |  |  |  |
+| `--allow-missing-classes` |  |  | benchmark although a class of the reference polygons has no sample (default: refuse) |
 
 ## `geocrop predict`
 
@@ -730,6 +734,8 @@ Write CLOUDMASK.tif for S2 scene folders with OmniCloudMask (optional dependency
 | Option | Required | Default | Notes |
 |---|---|---|---|
 | `--scenes` | yes |  |  |
+| `--weights-dir` |  |  | pinned OmniCloudMask weights (default $GEOCROP_CACHE/omnicloudmask/<revision>; downloaded and SHA-256 verified on first use) |
+| `--unpinned-weights` |  |  | let the omnicloudmask package pick and download its own weights (not reproducible) |
 
 ## `geocrop export`
 
@@ -762,6 +768,9 @@ Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)
 | `--repeats` |  | `3` |  |
 | `--holdout` |  |  |  |
 | `--targets` |  | `[]` |  |
+| `--params` |  |  | per-model parameter overrides as JSON, e.g. {"ltae": {"epochs": 30}, "rf": {"n_estimators": 200}} |
+| `--epochs` |  |  | training epochs of the temporal deep models (tempcnn, ltae) |
+| `--allow-missing-classes` |  |  | benchmark although a class of the reference polygons has no sample (default: refuse) |
 
 ## `geocrop benchmark-segmentation`
 
@@ -794,7 +803,7 @@ Pretrained Fields of The World field boundaries (CC-BY checkpoints) -> parcels
 | `--model` |  | `FTW_PRUE_EFNET_B3_CCBY` | FTW registry name (see --list-models) |
 | `--checkpoint` |  |  | local checkpoint file instead of a registry download |
 | `--allow-noncommercial` |  |  | permit FULL (non-commercial training data) checkpoints; prints a licence warning |
-| `--cache-dir` |  |  | checkpoint cache (default $GEOCROP_FTW_CACHE or ~/.cache/geocrop/ftw) |
+| `--cache-dir` |  |  | checkpoint cache (default $GEOCROP_CACHE/ftw, i.e. ~/.cache/geocrop/ftw) |
 | `--no-download` |  |  | fail if the checkpoint is not cached |
 | `--download-only` |  |  |  |
 | `--list-models` |  |  |  |
@@ -816,7 +825,7 @@ Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC
 |---|---|---|---|
 | `--protocol` | yes |  | versioned protocol YAML, e.g. configs/benchmarks/*.yaml |
 | `--work` | yes |  | working directory (scenes, composites, results.json/.md) |
-| `--cache` |  |  | download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public |
+| `--cache` |  |  | download cache; default $GEOCROP_CACHE/public, i.e. ~/.cache/geocrop/public |
 | `--models` |  |  | subset of the protocol's models (default all) |
 | `--workers` |  | `4` | parallel scene imports |
 | `--layer` |  |  | local copy of the EuroCrops layer instead of the pinned download |

@@ -7,15 +7,12 @@
   (``WW_*``). PANGAEA stores the files on tape: the first request answers ``503`` with ``Retry-After`` while the
   file is staged, so `fetch` polls until it is available.
 
-Files are downloaded into a cache directory (``$GEOCROP_DATA_CACHE`` or ``~/.cache/geocrop/public``) and
+Files are downloaded into a cache directory (``$GEOCROP_CACHE/public``, default ``~/.cache/geocrop/public``) and
 verified against a pinned checksum when one is given. Derived labels and calendars inherit the ShareAlike terms
 of their sources; do not commit or redistribute them without attribution and the same licence.
 """
 from __future__ import annotations
 
-import hashlib
-import os
-import time
 import zipfile
 from pathlib import Path
 
@@ -45,60 +42,25 @@ USER_AGENT = "geocrop-engine (https://github.com/ZeljkoDzafic/geocrop-engine)"
 
 
 def cache_dir(path: str | Path | None = None) -> Path:
-    root = Path(path or os.environ.get("GEOCROP_DATA_CACHE") or Path.home() / ".cache" / "geocrop" / "public")
+    """`path`, else ``$GEOCROP_CACHE/public`` (`geocrop.cachedirs`; ``$GEOCROP_DATA_CACHE`` is a deprecated alias)."""
+    from .cachedirs import cache_dir as _cache_dir
+    root = Path(path) if path else _cache_dir("public")
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
-def _digest(path: Path, algorithm: str) -> str:
-    h = hashlib.new(algorithm)
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def verify(path: str | Path, checksum: str | None) -> bool:
     """True when `checksum` ('md5:<hex>' or 'sha256:<hex>') matches, or when no checksum is pinned."""
-    if not checksum:
-        return Path(path).is_file()
-    algorithm, _, expected = checksum.partition(":")
-    if algorithm not in ("md5", "sha256") or not expected:
-        raise ValueError(f"Checksum must be 'md5:<hex>' or 'sha256:<hex>', got {checksum!r}")
-    return Path(path).is_file() and _digest(Path(path), algorithm) == expected.lower()
+    from .downloads import verify as _verify
+    return _verify(path, checksum)
 
 
 def fetch(url: str, dest: str | Path, checksum: str | None = None, *, max_wait_s: float = 900,
           timeout: float = 60, session: requests.Session | None = None) -> Path:
-    """Download `url` to `dest` (atomic rename), reuse a verified cached copy, poll on 503/Retry-After."""
-    dest = Path(dest)
-    if dest.is_file() and verify(dest, checksum):
-        return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    http = session or requests.Session()
-    deadline = time.monotonic() + max_wait_s
-    part = dest.with_name(dest.name + ".part")
-    while True:
-        with http.get(url, stream=True, timeout=timeout, headers={"User-Agent": USER_AGENT}) as r:
-            staged = r.status_code in (429, 503) or "text/html" in r.headers.get("content-type", "") and \
-                not url.endswith((".html", ".htm"))
-            if staged:
-                wait = float(r.headers.get("retry-after") or 30)
-                if time.monotonic() + wait > deadline:
-                    raise TimeoutError(f"{url} not available after {max_wait_s:.0f} s (HTTP {r.status_code}); "
-                                       "the provider may still be staging it, retry later")
-                time.sleep(max(wait, 5))
-                continue
-            r.raise_for_status()
-            with part.open("wb") as fh:
-                for chunk in r.iter_content(1 << 20):
-                    fh.write(chunk)
-        break
-    if not verify(part, checksum):
-        part.unlink(missing_ok=True)
-        raise ValueError(f"Checksum mismatch for {url}; expected {checksum}")
-    part.replace(dest)
-    return dest
+    """Download `url` to `dest`, reusing a verified cached copy (`geocrop.downloads.fetch`: retry with backoff,
+    HTTP Range resume, polling on 503/Retry-After while PANGAEA stages a file, checksum verification)."""
+    from .downloads import fetch as _fetch
+    return _fetch(url, dest, checksum, max_wait_s=max_wait_s, timeout=timeout, session=session)
 
 
 def zenodo_files(record: str = EUROCROPS_RECORD, session: requests.Session | None = None) -> dict[str, dict]:

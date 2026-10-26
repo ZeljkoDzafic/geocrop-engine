@@ -26,8 +26,8 @@ from .estimators import (
     predict_labels,
     sequence_params,
 )
-from .model import _fold_plan, cross_validate, selection_samples, spatial_blocks
-from .samples import Samples
+from .model import _fold_plan, cross_validate, fold_plan_signature, selection_samples, spatial_blocks
+from .samples import Samples, check_classes
 
 
 def _digest_array(values) -> str:
@@ -56,7 +56,7 @@ def run(samples: Samples, output_dir: str | Path,
         candidates: dict[str, dict] | None = None, n_splits: int = 5,
         spatial_block_m: float | None = 5000, seed: int = 42,
         spatial_buffer_m: float = 0, calibration_mode: str = "oof", calibration_fraction: float = 0.2,
-        holdout_fraction: float = 0.0) -> dict:
+        holdout_fraction: float = 0.0, allow_missing_classes: bool = False) -> dict:
     """Run named parameter sets on the same folds, persisting successful and failed outcomes.
 
     The locked final holdout (`holdout_fraction`, same deterministic split as `train`) is removed before
@@ -79,6 +79,7 @@ def run(samples: Samples, output_dir: str | Path,
             raise ValueError(f"Unknown algorithm in candidate {name!r}")
     from .model import split_final_holdout
 
+    missing_classes = check_classes(samples, allow_missing_classes, "benchmark")
     t_run = time.perf_counter()
     input_count = len(samples.y)
     samples, final_test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
@@ -122,6 +123,7 @@ def run(samples: Samples, output_dir: str | Path,
         "note": "Internal model-selection diagnostics on supplied reference samples. No external accuracy or "
                 "cross-engine superiority is established. Timings include CV fit/prediction on this machine.",
         "samples": len(samples.y), "input_samples": input_count, "features": samples.features,
+        "reference_classes_without_samples": missing_classes,
         "calibration_mode": calibration_mode, "calibration_split": calibration_split,
         "holdout_fraction": holdout_fraction,
         "holdout_samples_excluded": 0 if final_test is None else int(len(final_test.y)),
@@ -177,11 +179,11 @@ def candidate(name: str) -> dict:
 
 
 def _available(params: dict) -> str | None:
-    import importlib.util
+    from .estimators import backend_error
 
-    from .estimators import SEQUENCE_ALGORITHMS
-    if params.get("algorithm") in SEQUENCE_ALGORITHMS and importlib.util.find_spec("torch") is None:
-        return "pip install torch"
+    reason = backend_error(params.get("algorithm", "rf"))
+    if reason:
+        return reason
     try:
         make_estimator(params, 0)
         return None
@@ -192,12 +194,19 @@ def _available(params: dict) -> str | None:
 def models(samples: Samples, output_dir: str | Path, features: list[str] | None = None, candidates: dict | None = None,
            grids: dict | None = None, n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42,
            repeats: int = 3, holdout_fraction: float = 0.0, targets=(), spatial_buffer_m: float = 0,
-           calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> pd.DataFrame:
+           calibration_mode: str = "oof", calibration_fraction: float = 0.2,
+           allow_missing_classes: bool = False) -> pd.DataFrame:
     """Extended comparison: repeated seeds, nested tuning, locked holdout, timing and McNemar tests.
 
     Uses only the objects allowed for model selection under the declared calibration design
-    (`selection_samples`) and the same optional spatial buffer as training."""
+    (`selection_samples`) and the same optional spatial buffer as training. A sample set that lost a whole
+    reference class is refused (`samples.check_classes`) unless `allow_missing_classes`.
+
+    Every run records the signature of the folds it actually used (``fold_signature`` per run and
+    ``fold_signatures`` per model in the JSON report); identical signatures prove identical folds."""
     from .model import nested_cross_validate, split_final_holdout, tune
+
+    missing_classes = check_classes(samples, allow_missing_classes, "benchmark-models")
 
     t_run = time.perf_counter()
     out = Path(output_dir)
@@ -250,7 +259,7 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
             t0 = time.perf_counter()
             est.predict_proba(probe)
             px_per_s = len(probe) / max(time.perf_counter() - t0, 1e-9)
-            run = {"seed": s, "selected_params": run_selected,
+            run = {"seed": s, "fold_signature": cv.get("fold_signature"), "selected_params": run_selected,
                    "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"],
                    "macro_f1": cv["macro_f1"], "cv_seconds": cv_seconds, "fit_seconds": fit_seconds,
                    "predict_pixels_per_second": px_per_s}
@@ -269,7 +278,7 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                     run["holdout_mcnemar_p_vs_reference"] = metrics.mcnemar(test.y, pred,
                                                                             reference["hold"][1])["p_value"]
             runs.append(run)
-        frame = pd.DataFrame(runs)
+        frame = pd.DataFrame(runs).drop(columns=["fold_signature"])
         row = {"model": name, "status": "ok", "repeats": repeats, "tuned": name in grids}
         for col in frame.columns:
             if col in ("seed", "selected_params"):
@@ -280,7 +289,8 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 if col in ("overall_accuracy", "macro_f1", "holdout_macro_f1") and len(vals) > 1:
                     row[f"{col}_sd"] = vals.std(ddof=1)
         rows.append(row)
-        details[name] = {"params": params, "grid": grids.get(name), "runs": runs}
+        details[name] = {"params": params, "grid": grids.get(name), "runs": runs,
+                         "fold_signatures": [r["fold_signature"] for r in runs]}
     table = pd.DataFrame(rows)
     table.to_csv(out / "benchmark_models.csv", index=False)
     (out / "benchmark_models.json").write_text(json.dumps({
@@ -289,6 +299,9 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
         "spatial_buffer_m": spatial_buffer_m, "calibration_mode": calibration_mode,
         "calibration_split": calibration_split,
         "fold_signature": fold_signature(samples, spatial_block_m, n_splits, seed) if spatial_block_m else None,
+        "fold_signatures_per_model": {m: d["fold_signatures"] for m, d in details.items()},
+        "identical_folds_across_models": len({tuple(d["fold_signatures"]) for d in details.values()}) <= 1,
+        "reference_classes_without_samples": missing_classes,
         "note": "Same samples and spatial folds for every model; tuned models evaluated with nested CV."},
         indent=2, default=str), encoding="utf8")
     from . import registry
@@ -373,4 +386,4 @@ def fold_signature(samples: Samples, spatial_block_m: float, n_splits: int, seed
     """Hash of the fold assignment, recorded so that benchmark runs can prove they used identical folds."""
     groups = spatial_blocks(samples, spatial_block_m)
     plan = _fold_plan(samples.y, groups, n_splits, seed)
-    return hashlib.sha256(json.dumps([[k, _digest_array(te)] for k, (_, te, _) in enumerate(plan)]).encode()).hexdigest()[:16]
+    return fold_plan_signature([te for _, te, _ in plan])

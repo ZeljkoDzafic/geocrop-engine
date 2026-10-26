@@ -38,7 +38,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling, transform_bounds
 
-from . import __version__
+from . import __version__, attribution
 from . import scenes as scene_meta
 from .indices import S1_POLARISATIONS, S2_BANDS
 from .raster import NODATA, float_profile, gtiff_profile, read_aligned
@@ -549,11 +549,12 @@ def convert(item: dict, files, reference, backend: dict, recipe: dict) -> dict:
         return {"product": product, "scenes": len(written), "path": item["target"]}
     if len(tifs) != 1:
         raise ValueError(f"{item['name']}: expected one GeoTIFF, got {[str(t) for t in tifs]}")
+    years = range(int(str(item["start"])[:4]), int(str(item["end"])[:4]) + 1) if item.get("start") and item.get("end") else ()
     if product == "s2_composites":
         write_s2_composite(tifs[0], item["target"], reference, recipe["compositing"], backend,
-                           recipe["compositing"]["min_valid_observations"])
+                           recipe["compositing"]["min_valid_observations"], years=years)
     else:
-        write_s1_composite(tifs[0], item["target"], reference, item.get("orbit"), recipe["s1"], backend)
+        write_s1_composite(tifs[0], item["target"], reference, item.get("orbit"), recipe["s1"], backend, years=years)
     return {"product": product, "window": item.get("window"), "path": item["target"]}
 
 
@@ -609,7 +610,7 @@ def _check_red(red: np.ndarray, where: str):
 
 
 def write_s2_composite(result: str | Path, out_dir: str | Path, reference: str | Path, compositing: dict,
-                       backend: dict, min_valid_observations: int = 1) -> Path:
+                       backend: dict, min_valid_observations: int = 1, years=()) -> Path:
     """openEO composite GeoTIFF (B02 ... B12 DN statistic, valid_count) -> GeoCrop composite folder."""
     out = Path(out_dir)
     with rasterio.open(reference) as ref:
@@ -627,8 +628,10 @@ def write_s2_composite(result: str | Path, out_dir: str | Path, reference: str |
         for b, v in bands.items():
             with rasterio.open(out / f"{b}.tif", "w", **float_profile(ref)) as dst:
                 dst.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), 1)
+                dst.update_tags(**attribution.tags(years))
         with rasterio.open(out / "valid_count.tif", "w", **gtiff_profile(ref, count=1, dtype="uint16", nodata=None)) as dst:
             dst.write(count.astype("uint16"), 1)
+            dst.update_tags(**attribution.tags(years))
     (out / "composite.json").write_text(json.dumps({
         "sensor": "S2", "acquisitions": {}, "statistic": compositing["statistic"],
         "scl_invalid": list(compositing["scl_invalid"]), "cloud_probability_max": compositing["cloud_probability_max"],
@@ -640,7 +643,7 @@ def write_s2_composite(result: str | Path, out_dir: str | Path, reference: str |
 
 
 def write_s1_composite(result: str | Path, out_dir: str | Path, reference: str | Path, orbit: str | None,
-                       s1: dict, backend: dict) -> Path:
+                       s1: dict, backend: dict, years=()) -> Path:
     """openEO VV/VH GeoTIFF -> ``[ASC_|DESC_]VV.tif`` / ``VH.tif`` and ``composite_s1.json`` (merged per window)."""
     out = Path(out_dir)
     prefix = f"{orbit}_" if orbit else ""
@@ -653,6 +656,7 @@ def write_s1_composite(result: str | Path, out_dir: str | Path, reference: str |
             with rasterio.open(out / f"{prefix}{pol}.tif", "w", **float_profile(ref)) as dst:
                 dst.write(np.where(np.isfinite(v) & (v > 0), v, NODATA).astype("float32"), 1)
                 dst.set_band_description(1, f"{s1.get('coefficient', 'sigma0')}_{pol}_linear")
+                dst.update_tags(**attribution.tags(years))
     meta_path = out / "composite_s1.json"
     meta = json.loads(meta_path.read_text(encoding="utf8")) if meta_path.exists() else {}
     groups = meta.get("groups", {}) if meta.get("backend", {}).get("type") == "openeo" else {}
@@ -689,12 +693,15 @@ def write_scenes(results, out_root: str | Path, reference: str | Path, band_orde
             _check_red(np.where(clear, bands["B04"], np.nan), str(path))
             folder = Path(out_root) / f"openeo_{day.isoformat()}"
             folder.mkdir(parents=True, exist_ok=True)
+            atags = attribution.tags([day])
             for b, v in bands.items():
                 with rasterio.open(folder / f"{b}.tif", "w", **float_profile(ref)) as dst:
                     dst.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), 1)
+                    dst.update_tags(**atags)
             uint8 = gtiff_profile(ref, count=1, dtype="uint8", nodata=None)
             with rasterio.open(folder / "SCL.tif", "w", **uint8) as dst:
                 dst.write(scl, 1)
+                dst.update_tags(**atags)
             if "CLD" in arrays:
                 cld = np.clip(np.where(np.isfinite(arrays["CLD"]), arrays["CLD"], 0), 0, 100).astype("uint8")
                 with rasterio.open(folder / "CLDPRB.tif", "w", **uint8) as dst:

@@ -23,7 +23,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling
 
-from . import contracts, indices
+from . import attribution, contracts, indices
 from . import scenes as scene_meta
 from . import temporal_quality as tq
 from . import timeseries as ts
@@ -113,6 +113,11 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
             sink.set_band_description(i, n)
         for i, n in enumerate(qa_names, 1):
             qa_sink.set_band_description(i, n)
+        scene_bands = [m["path"] / f"{('B04' if sensor == 'S2' else 'VV')}.tif" for sensor, _, scenes in series
+                       for m in scenes]
+        credit = attribution.read(scene_bands)
+        for target in (sink, qa_sink) if credit else ():
+            target.update_tags(**{attribution.TAG: credit, attribution.LICENCE_TAG: attribution.COPERNICUS_LICENCE})
         if temporal_support:
             tq_sink = rasterio.open(tq_path, "w", **float_profile(ref, count=len(tq_names)))
             for i, n in enumerate(tq_names, 1):
@@ -243,6 +248,7 @@ def merge_stacks(stacks, output: str | Path, block_size: int = 512) -> Path:
         with rasterio.open(out, "w", **float_profile(first, count=len(names))) as sink:
             for i, n in enumerate(names, 1):
                 sink.set_band_description(i, n)
+            attribution.propagate(stacks, sink)
             for w in blocks(first.width, first.height, block_size):
                 band = 1
                 for h in handles:

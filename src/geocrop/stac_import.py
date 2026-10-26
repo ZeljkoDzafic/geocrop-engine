@@ -21,6 +21,7 @@ import rasterio
 from rasterio.warp import Resampling, reproject, transform_bounds
 from rasterio.windows import Window, from_bounds
 
+from . import attribution
 from . import scenes as scene_meta
 from .indices import S2_BANDS
 from .raster import NODATA, float_profile, gtiff_profile
@@ -114,17 +115,21 @@ def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: di
         red = bands["B04"][clear & np.isfinite(bands["B04"])]
         if red.size and (red < 0).mean() > max_negative_fraction:
             raise ValueError(f"{item.id}: {(red < 0).mean():.0%} negative red reflectance; check radiometric offset")
+        atags = attribution.tags([item.properties.get("datetime")])
         for band, arr in bands.items():
             with rasterio.open(out / f"{band}.tif", "w", **float_profile(ref)) as dst:
                 dst.write(np.where(np.isfinite(arr), arr, NODATA).astype("float32"), 1)
+                dst.update_tags(**atags)
         with rasterio.open(out / "SCL.tif", "w", **gtiff_profile(ref, count=1, dtype="uint8", nodata=None)) as dst:
             dst.write(scl, 1)
+            dst.update_tags(**atags)
     p = item.properties
     scene_meta.write(out, sensor="S2", datetime=p.get("datetime"), tile=p.get("s2:mgrs_tile") or p.get("grid:code"),
                      platform=p.get("platform"), processing_baseline=p.get("s2:processing_baseline"),
                      boa_offset_applied=p.get("earthsearch:boa_offset_applied"), source=item.id,
                      stac_self=item.get_self_href(), clear_fraction=round(clear_fraction, 4),
-                     grid_id=grid_identity(reference),
+                     grid_id=grid_identity(reference), attribution=atags[attribution.TAG],
+                     licence=attribution.COPERNICUS_LICENCE,
                      note="Windowed COG import on the reference grid")
     return {"item": item.id, "status": "imported", "path": str(out), "clear_fraction": clear_fraction}
 

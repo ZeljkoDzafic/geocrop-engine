@@ -759,6 +759,12 @@ def run(cfg, config_path=None, inventories=()) -> dict:
                 f"Input audit: {audit['summary']['passed']} passed, {audit['summary']['errors']} error(s), "
                 f"{audit['summary']['warnings']} warning(s).")
     classes = _check_classes(cfg, layout, rep)
+    from .estimators import backend_error
+    algorithm = cfg["model"].get("algorithm") or "rf"
+    unavailable = backend_error(algorithm)
+    rep.add("model.backend", "classes", "error" if unavailable else "pass",
+            f"Estimator {algorithm!r} cannot be used: {unavailable}" if unavailable
+            else f"Estimator {algorithm!r} and its optional backend load.")
     if cfg["timeseries"]["enabled"] and not (cfg["timeseries"]["start"] and cfg["timeseries"]["end"]):
         rep.add("timeseries.season", "scenes", "error", "timeseries.enabled needs timeseries.start and timeseries.end.")
     n_classes = len(classes.get("per_class", {})) or None

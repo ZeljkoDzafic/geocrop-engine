@@ -125,6 +125,12 @@ DEFAULTS: dict[str, Any] = {
         "calibration_fraction": 0.2,
         "holdout_fraction": 0.0,
         "inner_splits": 3,
+        # Feature groups the model is trained on (e.g. [s2_band, s2_index, ts]); samples are then extracted for
+        # these features only, so NaN in other groups (phenology of a season that starts before the series)
+        # does not remove polygons. null = every feature of the stack.
+        "feature_groups": None,
+        # Train although a class of the reference polygons has no sample left (default: the run fails).
+        "allow_missing_classes": False,
         # Estimator-specific hyperparameters passed through unchanged (e.g. for plugin estimators), validated
         # against the parameters the selected estimator accepts; they override the shared keys above.
         "params": {},
@@ -209,6 +215,9 @@ FINGERPRINT_NEUTRAL[("data",)] = copy.deepcopy(DEFAULTS["data"])
 # Temporal-support measurement/routing (docs/temporal-quality.md), off by default.
 FINGERPRINT_NEUTRAL[("timeseries", "temporal_support")] = False
 FINGERPRINT_NEUTRAL[("cbm", "temporal_support")] = copy.deepcopy(temporal_quality.RULE_DEFAULTS)
+# Training feature selection and the lost-class guard (release gate c091962), at their defaults.
+FINGERPRINT_NEUTRAL[("model", "feature_groups")] = None
+FINGERPRINT_NEUTRAL[("model", "allow_missing_classes")] = False
 
 
 class ConfigError(ValueError):
@@ -311,6 +320,12 @@ def validate(cfg: dict) -> dict:
     buffer = cfg["model"]["spatial_buffer_m"]
     if isinstance(buffer, bool) or not isinstance(buffer, (int, float)) or not math.isfinite(buffer) or buffer < 0:
         raise ConfigError("model.spatial_buffer_m must be a finite nonnegative distance in metres")
+    groups = cfg["model"]["feature_groups"]
+    from .features import GROUPS
+    if groups is not None and (not isinstance(groups, list) or not groups or set(groups) - set(GROUPS)):
+        raise ConfigError(f"model.feature_groups must be null or a non-empty subset of {list(GROUPS)}")
+    if not isinstance(cfg["model"]["allow_missing_classes"], bool):
+        raise ConfigError("model.allow_missing_classes must be true or false")
     h = cfg["model"]["holdout_fraction"]
     if isinstance(h, bool) or not isinstance(h, (int, float)) or not 0 <= h < 0.5:
         raise ConfigError("model.holdout_fraction must be in [0, 0.5)")
