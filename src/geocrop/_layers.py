@@ -28,7 +28,8 @@ ALLOWED: dict[str, frozenset[str]] = {
 LAYERS: dict[str, frozenset[str]] = {
     # Pure geospatial/ML logic. Reads and writes local files only; no network, no subprocesses.
     CORE: frozenset({
-        "applicability", "cbm", "clouds", "contracts", "estimators", "features", "fieldwork", "hashing",
+        "active_learning", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "estimators", "faultinject",
+        "features", "fieldwork", "ftw", "hashing",
         "indices", "metrics", "model", "parcels", "plugins", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
@@ -40,14 +41,17 @@ LAYERS: dict[str, frozenset[str]] = {
         "catalog",       # Copernicus Data Space (OData, HTTP)
         "client",        # HTTP client for the web workspace
         "export",        # COG, GeoParquet, STAC items, HCAT
+        "ftw_weights",   # Fields of The World checkpoint download (HTTPS, sha256-pinned)
         "quicklook",     # STAC COG quicklooks
+        "s1_stac",       # Sentinel-1 RTC from Planetary Computer STAC (signed COG reads)
         "snap",          # ESA SNAP gpt runner (subprocess)
         "stac",          # STAC inventory (pystac-client)
         "stac_import",   # STAC COG import
+        "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
-        "audit", "benchmark", "cache", "config", "demo", "experiments", "pipeline", "provenance",
+        "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),
@@ -60,7 +64,8 @@ WEB_IMPORTERS = frozenset({"cli"}) | WEB_MODULES
 #: Third-party libraries core modules may use: the scientific/geospatial stack and optional ML backends.
 CORE_THIRD_PARTY = frozenset({
     "numpy", "scipy", "pandas", "sklearn", "joblib", "rasterio", "geopandas", "shapely", "pyproj", "affine",
-    "skimage", "torch", "lightgbm", "catboost", "omnicloudmask",
+    "skimage", "torch", "lightgbm", "catboost", "omnicloudmask", "segmentation_models_pytorch",
+    "matplotlib",   # optional, imported lazily for figures (active_learning.plot_curves)
 })
 
 #: Standard-library modules core must not use: network access and process execution belong in adapters.

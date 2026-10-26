@@ -1,0 +1,61 @@
+{
+  "description": "GeoCrop Engine recipe exported as an openEO process graph; see docs/openeo.md for differences from local processing.",
+  "id": "geocrop_s2_scenes",
+  "process_graph": {
+    "loadcollection1": {
+      "arguments": {
+        "bands": [
+          "B02",
+          "B03",
+          "B04",
+          "B05",
+          "B06",
+          "B07",
+          "B08",
+          "B8A",
+          "B11",
+          "B12",
+          "SCL",
+          "CLD"
+        ],
+        "id": "SENTINEL2_L2A",
+        "spatial_extent": {
+          "crs": 32634,
+          "east": 500100.0,
+          "north": 5000080.0,
+          "south": 4999980.0,
+          "west": 499980.0
+        },
+        "temporal_extent": [
+          "2023-04-01",
+          "2023-08-01"
+        ]
+      },
+      "process_id": "load_collection"
+    },
+    "resamplespatial1": {
+      "arguments": {
+        "align": "upper-left",
+        "data": {
+          "from_node": "loadcollection1"
+        },
+        "method": "near",
+        "projection": 32634,
+        "resolution": 10.0
+      },
+      "process_id": "resample_spatial"
+    },
+    "saveresult1": {
+      "arguments": {
+        "data": {
+          "from_node": "resamplespatial1"
+        },
+        "format": "GTiff",
+        "options": {}
+      },
+      "process_id": "save_result",
+      "result": true
+    }
+  },
+  "summary": "Sentinel-2 L2A scenes on the study grid"
+}

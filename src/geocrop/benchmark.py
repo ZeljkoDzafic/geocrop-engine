@@ -20,7 +20,12 @@ import pandas as pd
 import sklearn
 
 from . import metrics
-from .estimators import available_algorithms, make_estimator, sequence_params
+from .estimators import (
+    available_algorithms,
+    make_estimator,
+    predict_labels,
+    sequence_params,
+)
 from .model import _fold_plan, cross_validate, selection_samples, spatial_blocks
 from .samples import Samples
 
@@ -249,7 +254,7 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 run["mcnemar_p_vs_reference"] = metrics.mcnemar(y, oof, reference["oof"][1])["p_value"]
             if hold:
                 Xt = test.subset(features) if features else test.X
-                pred = np.asarray(est.predict(Xt)).astype(str)
+                pred = predict_labels(est, Xt).astype(str)
                 h = metrics.summary(test.y, pred, labels=np.unique(np.concatenate([y, test.y])))
                 run.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"]})
                 if r == 0:

@@ -22,7 +22,25 @@
 * **Benchmark identity**: actual sample-array/feature/CRS hashes plus training/test index hashes per fold;
   candidate metrics, parameter settings, explicit failures, runtimes and library versions are retained.
 * **Determinism**: all random operations take the configured seed. Random Forest results are reproducible for a
-  fixed seed, data and library version; changing `n_jobs` does not change results.
+  fixed seed, data and library version; changing `n_jobs` does not change results. `tests/test_reliability.py`
+  checks that two runs from fresh directories, with the same inputs and configuration, give byte-identical stack,
+  samples, model and prediction rasters and an identical `train_report.json`. Caveats:
+  - `model.joblib`, and with it `model_sha256` in reports, manifests and raster tags, embeds the configuration
+    fingerprint, and that fingerprint includes the configured *paths*. The same study configured with other
+    paths gives the same predictions and metrics but a different model hash. Use relative paths, or compare
+    pixels and metrics rather than hashes.
+  - Results are only bitwise reproducible with the same versions of NumPy, scikit-learn, GDAL/rasterio and
+    the same platform. Other BLAS/CPU builds or library upgrades can change the last bits of float results
+    and, rarely, an RF tie. The run manifest records the versions.
+  - Estimators outside scikit-learn (LightGBM, CatBoost, TempCNN/PyTorch) can be nondeterministic with
+    several threads or on a GPU. Set `n_jobs: 1` and deterministic framework flags when bitwise
+    reproducibility matters.
+  - `run_manifest.json`, `run.log` and the timing fields in `stages.json` contain times, so they always
+    differ between runs.
+* **Interruption**: a stage killed at any point (SIGKILL, power loss) stays `running` in `stages.json`. The next
+  run takes over the stale lock and recomputes that stage and its dependants. Until then, downstream stages
+  refuse to start rather than read its possibly partial products. A lock whose pid is alive (also after pid
+  reuse) is respected: delete `<output>/.geocrop.lock` if no geocrop run is actually active.
 
 ## Checklist for a publication
 1. Archive the configuration file, `run_manifest.json`, scene inventories and `download_status.json`.

@@ -141,13 +141,22 @@ class Runner:
         self._save_state()
 
     def stage(self, name, fp, outputs, fn):
-        upstream = {d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(name, ())}
+        # Never consume the possibly partial outputs of an upstream stage whose last run failed or was killed.
+        incomplete = {d: self.state[d].get("status") for d in DEPENDS.get(name, ())
+                      if self.state.get(d, {}).get("status") not in (None, "success")
+                      and not (d == "cbm" and not self.cfg["cbm"]["enabled"])}
+        if incomplete:
+            raise RuntimeError(f"Stage {name} depends on {incomplete} whose last run did not complete, so their "
+                               f"outputs may be partial; rerun them first (geocrop run --stages "
+                               f"{' '.join(sorted(incomplete))} {name})")
+        upstream ={d: self.state.get(d, {}).get("fingerprint") for d in DEPENDS.get(name, ())}
         fp = _fp(CACHE_SCHEMA, self.code_fp, upstream, fp)
         if self._done(name, fp, outputs):
             self._note(f"[skip] {name} (unchanged)")
             return self.state[name].get("info")
+        self._disk_guard(name, outputs)
         self._note(f"[run ] {name}")
-        started = time.time()
+        started, started_ns = time.time(), time.time_ns() - 2_000_000_000   # 2 s: coarse filesystem clocks
         self._record(name, fp, started, "running")
         try:
             info = fn()
@@ -157,14 +166,32 @@ class Runner:
                 raise RuntimeError(f"Stage {name} did not produce its complete nonempty output set: {missing}")
             self._record(name, fp, started, "success", info, identity)
         except BaseException as exc:
-            self._record(name, fp, started, "failed", error=exc)
+            from .cleanup import quarantine_partial
+            moved = quarantine_partial(outputs, started_ns, self.out, name)   # partial outputs never look final
+            self._record(name, fp, started, "failed", {"quarantined": moved} if moved else None, error=exc)
             self._note(f"[fail] {name}: {type(exc).__name__}: {exc}", echo=False)
+            if moved:
+                self._note(f"[clean] {name}: {len(moved)} partial output(s) moved to {self.out / '.quarantine'}")
             raise
         finally:
             self.hashes.save()
         self._note(f"[done] {name} in {self.state[name]['seconds']} s, peak RSS {self.state[name]['peak_rss_mb']} MB",
                    echo=False)
         return info
+
+    def _disk_guard(self, name, outputs):
+        """Fail before a heavy stage starts when its output volume lacks the estimated space (see preflight)."""
+        from .preflight import HEAVY_STAGES, DiskSpaceError, check_disk
+        if name not in HEAVY_STAGES or not self.cfg.get("resources", {}).get("disk_guard", True):
+            return
+        existing = sum(Path(p).stat().st_size for p in outputs if Path(p).is_file())
+        try:
+            info = check_disk(self.cfg, name, existing)
+        except DiskSpaceError as exc:
+            self._note(f"[fail] {name}: {exc}")
+            raise
+        if info:
+            self._note(f"[disk] {name}: {info['free_gb']} GB free, {info['need_gb']} GB required", echo=False)
 
     # ------------------------------------------------------------------ stages
     def composite(self):
