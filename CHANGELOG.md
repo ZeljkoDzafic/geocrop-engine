@@ -6,6 +6,12 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- Redesigned web workspace: the map as the main view, a guided *New analysis* sheet (area by coordinates or drawn on
+  the map, period presets, command preview) that runs `quicklook`, one-click Semberija and demo examples, an imagery
+  bar (composites/scenes, product, date stepping), layer switches and colour-ramp legends, a searchable command
+  palette (⌘K / Ctrl K), grouped command forms with a live command-line preview, a job history with durations and
+  relative times, file icons and sizes, notifications for finished and failed jobs, keyboard shortcuts (?),
+  light and dark appearance, and a phone layout with a tab bar. The Terminal view hosts the CLI console component.
 
 ### Fixed
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).

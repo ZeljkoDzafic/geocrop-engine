@@ -4,9 +4,10 @@ The web extra adds a local interface around the existing engine CLI. All existin
 Python functions remain available. No frontend build service, Node runtime, external fonts or CDN is
 needed. HTML/CSS/JavaScript are shipped inside the Python package.
 
-![GeoCrop workspace after a synthetic software-check run](images/web-workspace.png)
+![GeoCrop workspace with a Sentinel-2 quicklook of Semberija on the map](images/web-workspace.png)
 
-The screenshot shows synthetic verification data, not an observational crop-accuracy result.
+The screenshot shows a monthly true-colour composite from `geocrop quicklook` (contains modified Copernicus
+Sentinel data 2023); it is imagery for orientation, not a crop-accuracy result.
 
 ## Start the workspace
 
@@ -23,13 +24,53 @@ loopback only. A notebook on another machine can use an SSH-forwarded local port
 trusted owner's research tool running as that owner's account, not a public/multi-tenant service or
 a security sandbox for untrusted model files. Inputs, configs and joblib models must be trusted.
 
-The UI provides:
+## First steps: from an area and dates to imagery
 
-* forms generated from the actual CLI parser, including required fields and optional settings;
-* an engine command console with quoted-argument support;
-* persistent job history, queued/running/succeeded/failed/cancelled/interrupted states and exit codes;
-* incremental stdout/stderr logs, cancellation and artifact downloads;
-* Python/Jupyter examples and an authenticated OpenAPI schema download.
+The workspace opens on the **Map**. With no job selected it offers three ways in:
+
+1. **New analysis** (or press <kbd>N</kbd>) opens a three-step sheet:
+   *Area* — type a bounding box in degrees (WGS 84), use the Semberija example, or choose **Draw on map** and drag a
+   rectangle (or click/tap two corners; <kbd>Esc</kbd> cancels); *Period* — start and end dates or a preset such as
+   the latest growing season; *Run* — review the area size, the period and a fresh output folder. The sheet shows the
+   exact `geocrop quicklook ...` command it submits, so the same run can be repeated in a shell or notebook.
+2. **Try Semberija, Jun–Aug 2023** submits that quicklook with one click.
+3. **Run the synthetic demo** is a software check that produces crop classes, uncertainty and parcels.
+
+While a job runs, the map shows its progress and the output streams below the map. When it finishes, a
+notification appears and the imagery is drawn on the map. The *imagery bar* at the bottom of the map switches between
+monthly composites and single scenes, between true colour, false colour and NDVI, and steps through the dates
+(<kbd>[</kbd> and <kbd>]</kbd>). The side panel holds the imagery switch and opacity, a switch per result layer and
+the legend. The expand button (or <kbd>F</kbd>) shows the map full-window.
+
+## Views
+
+* **Map** — imagery and results of the selected job, its output log and its files (with type and size; click to
+  download).
+* **Commands** — every engine command as a form generated from the actual CLI parser, grouped by purpose and
+  filterable. Required inputs come first; optional settings sit under *Advanced options*. The live *Command line*
+  preview omits unchanged defaults, so it is exactly what one would type.
+* **Jobs** — the persistent job history with status, relative start time, duration and exit code;
+  queued/running/succeeded/failed/cancelled/interrupted states, incremental logs and cancellation.
+* **Terminal** — a CLI console for typing engine commands with quoted-argument support.
+* **Python & API** — Jupyter/Python and HTTP examples and an authenticated OpenAPI schema download.
+
+The sidebar lists recent jobs; on a phone the views move to a bottom tab bar. Light and dark appearance follow the
+system; the moon/sun button overrides it (remembered in this browser only).
+
+### Keyboard shortcuts
+
+| Keys | Action |
+|---|---|
+| <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> | command palette: search commands and actions |
+| <kbd>N</kbd> | new analysis |
+| <kbd>1</kbd>–<kbd>5</kbd> | Map, Commands, Jobs, Terminal, Python & API |
+| <kbd>F</kbd> | expand or restore the map |
+| <kbd>[</kbd> / <kbd>]</kbd> | previous / next imagery date |
+| <kbd>J</kbd> / <kbd>K</kbd> | next / previous job |
+| <kbd>?</kbd> | shortcut overview |
+| <kbd>Esc</kbd> | close a sheet, cancel area drawing or leave the expanded map |
+
+Single-key shortcuts are ignored while typing in a field or the terminal.
 
 The console invokes `python -m geocrop.cli` with an argument list, never a shell. `serve`, direct SNAP
 executable invocation and `manifest --snap-gpt` are unavailable in the web console; use the ordinary
@@ -105,7 +146,7 @@ other code is recorded as failed, including audit/readiness commands that intent
 exit codes to report data problems. Use the logs to distinguish those outcomes.
 
 ## Results map
-Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /api/jobs/{id}/map`):
+Selecting a succeeded job loads its spatial outputs on the **Map** (`GET /api/jobs/{id}/map`):
 
 | Layer | Source | Default |
 |---|---|---|
@@ -116,7 +157,8 @@ Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /a
 | Other vector outputs (segments, reference layers, observations) | `.gpkg` / `.geojson` | off |
 | Satellite imagery: true colour (B4-B3-B2), false colour (B8-B4-B3), NDVI | every window composite and scene folder of the job | latest cloud-free composite (true colour) when the job has no classification |
 
-Imagery is chosen with one compact control (date or window, product, opacity), so only one image is drawn at a time.
+Imagery is chosen with the imagery bar (composites or scenes, product, date) and the side panel (on/off, opacity), so
+only one image is drawn at a time.
 
 ### Real imagery in two minutes
 ```bash
