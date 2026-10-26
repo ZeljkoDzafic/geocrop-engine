@@ -36,7 +36,7 @@ def client(tmp_path):
 
 def test_authentication_static_ui_origin_and_schema(client):
     page = client.get("/")
-    assert page.status_code == 200 and "CLI konzola" in page.text
+    assert page.status_code == 200 and "CLI console" in page.text and "id=\"map\"" in page.text
     assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
     assert client.get("/static/app.js").status_code == 200
     assert client.get("/api/health").status_code == 401

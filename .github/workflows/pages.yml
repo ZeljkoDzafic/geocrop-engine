@@ -1,12 +1,8 @@
 name: Deploy presentation to GitHub Pages
 
+# Manual only: a GitHub Pages site is public even when the repository is private.
+# Run it deliberately when the project is ready to be published.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'website/**'
-      - 'tools/check_presentation_site.py'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -21,6 +17,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:

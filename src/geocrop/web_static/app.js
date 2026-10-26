@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { token: "", commands: [], jobs: [], selected: null, offset: 0, log: "", generation: 0 };
-const statuses = { queued: "NA ČEKANJU", running: "U TOKU", succeeded: "USPJEŠNO", failed: "GREŠKA", cancelled: "ZAUSTAVLJENO", interrupted: "PREKINUTO" };
+const statuses = { queued: "QUEUED", running: "RUNNING", succeeded: "SUCCEEDED", failed: "FAILED", cancelled: "CANCELLED", interrupted: "INTERRUPTED" };
 const terminal = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 function message(text) { $("message").textContent = text; $("message").hidden = !text; }
 async function api(path, options = {}) {
@@ -15,11 +15,11 @@ function field(spec, container) {
   label.textContent = spec.flag.slice(2).replaceAll("-", " ") + (spec.required ? " *" : "");
   let input;
   if (spec.boolean) { input = document.createElement("input"); input.type = "checkbox"; input.checked = !!spec.default; wrapper.classList.add("checkbox"); }
-  else if (spec.choices) { input = document.createElement("select"); if (!spec.required) input.append(new Option("Podrazumijevano", "")); for (const value of spec.choices) input.append(new Option(String(value), String(value))); }
+  else if (spec.choices) { input = document.createElement("select"); if (!spec.required) input.append(new Option("Default", "")); for (const value of spec.choices) input.append(new Option(String(value), String(value))); }
   else input = document.createElement(spec.multiple ? "textarea" : "input");
   input.id = id; input.dataset.flag = spec.flag; input.required = spec.required && !spec.boolean;
   if (!spec.boolean && spec.default !== null && spec.default !== undefined) input.value = Array.isArray(spec.default) ? spec.default.join("\n") : String(spec.default);
-  if (spec.multiple) input.placeholder = "Jedna vrijednost po redu";
+  if (spec.multiple) input.placeholder = "One value per line";
   if (spec.boolean) wrapper.append(input, label); else wrapper.append(label, input);
   if (spec.help && !spec.boolean) { const help = document.createElement("p"); help.className = "help"; help.textContent = spec.help; wrapper.append(help); }
   container.append(wrapper);
@@ -53,7 +53,7 @@ function renderJobs() {
   $("succeeded").textContent = state.jobs.filter(j => j.status === "succeeded").length;
   $("failed").textContent = state.jobs.filter(j => ["failed", "interrupted"].includes(j.status)).length;
   $("jobs").replaceChildren();
-  if (!state.jobs.length) { const row = document.createElement("tr"), cell = document.createElement("td"); cell.colSpan = 4; cell.className = "empty"; cell.textContent = "Još nema poslova. Pokreni prvu komandu iznad."; row.append(cell); $("jobs").append(row); }
+  if (!state.jobs.length) { const row = document.createElement("tr"), cell = document.createElement("td"); cell.colSpan = 4; cell.className = "empty"; cell.textContent = "No jobs yet. Run your first command above."; row.append(cell); $("jobs").append(row); }
   for (const job of state.jobs) {
     const row = document.createElement("tr"); row.dataset.job = job.id; row.tabIndex = 0;
     const command = document.createElement("td"); command.className = "job-command"; command.textContent = "geocrop " + job.argv.join(" "); command.title = command.textContent;
@@ -67,7 +67,7 @@ function renderJobs() {
 }
 async function download(path, name) {
   const response = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
-  if (!response.ok) throw new Error(`Preuzimanje nije uspjelo: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
   const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
   link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -82,11 +82,12 @@ async function refresh() {
     const artifacts = await api(`/api/jobs/${id}/artifacts`);
     if (generation !== state.generation) return;
     state.log = (state.log + result.text).slice(-400000); state.offset = result.next_offset;
-    $("logs").textContent = state.log || (job.status === "queued" ? "Posao čeka slobodan worker…" : "Čekam izlaz komande…");
+    $("logs").textContent = state.log || (job.status === "queued" ? "Waiting for a free worker…" : "Waiting for command output…");
     $("logs").scrollTop = $("logs").scrollHeight;
     $("selected-job").textContent = `${job.argv[0]} · ${id.slice(0, 8)}`;
     $("selected-status").className = "badge " + job.status; $("selected-status").textContent = statuses[job.status];
     $("cancel").hidden = terminal.has(job.status); $("artifact-list").replaceChildren();
+    if (job.status === "succeeded" && typeof GeoMap !== "undefined" && GeoMap.loaded() !== id) GeoMap.load(id, api);
     $("file-count").textContent = artifacts.files.length ? `(${artifacts.files.length}${artifacts.files.length === artifacts.limit ? "+" : ""})` : "";
     $("artifact-empty").hidden = !!artifacts.files.length;
     for (const file of artifacts.files) { const li = document.createElement("li"), button = document.createElement("button"), size = document.createElement("span");
@@ -101,9 +102,9 @@ $("connect-form").addEventListener("submit", async event => {
     $("command-select").replaceChildren(...state.commands.map(c => new Option(c.name, c.name)));
     $("command-select").value = "demo"; $("command-select").disabled = false; buildForm();
     $("version").textContent = `ENGINE ${health.version}`; $("workspace-path").textContent = health.workspace;
-    $("connection-dot").classList.add("online"); $("connection-label").textContent = "Engine povezan";
+    $("connection-dot").classList.add("online"); $("connection-label").textContent = "Engine connected";
     $("auth-panel").hidden = true; $("token").value = ""; $("disconnect").hidden = false;
-    for (const id of ["run-command", "run-console", "refresh", "api-schema"]) $(id).disabled = false;
+    for (const id of ["run-command", "run-console", "refresh", "api-schema", "map-load"]) $(id).disabled = false;
     message(""); await refresh();
   } catch (error) { state.token = ""; message(error.message); }
 });
@@ -113,11 +114,12 @@ $("command-form").addEventListener("submit", e => { e.preventDefault(); submit({
 $("console-form").addEventListener("submit", e => { e.preventDefault(); submit({ command: $("console-input").value }); });
 $("refresh").addEventListener("click", () => refresh().catch(e => message(e.message)));
 $("cancel").addEventListener("click", async () => { try { await api(`/api/jobs/${state.selected}/cancel`, { method: "POST" }); await refresh(); } catch (e) { message(e.message); } });
+$("map-load").addEventListener("click", () => { if (state.selected) GeoMap.load(state.selected, api); else message("Select a job first."); });
 $("api-schema").addEventListener("click", () => download("/api/openapi.json", "geocrop-openapi.json").catch(e => message(e.message)));
 for (const button of document.querySelectorAll("[data-tab]")) button.addEventListener("click", () => {
   for (const item of document.querySelectorAll("[data-tab]")) item.classList.toggle("active", item === button);
   for (const name of ["commands", "console", "notebook"]) $(name + "-tab").hidden = name !== button.dataset.tab;
-  $("panel-title").textContent = { commands: "Engine komande", console: "CLI konzola", notebook: "Jupyter & API" }[button.dataset.tab];
+  $("panel-title").textContent = { commands: "Engine commands", console: "CLI console", notebook: "Jupyter & API" }[button.dataset.tab];
 });
 async function poll() { try { await refresh(); } catch (e) { message(e.message); } setTimeout(poll, 2000); }
 poll();

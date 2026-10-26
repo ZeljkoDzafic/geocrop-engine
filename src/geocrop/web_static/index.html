@@ -1,54 +1,65 @@
 <!doctype html>
-<html lang="bs">
+<html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GeoCrop · Engine workspace</title>
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css"><script defer src="/static/app.js"></script>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/vendor/leaflet/leaflet.js"></script>
+  <script defer src="/static/map.js"></script>
+  <script defer src="/static/app.js"></script>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="GeoCrop početna"><span class="mark">G</span><span>GeoCrop<small>ENGINE WORKSPACE</small></span></a>
-    <div class="nav-label">RADNI PROSTOR</div>
-    <nav aria-label="Glavna navigacija">
-      <button class="nav active" data-tab="commands"><span>▦</span> Komande</button>
-      <button class="nav" data-tab="console"><span>›_</span> CLI konzola</button>
-      <button class="nav" data-tab="notebook"><span>⌘</span> Jupyter & API</button>
+    <a class="brand" href="/" aria-label="GeoCrop home"><span class="mark">G</span><span>GeoCrop<small>ENGINE WORKSPACE</small></span></a>
+    <div class="nav-label">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <button class="nav active" data-tab="commands"><span>▦</span> Commands</button>
+      <button class="nav" data-tab="console"><span>›_</span> CLI console</button>
+      <button class="nav" data-tab="notebook"><span>⌘</span> Jupyter &amp; API</button>
     </nav>
-    <div class="sidebar-note"><span class="leaf">↗</span><strong>Od opažanja do odluke.</strong><p>Otvoren tok obrade za Sentinel podatke i provjeru poljoprivrednih parcela.</p></div>
-    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-label">Nije povezano</span><button id="disconnect" class="text-button" hidden>Odjavi</button></div>
+    <div class="sidebar-note"><span class="leaf">↗</span><strong>From observation to decision.</strong><p>An open processing workflow for Sentinel data and agricultural parcel verification.</p></div>
+    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-label">Not connected</span><button id="disconnect" class="text-button" hidden>Sign out</button></div>
   </aside>
   <main>
-    <header><div class="breadcrumb">GeoCrop Engine <span>/</span> Radni prostor</div><span id="version" class="pill">LOKALNI ENGINE</span></header>
-    <section class="intro"><div><div class="eyebrow">REPRODUCIBILNA GEOANALITIKA</div><h1>Pokreni. Prati. Provjeri.</h1><p>Postojeće engine komande, jedan pregledan radni prostor.</p></div><div class="terrain" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>
+    <header><div class="breadcrumb">GeoCrop Engine <span>/</span> Workspace</div><span id="version" class="pill">LOCAL ENGINE</span></header>
+    <section class="intro"><div><div class="eyebrow">REPRODUCIBLE GEOANALYTICS</div><h1>Run. Monitor. Verify.</h1><p>The engine's commands, one transparent workspace.</p></div><div class="terrain" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>
     <div id="message" role="status" hidden></div>
-    <section class="card auth" id="auth-panel"><div><h2>Poveži se s engineom</h2><p>Unesi pristupni token podešen pri pokretanju servera.</p></div><form id="connect-form"><label class="sr-only" for="token">Pristupni token</label><input id="token" type="password" autocomplete="off" placeholder="Pristupni token" required><button class="primary">Poveži se <span>→</span></button></form></section>
-    <section class="stats" aria-label="Pregled poslova"><article><span>PRIKAZANI POSLOVI</span><strong id="total">—</strong></article><article><span>AKTIVNI</span><strong id="running">—</strong></article><article><span>USPJEŠNI</span><strong id="succeeded">—</strong></article><article><span>ZA PROVJERU</span><strong id="failed">—</strong></article></section>
+    <section class="card auth" id="auth-panel"><div><h2>Connect to the engine</h2><p>Enter the access token configured when the server was started.</p></div><form id="connect-form"><label class="sr-only" for="token">Access token</label><input id="token" type="password" autocomplete="off" placeholder="Access token" required><button class="primary">Connect <span>→</span></button></form></section>
+    <section class="stats" aria-label="Job overview"><article><span>JOBS SHOWN</span><strong id="total">—</strong></article><article><span>ACTIVE</span><strong id="running">—</strong></article><article><span>SUCCEEDED</span><strong id="succeeded">—</strong></article><article><span>NEED ATTENTION</span><strong id="failed">—</strong></article></section>
     <div class="workspace-grid">
       <section class="card command-card">
-        <div class="card-top"><div><span class="eyebrow">NOVA OBRADA</span><h2 id="panel-title">Engine komande</h2></div><span class="step">01</span></div>
-        <div id="commands-tab" class="tab-panel"><label for="command-select">Komanda</label><select id="command-select" disabled><option>Poveži engine za dostupne komande</option></select><p class="help" id="command-help">Izaberi komandu i unesi putanje i parametre.</p><form id="command-form"><div id="required-fields"></div><details id="advanced" hidden><summary>Napredne opcije</summary><div id="optional-fields"></div></details><button class="primary wide" id="run-command" disabled>Pokreni obradu <span>→</span></button></form></div>
-        <div id="console-tab" class="tab-panel" hidden><p class="help">Unesi jednu GeoCrop komandu. Navodnici se podržavaju za putanje s razmacima.</p><form id="console-form"><label for="console-input">CLI komanda</label><textarea id="console-input" class="code-input" rows="5" spellcheck="false">geocrop indices --format markdown</textarea><p class="help">Konzola pokreće engine komande. Shell operatori i izvršavanje proizvoljnih programa nisu podržani.</p><button class="primary wide" id="run-console" disabled>Pokreni komandu <span>→</span></button></form></div>
-        <div id="notebook-tab" class="tab-panel" hidden><p>Pozovi isti engine iz Jupyter Notebooka, JupyterLaba ili Python skripte.</p><pre class="snippet"><code>import os
+        <div class="card-top"><div><span class="eyebrow">NEW RUN</span><h2 id="panel-title">Engine commands</h2></div><span class="step">01</span></div>
+        <div id="commands-tab" class="tab-panel"><label for="command-select">Command</label><select id="command-select" disabled><option>Connect the engine to list commands</option></select><p class="help" id="command-help">Choose a command and enter paths and parameters.</p><form id="command-form"><div id="required-fields"></div><details id="advanced" hidden><summary>Advanced options</summary><div id="optional-fields"></div></details><button class="primary wide" id="run-command" disabled>Start run <span>→</span></button></form></div>
+        <div id="console-tab" class="tab-panel" hidden><p class="help">Enter one GeoCrop command. Quotes are supported for paths containing spaces.</p><form id="console-form"><label for="console-input">CLI command</label><textarea id="console-input" class="code-input" rows="5" spellcheck="false">geocrop indices --format markdown</textarea><p class="help">The console runs engine commands only. Shell operators and arbitrary programs are not supported.</p><button class="primary wide" id="run-console" disabled>Run command <span>→</span></button></form></div>
+        <div id="notebook-tab" class="tab-panel" hidden><p>Call the same engine from a Jupyter notebook, JupyterLab or a Python script.</p><pre class="snippet"><code>import os
 from geocrop.client import EngineClient
 
-# GEOCROP_WEB_TOKEN u okruženju notebooka
+# GEOCROP_WEB_TOKEN in the notebook environment
 engine = EngineClient()
 job = engine.submit(["indices", "--format", "json"])
 result = engine.wait(job["id"], timeout=60)
-print(engine.logs(job["id"])["text"])</code></pre><p class="help">Ako je notebook na drugom računaru, koristi lokalno proslijeđeni port. Token prenesi kroz varijablu okruženja.</p><h3>HTTP API</h3><pre class="snippet"><code>POST /api/jobs
+print(engine.logs(job["id"])["text"])</code></pre><p class="help">If the notebook runs on another machine, use a locally forwarded port. Pass the token through an environment variable.</p><h3>HTTP API</h3><pre class="snippet"><code>POST /api/jobs
 Authorization: Bearer &lt;token&gt;
 Content-Type: application/json
 
-{"argv": ["indices", "--format", "json"]}</code></pre><button id="api-schema" class="secondary" disabled>Preuzmi OpenAPI shemu ↓</button></div>
+{"argv": ["indices", "--format", "json"]}</code></pre><button id="api-schema" class="secondary" disabled>Download OpenAPI schema ↓</button></div>
       </section>
-      <section class="card log-card"><div class="card-top"><div><span class="eyebrow">PRAĆENJE IZVRŠAVANJA</span><h2>Izlaz komande</h2></div><button id="cancel" class="danger" hidden>Zaustavi</button></div><div class="log-meta"><span id="selected-job">Nijedan posao nije odabran</span><span id="selected-status" class="badge">SPREMNO</span></div><pre id="logs" class="terminal" aria-live="polite">GeoCrop je spreman.
+      <section class="card log-card"><div class="card-top"><div><span class="eyebrow">EXECUTION</span><h2>Command output</h2></div><button id="cancel" class="danger" hidden>Stop</button></div><div class="log-meta"><span id="selected-job">No job selected</span><span id="selected-status" class="badge">READY</span></div><pre id="logs" class="terminal" aria-live="polite">GeoCrop is ready.
 
-Pokreni komandu ili izaberi posao iz historije.
-Ovdje se prikazuju izlaz, upozorenja i greške.</pre><div class="artifacts"><h3>Izlazne datoteke <span id="file-count"></span></h3><p id="artifact-empty" class="help">Datoteke se prikazuju kada ih odabrani posao kreira.</p><ul id="artifact-list"></ul></div></section>
+Run a command or choose a job from the history.
+Output, warnings and errors appear here.</pre><div class="artifacts"><h3>Output files <span id="file-count"></span></h3><p id="artifact-empty" class="help">Files appear when the selected job creates them.</p><ul id="artifact-list"></ul></div></section>
     </div>
-    <section class="card history"><div class="card-top"><div><span class="eyebrow">HISTORIJA</span><h2>Poslovi</h2></div><button id="refresh" class="secondary" disabled>Osvježi ↻</button></div><div class="table-wrap"><table><thead><tr><th>Komanda</th><th>Status</th><th>Pokrenuto</th><th>Exit</th></tr></thead><tbody id="jobs"><tr><td colspan="4" class="empty">Poveži engine za pregled poslova.</td></tr></tbody></table></div></section>
-    <footer><span id="workspace-path">Lokalni istraživački radni prostor</span><span>1 worker · postojeći CLI i Python API</span></footer>
+    <section class="card map-card" aria-labelledby="map-title">
+      <div class="card-top"><div><span class="eyebrow">RESULTS ON THE MAP</span><h2 id="map-title">Map</h2></div>
+        <div class="map-actions"><label class="map-toggle"><input type="checkbox" id="basemap-toggle"> OpenStreetMap basemap</label><button id="map-load" class="secondary" disabled>Show selected job ↻</button></div></div>
+      <p id="map-status" class="help">Select a finished job with spatial outputs (for example <code>geocrop demo</code>: crop classes, uncertainty, area of applicability and parcels coloured by the traffic light).</p>
+      <div class="map-layout"><div id="map" role="region" aria-label="Results map"></div><aside id="map-side"><h3>Layers</h3><ul id="map-layers" class="map-layers"></ul><h3>Legend</h3><div id="map-legend" class="map-legend"></div></aside></div>
+      <p class="help map-note">Previews are downsampled for display; download the files for analysis. The basemap is off by default: when enabled, tile requests reveal the viewed area to OpenStreetMap.</p>
+    </section>
+    <section class="card history"><div class="card-top"><div><span class="eyebrow">HISTORY</span><h2>Jobs</h2></div><button id="refresh" class="secondary" disabled>Refresh ↻</button></div><div class="table-wrap"><table><thead><tr><th>Command</th><th>Status</th><th>Started</th><th>Exit</th></tr></thead><tbody id="jobs"><tr><td colspan="4" class="empty">Connect the engine to list jobs.</td></tr></tbody></table></div></section>
+    <footer><span id="workspace-path">Local research workspace</span><span>1 worker · same CLI and Python API</span></footer>
   </main>
 </body>
 </html>

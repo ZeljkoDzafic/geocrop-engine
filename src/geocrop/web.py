@@ -56,7 +56,8 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data: https://tile.openstreetmap.org; "
             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         return response
 
@@ -120,6 +121,14 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
         file = jobs(request).artifact(job_id, path)
         # Downloads remain attachments; generated HTML never executes in the app's origin.
         return FileResponse(file, filename=file.name, media_type="application/octet-stream")
+
+    @app.get("/api/jobs/{job_id}/map", dependencies=[Depends(authenticate)])
+    def job_map(job_id: str, request: Request, max_px: int = Query(default=1024, ge=128, le=4096)):
+        """Map-ready previews (WGS 84) of the job's rasters and vector outputs."""
+        from .web_map import job_layers
+        manager = jobs(request)
+        files = [manager.artifact(job_id, item["path"]) for item in manager.artifacts(job_id)]
+        return job_layers(files, max_px)
 
     @app.get("/api/openapi.json", dependencies=[Depends(authenticate)])
     def schema():
