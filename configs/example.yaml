@@ -72,7 +72,7 @@ features:
   deltas: [NDVI, NDRE, NDMI, VH_dB]
   seasonal: [NDVI]
   # embeddings:              # optional `emb` group; geocrop run then has an embeddings stage (docs/embeddings.md)
-  #   source: alphaearth     # alphaearth | tessera | presto
+  #   source: alphaearth     # alphaearth | tessera | presto (geocrop run); galileo | anysat | a list: geocrop embeddings
   #   year: 2023
 
 classes:

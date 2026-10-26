@@ -363,7 +363,7 @@
           <div class="code-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>Terminal</span><button class="copy" type="button" data-copy="code-unix"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button></div>
 <pre><code id="code-unix">git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
 cd geocrop-engine
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate
 python -m pip install -e '.[all,web]'
 geocrop demo --root outputs/my-first-demo --quick
 

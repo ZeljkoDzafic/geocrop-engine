@@ -539,7 +539,7 @@ Map external parcel fields to the neutral schema
 
 ## `geocrop segment-obia`
 
-SLIC superpixel segmentation (tile-bounded)
+SLIC superpixel segmentation (tiled, segments merged across tile seams)
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
@@ -839,7 +839,7 @@ Run a frozen public region/year TRANSFER protocol (train in one domain, test in 
 |---|---|---|---|
 | `--protocol` | yes |  | versioned transfer protocol YAML (configs/benchmarks/*transfer*) |
 | `--work` | yes |  | working directory (tiles, transfer_cv, results.json/.md) |
-| `--cache` |  |  | download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public |
+| `--cache` |  |  | download cache; default $GEOCROP_CACHE/public (~/.cache/geocrop/public) |
 | `--workers` |  | `4` | parallel scene imports |
 | `--skip-transfer-cv` |  |  | skip the pooled leave-one-region/year-out CV |
 | `--publish` |  |  | directory to copy results.md/.json to (named after the protocol) |
@@ -1108,7 +1108,7 @@ External data cubes: load S2 via odc-stac, import xarray/Zarr/NetCDF cubes into 
 
 ### `geocrop cube load`
 
-Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders (same masking/radiometry as stac-import; optional odc-stac extra)
+Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders (same masking/radiometry as stac-import; optional cube extra)
 
 | Option | Required | Default | Notes |
 |---|---|---|---|

@@ -13,6 +13,10 @@
   (re-import) instead of crashing with `AttributeError`.
 
 ### Added
+- `tools/check_docs.py` (run by `tests/test_check_docs.py` in the default tier): every relative link and anchor in
+  the Markdown documents and `website/index.html` resolves, every `geocrop <command>`/`--option` written in the
+  living docs exists, `docs/configuration.md` lists exactly the keys of `geocrop.config.DEFAULTS`,
+  `docs/architecture.md` names every module of the layer map, and `docs/cli.md` matches the parser.
 - Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
   (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
   season that starts before the series) no longer removes polygons; sample files record the classes of the
@@ -276,6 +280,16 @@
   subprocess-running code.
 
 ### Fixed
+- Documentation matches the code (docs/limitations.md, docs/testing.md and README rewritten): OBIA seam
+  reconciliation was described as missing in limitations/segmentation; limitations now separate synthetic,
+  real-data and public-benchmark evidence (field accuracy in the study region open; conformal coverage below
+  target under shift); configuration table gained `cache.hash`, `model.holdout_fraction`, `model.inner_splits`
+  and `openeo.*`; architecture/ADR module maps, ablation ladder, embedding names, marker confidence formula,
+  contract list, deploy runbook (user/ownership/paths), Docker user and loopback-only serving, Ubuntu 26.04,
+  Python 3.10–3.12, and stale CLI help (`segment-obia`, `benchmark-transfer --cache`, `cube load`) corrected;
+  `geocrop run` embeddings limitation (single AlphaEarth/TESSERA/Presto source) documented.
+- OBIA and watershed post-processing raise a clear error naming the `segmentation` extra when scikit-image is
+  missing (previously a bare `ModuleNotFoundError`, e.g. in `geocrop acceptance --offline` on a core install).
 - The default test tier passes on a minimal install (`.[dev,stac,web]`, no torch/pyarrow/matplotlib), as in CI;
   openEO parcel geometries are rounded to 1e-7° so process graphs are identical across platforms.
 - STAC imports (Sentinel-2 Earth Search, Sentinel-1 RTC Planetary Computer) set GDAL HTTP connect/total

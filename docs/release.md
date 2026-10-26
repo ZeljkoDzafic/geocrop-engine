@@ -46,7 +46,8 @@ PATCH releases contain only bug and security fixes. Security fixes may tighten t
    `src/geocrop/__init__.py`; rename `## Unreleased` in `CHANGELOG.md` to `## X.Y.Z — YYYY-MM-DD` and add a new
    empty `## Unreleased` above it.
 6. `python tools/check_versions.py` must report "versions consistent".
-7. Regenerate CLI docs if commands changed (`python tools/generate_cli_docs.py`).
+7. Regenerate CLI docs if commands changed (`python tools/generate_cli_docs.py`); `python tools/check_docs.py` must
+   report "docs consistent" (links, commands, options, configuration keys, module map).
 8. Merge the release pull request, then tag the merge commit: `git tag -a vX.Y.Z -m "GeoCrop Engine X.Y.Z" && git push origin vX.Y.Z`.
 9. The `release` workflow checks the tag against all version sources, runs the tests, builds sdist + wheel,
    smoke-tests the wheel, and creates the GitHub Release with that version's CHANGELOG section and the

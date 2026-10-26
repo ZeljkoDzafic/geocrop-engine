@@ -75,7 +75,9 @@ def test_queue_filters_sorting_and_paging(env):
     soy = get(env, "/parcels", declared_class="soybean", review="all").json()
     assert soy["total"] and all(i["declared_class"] == "soybean" for i in soy["items"])
     disc = get(env, "/parcels", reason="discrepancy", review="all").json()
-    assert 0 < disc["total"] <= n_light["red"] + n_light["yellow"] + all_["total"]
+    n_disc = sum(1 for i in all_["items"] if "discrepancy" in i["reasons"])
+    assert 0 < n_disc < all_["total"] and disc["total"] == n_disc
+    assert all("discrepancy" in i["reasons"] for i in disc["items"])
     low = get(env, "/parcels", max_confidence=0.9, review="all").json()
     assert all(i["confidence"] < 0.9 for i in low["items"])
     assert get(env, "/parcels", min_set_size=2, review="all").json()["total"] == sum(

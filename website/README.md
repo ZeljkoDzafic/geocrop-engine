@@ -75,7 +75,7 @@ is manual and makes the page public.
 3. Open **Actions → Deploy presentation to GitHub Pages → Run workflow**, select `main` and run it.
 4. After the deployment succeeds, open <https://zeljkodzafic.github.io/geocrop-engine/>.
 
-Later changes to the website on `main` deploy automatically. The workflow checks local links,
+The workflow is manual only: rerun it after changes to the website on `main`. It checks local links,
 screenshots and the bundled plugin before publishing. The repository's Actions settings must allow
 GitHub Actions; any configured `github-pages` environment approval still applies. Adding the workflow
 does not enable repository Pages settings or perform a deployment by itself.

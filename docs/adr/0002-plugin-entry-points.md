@@ -21,7 +21,8 @@ Use the standard Python packaging mechanism: entry points, discovered with `impo
 | `validators` | `geocrop.validators` | `validate(path, **options) -> dict` with a `problems` list |
 | `feature_providers` | `geocrop.feature_providers` | object or class satisfying `geocrop.feature_providers.FeatureProvider`: `name`, `dims`, `licence`, pinned `weights`, input `contract`, `load_model`, `embed_pixels`, `embed_parcels` (see [embeddings](../embeddings.md#feature-provider-interface)) |
 
-* Built-ins register through the same registries in code (`estimators.py`, `indices.py`, `segmenters.py`;
+* Built-ins register through the same registries in code (`estimators.py`, `indices.py`, `segmenters.py`,
+  `feature_providers.py`;
   exporters/validators as lazy `"module:attribute"` names so core does not import adapters).
 * Lookup consults the registry: `estimators.make_estimator`, `indices.get` (hence features, configuration
   validation, CBM markers, time-series features) and `benchmark.segmentation` / `benchmark.run`.
@@ -39,6 +40,7 @@ A complete installable example is in [`examples/plugin_example`](../../examples/
   model payload. Reproducing a run requires the same plugin version, which the run manifest's package list
   only covers when the plugin is added to `provenance.PACKAGES` by the user.
 * Plugins run in-process with full trust; installing one is equivalent to installing any Python package.
-* Not yet wired: the CLI `--algorithm` choices list built-ins only (YAML `model.algorithm` accepts plugins),
-  the pipeline forwards only the documented model keys (`model.RF_KEYS`) to estimator factories, and exporters
-  and validators are not yet selectable from the CLI.
+* Wired since: the CLI `--algorithm` choices include registered plugin estimators (entry-point names are read
+  without importing them), and `model.params` passes estimator-specific hyperparameters through to the factory
+  (`model.config_params`, validated against the estimator's constructor). Not yet wired: exporters and
+  validators are not selectable from the CLI.

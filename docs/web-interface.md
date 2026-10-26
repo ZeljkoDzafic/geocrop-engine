@@ -197,13 +197,13 @@ national layers should be reviewed in subsets); chips need S2 bands `B02`, `B03`
 folders of the job; the screenshots in the tests use the synthetic demo, which is a software check, not evidence of
 accuracy.
 
-## CLI console (terminal)
+## Terminal (CLI console)
 
-The **CLI console** tab is a macOS Terminal-style session. Type an engine command with or without the
+The **Terminal** tab is a macOS Terminal-style session. Type an engine command with or without the
 leading `geocrop` (`indices --format markdown` and `geocrop indices --format markdown` are equivalent) and
 press Enter. The job's output streams inline; a closing line shows `✓` (green) or `✗` (red) with the exit
-code, duration and job ID. A started job is also selected in the *Command output* card, so its files and
-map layers are available there.
+code, duration and job ID. A started job is also selected, so its output, files and map layers appear in the
+Map view.
 
 While typing, the line is coloured: command names, known flags, numbers, quoted strings, paths and valid
 choices each have their own colour; unknown commands, unknown flags, invalid choices and shell operators

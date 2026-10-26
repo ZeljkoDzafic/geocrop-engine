@@ -74,7 +74,8 @@ features:
 
 `monthly`, `start`, `months` and `checkpoint` apply to every monthly provider (Presto, Galileo, AnySat). A list
 of sources (`source: [presto, galileo, anysat]`) produces one raster per source with namespaced names; all are
-attached to the stack.
+attached to the stack. In `geocrop run` the embeddings stage currently supports a single AlphaEarth, TESSERA or
+Presto source only (see [Limitations](#limitations)).
 
 ## Commands
 
@@ -387,15 +388,18 @@ been run yet.
   spatial patches and AnySat larger tiles, which GeoCrop does not use yet).
 * **Presto without ERA5, SRTM and Dynamic World.** These token groups are masked. Presto was pre-trained with
   random group masking, so this is in-distribution, but embeddings computed without these inputs are not
-  identical to those of a full WorldCereal-style pipeline. S1 composites need GeoCrop's SNAP route (or another
-  source of linear VV/VH). When S1 is absent, the S1 token is masked.
+  identical to those of a full WorldCereal-style pipeline. S1 composites need linear VV/VH: GeoCrop's SNAP
+  route, the Planetary Computer RTC import (`s1_stac`) or openEO `s1_composites`. When S1 is absent, the S1 token is masked.
 * **Resampling.** The default is nearest neighbour, which keeps AlphaEarth vectors unit-length. Grids that are
   not aligned to the source's 10 m lattice therefore shift by up to half a pixel.
 * **Version drift.** AlphaEarth, the TESSERA v1 `.npy` tiles (deprecated upstream in favour of Zarr and
   Icechunk) and the model checkpoints can change upstream. GeoCrop pins the Presto, Galileo and AnySat weights
   by commit/revision URL and SHA-256 and records tile URLs and checkpoint hashes in the output tags. Re-extract when you change versions.
 * **Pipeline.** `geocrop run` extracts and attaches embeddings when `features.embeddings` is set (see
-  [Commands](#commands)).
+  [Commands](#commands)), but only for a **single** AlphaEarth, TESSERA or Presto source: the embeddings stage
+  does not yet pass monthly composites to Galileo/AnySat, does not accept a list of sources and ignores
+  `namespace`/`allow_license`. For those, run `geocrop embeddings` and then `geocrop features --config` (or
+  `geocrop merge-stacks`).
 * **Licences.** You are responsible for attribution when publishing maps derived from AlphaEarth (CC-BY-4.0)
   and TESSERA (see the licence notes above). The MIT licences of the Galileo and AnySat weights cover the
   weights; they do not re-license the pre-training datasets, which GeoCrop never downloads or redistributes.
