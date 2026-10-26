@@ -1,6 +1,17 @@
 # Changelog
 
 ## Unreleased
+### Tests
+- Branch-coverage tests for error and edge paths of the result-critical core modules, review/registry and the
+  data adapters (mocked HTTP, no network): every 1.0 coverage-goal module is at or above 90 % branch coverage on the
+  minimal CI install, whose total rose from 72.6 % to 78.6 % (CI `--cov-fail-under` 71 -> 76).
+
+### Fixed
+- `applicability.fit` raises a clear `ValueError` for a single CV fold, identical or non-finite training features
+  and mismatched fold ids instead of an opaque NumPy/SciPy error; `map_aoa` names AOA features missing from the stack.
+- `stac_import.cached_scene_valid` treats a `scene.json` that is valid JSON but not an object as not cached
+  (re-import) instead of crashing with `AttributeError`.
+
 ### Added
 - `tools/check_docs.py` (run by `tests/test_check_docs.py` in the default tier): every relative link and anchor in
   the Markdown documents and `website/index.html` resolves, every `geocrop <command>`/`--option` written in the

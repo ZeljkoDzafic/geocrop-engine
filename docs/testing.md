@@ -73,27 +73,47 @@ CI measures coverage of the default tier on every Python version:
 python -m pytest --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
 ```
 
-`coverage.xml` is uploaded as a workflow artifact. The build fails below `--cov-fail-under=71`: the total measured on
-the minimal CI install `.[dev,stac,web]` (72.9 %, optional backends such as PyTorch skipped) minus two points; raise
-the threshold when coverage improves. Engine commands run by web jobs execute in subprocesses and are not counted;
-the CLI's own tests cover them in-process.
+`coverage.xml` is uploaded as a workflow artifact. The build fails below the current total minus two points
+(`--cov-fail-under=76`, measured on the minimal CI install `.[dev,stac,web]` where optional backends — torch,
+pyarrow, matplotlib, catboost, openeo, xarray — are skipped); raise the threshold when coverage improves. Engine
+commands run by web jobs execute in subprocesses and are not counted; the CLI's own tests cover them in-process.
 
-Measured on 2026-10-26 (Python 3.12, default tier, local environment with the optional extras including
-PyTorch, so slightly higher than a CI job without them; statements + branches combined: **83.8 %**; statements
-86.6 %, branches 75.2 %):
+Measured on 2026-10-26 (Python 3.12, default tier, statements + branches combined): **78.6 %** on the minimal CI
+install (statements 79.7 %, branches 75.2 %) and **89.9 %** with every optional backend installed (statements
+91.5 %, branches 84.8 %). The `tests/test_cov_*.py` files target error and edge paths (empty inputs, single
+class, NaN, nodata-only rasters, mismatched CRS/grids, corrupt JSON, mocked HTTP for the data adapters) and add
+about 11 s to the default tier. Branch coverage per module, minimal CI install:
 
 | Module | Statements | Branches | Module | Statements | Branches |
 |---|---|---|---|---|---|
-| `model` | 96.2 % | 90.4 % | `pipeline` | 93.8 % | 82.1 % |
-| `features` | 96.4 % | 87.3 % | `tsfeatures` | 92.8 % | 86.4 % |
-| `parcels` | 94.8 % | 84.5 % | `timeseries` | 96.6 % | 86.0 % |
-| `validation` | 92.7 % | 64.7 % | `uncertainty` | 94.9 % | 71.4 % |
-| `applicability` | 95.8 % | 70.0 % | `cbm` | 96.7 % | 88.6 % |
-| `metrics` | 96.6 % | 83.3 % | `audit` | 97.7 % | 98.1 % |
-| `web` | 97.0 % | 94.6 % | `web_jobs` | 91.8 % | 84.0 % |
-| `client` | 91.7 % | 88.5 % | `config` | 88.5 % | 82.7 % |
+| `model` | 99.5 % | 98.4 % | `pipeline` | 97.5 % | 91.1 % |
+| `features` | 100 % | 97.1 % | `tsfeatures` | 97.2 % | 95.5 % |
+| `parcels` | 100 % | 99.1 % | `timeseries` | 100 % | 98.0 % |
+| `validation` | 100 % | 100 % | `uncertainty` | 100 % | 100 % |
+| `applicability` | 100 % | 100 % | `cbm` | 99.6 % | 98.9 % |
+| `metrics` | 100 % | 100 % | `splits` | 98.8 % | 97.6 % |
+| `cbm_markers` | 100 % | 100 % | `temporal_quality` | 100 % | 100 % |
+| `evidence` | 93.0 % | 93.2 % | `preflight` | 98.0 % | 95.2 % |
+| `review` | 99.5 % | 99.1 % | `web_review` | 98.8 % | 93.9 % |
+| `registry` | 98.9 % | 98.4 % | `plugins` | 97.9 % | 97.8 % |
+| `web` | 97.0 % | 94.6 % | `web_jobs` | 94.4 % | 90.4 % |
+| `client` | 100 % | 96.2 % | `config` | 88.1 % | 82.1 % |
+| `stac_import` | 100 % | 100 % | `s1_stac` | 99.6 % | 100 % |
+| `openeo_adapter` | 99.8 % | 98.7 % | `embedding_sources` | 100 % | 100 % |
+| `downloads` | 100 % | 100 % | `public_data` | 100 % | 100 % |
+
+`datacube` needs xarray (extra `cube`) and is skipped on the minimal install; with it installed its branch
+coverage is 98.4 %. The total stays below 80 % on the minimal install because whole optional-backend modules
+(torch encoders, CatBoost, matplotlib reports, parquet paths) are not importable there.
 
 **Goal for 1.0:** at least 90 % *branch* coverage for the core modules that determine results — `model`,
 `features`, `tsfeatures`, `pipeline`, `parcels`, `validation`, `uncertainty`, `applicability`, `metrics`,
-`cbm` — and for the web security surface (`web`, `web_jobs`, `client`). Data-access modules that need real
-services (`catalog`, `stac`, `stac_import`, `s1`) are covered by the `network` tier instead.
+`cbm` — and for the web security surface (`web`, `web_jobs`, `client`). **Status:** reached for all thirteen
+on the minimal CI install. The closest margins are `pipeline` (91.1 %; the remaining branches are stage
+combinations such as embeddings attached to time-series stacks and S1 event markers, exercised by the slow
+end-to-end tier) and `web_jobs` (90.4 %; the rest are non-POSIX process handling and shutdown races). A few
+remaining branches are defensive assertions that cannot fire (train/test group leakage checks in `model` and
+`splits`). Not yet at 90 %: `config` (82 %; validation messages of rarely used keys). Data-access modules
+that need real services (`catalog`, `stac`, `s1`) are covered by the `network` tier; `stac_import`, `s1_stac`,
+`openeo_adapter`, `downloads`, `embedding_sources` and `public_data` are now also covered offline with mocked
+HTTP clients.
