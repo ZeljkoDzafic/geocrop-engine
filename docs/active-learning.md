@@ -10,7 +10,7 @@ need for a given accuracy?*
  geocrop parcels ──► active-learning select ──► field visits / analyst review ──► active-learning ingest
        ▲                (uncertain, diverse,        (label form CSV)              (provenance, conflicts,
        │                 spread, by trip)                                           validation kept apart)
-       └──────── geocrop extract / train / predict ◄──────────── updated training polygons ◄──┘
+       └──────── geocrop samples / train / predict ◄──────────── updated training polygons ◄──┘
 ```
 
 ## 1. Select a batch: `geocrop active-learning select`

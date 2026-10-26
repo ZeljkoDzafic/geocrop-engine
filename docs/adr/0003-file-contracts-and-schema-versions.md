@@ -26,6 +26,9 @@ malformed one, and a future layout change would be misread silently.
   (they ignore the extra key).
 * The feature manifest (`<stack>.features.json`) is stamped by `features.write_manifest` (used for window,
   time-series, merged and embedding stacks) and validated by `features.read_manifest` / `load_manifest`
-  (added after this ADR; unversioned manifests still load). Reports (`train_report.json`, `benchmark.json`)
-  keep their `schema` strings.
+  (added after this ADR; unversioned manifests still load). The temporal-support sidecar
+  (`<stack>_temporal_support.json`) and parcel evidence packages (`<id>/evidence.json`) were added later as
+  contracts `temporal_support` and `evidence`; `contracts.SCHEMA_VERSIONS` is the complete list. Reports with a
+  `schema` string (`benchmark.json`: `geocrop-benchmark/1`, prediction manifest: `geocrop-prediction/1`) keep it;
+  `train_report.json` has neither marker.
 * Version numbers are per contract, not per GeoCrop release.

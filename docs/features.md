@@ -14,7 +14,8 @@ manifest drives feature selection in ablation experiments, so experiments are de
 | `s1` | `P2_VH_dB`, `P2_ASC_VHVV_dB` | radar feature per window (orbit prefix when orbits are separate) |
 | `delta` | `delta_NDVI_P1_P2` | change between consecutive windows, `X(P2) - X(P1)` |
 | `seasonal` | `season_NDVI_max`, `season_NDVI_argmax` | statistic over all windows (`max`, `min`, `range`, `argmax` = 1-based window of the peak) |
-| `emb` | `emb_00` … `emb_63` / `emb_127` | optional foundation-model embedding (AlphaEarth, TESSERA, Presto), see [embeddings](embeddings.md) |
+| `ts`, `phenology`, `harmonic` | `ts_NDVI_d150`, `phen_NDVI_sos`, `harm_NDVI_amp1` | optional time-series features (`timeseries.enabled`), see [time series](timeseries.md) |
+| `emb` | `emb_00` … `emb_63` (legacy) or `emb_<provider>_00` … | optional foundation-model embedding (AlphaEarth, TESSERA, Presto, Galileo, AnySat or a plugin provider; up to `_767` for AnySat), see [embeddings](embeddings.md) |
 
 Indices are computed from the composite reflectances of each window, which keeps band and index values
 mutually consistent. Missing inputs propagate as nodata; samples and predictions use only pixels valid in every
