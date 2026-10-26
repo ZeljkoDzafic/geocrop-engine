@@ -5,6 +5,30 @@
 - Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
   fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
   real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
+- External data-cube adapter (`geocrop.datacube`, docs/datacube.md): `geocrop cube load` reads Sentinel-2 L2A from
+  any STAC API through odc-stac directly onto the study grid with the same SCL screening and BOA-offset handling as
+  `stac-import` (identical scene folders on a real Semberija July 2023 run); `geocrop cube import` validates
+  xarray/Zarr/NetCDF or Open Data Cube cubes (band names, CRS, grid lattice, units/scale, nodata, UTC time) and
+  writes scene folders or window composites; `geocrop cube export` writes scenes, composites or a feature stack as
+  CF-1.8 Zarr/NetCDF. Optional `data:` config section (`source: local|odc-stac`). xarray, odc-stac, zarr and
+  netCDF4 are optional.
+- Local model and benchmark registry (`geocrop.registry`, docs/model-registry.md): `geocrop models
+  register|list|show|compare|promote|verify` stores trained models as immutable, hash-sealed entries (content
+  SHA-256, engine version and git commit, algorithm and parameters, feature manifest, input contract, classes and
+  HCAT mapping, training-data summary, CV/holdout/transfer/conformal metrics, licences of pretrained components)
+  with verified split fingerprints; `compare` refuses results scored on different folds or holdouts; stages
+  staging/production/archived in an append-only log; `geocrop predict --model registry:<name>@<version|stage>`
+  with an input-contract check against the feature stack. FTW and Presto checkpoints appear as `pretrained`
+  entries from their existing URL+SHA-256 pins. `benchmark`, `benchmark-models`, `benchmark-public`,
+  `benchmark-segmentation`, `ablation` and `transfer` runs are recorded automatically (`$GEOCROP_REGISTRY`,
+  `off` disables); `geocrop benchmarks list|show|leaderboard` ranks only runs with identical split fingerprints
+  (Markdown/CSV/JSON). `registry.overview()` gives the web layer a read-only JSON snapshot.
+- Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
+  `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
+  TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
+  GeoCrop monthly S2/S1 composites (pixel and parcel level; official MIT checkpoint pinned by SHA-256).
+  `features.embeddings` config key, `features.attach_embeddings`, and ablation rows E5–E7 (handcrafted vs
+  embeddings vs both) when the stack carries `emb`.
 - `geocrop active-learning select|ingest|simulate` (`geocrop.active_learning`, gap G9): batch selection among
   top-uncertain parcels with k-center diversity in standardised feature space, per-predicted-class quotas,
   minimum spacing and trip grouping; ingestion of field/analyst labels with per-round provenance, conflict
@@ -83,6 +107,16 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- `geocrop benchmark-public` (G1): frozen, versioned benchmark protocols (`configs/benchmarks/`) on public
+  EuroCrops parcels with Sentinel-2 from Earth Search; parcel-level OA / macro-F1 / per-class F1 with
+  block-bootstrap CIs, split-conformal coverage and set size, review burden at a target accuracy, wall time and
+  peak RSS; results JSON + Markdown (`docs/benchmarks/`). EuroCrops data are downloaded at run time (md5-pinned).
+- `geocrop.hcat` and `configs/hcat/` (G12): populated HCAT mapping and harmonisation table for the RS/BiH classes
+  (CC-BY-SA-4.0 data, attribution in `configs/hcat/LICENSE-HCAT.md`).
+- `geocrop calendar derive|worldcereal` (G11): data-driven crop calendars and suggested phenological windows from
+  parcel markers; WorldCereal crop-calendar priors (PANGAEA, runtime download, SHA-256-pinned). See
+  `docs/calendars.md`.
+- GitHub issue templates (bug report, feature request).
 - `geocrop parcel-classify` / `geocrop.parcel_classify` (gap G4): parcel-level classification on parcel
   signatures (Whittaker-smoothed mean/std series, temporal percentiles, window means, shape descriptors)
   through the same parcel-grouped spatial CV, locked holdout, calibration, conformal sets and AOA as
@@ -130,6 +164,7 @@
   subprocess-running code.
 
 ### Fixed
+- `docs/limitations.md` no longer states a fixed (stale) number of tests.
 - Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
   flattened through `estimators.predict_labels`.

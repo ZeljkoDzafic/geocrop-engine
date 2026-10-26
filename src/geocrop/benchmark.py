@@ -79,6 +79,7 @@ def run(samples: Samples, output_dir: str | Path,
             raise ValueError(f"Unknown algorithm in candidate {name!r}")
     from .model import split_final_holdout
 
+    t_run = time.perf_counter()
     input_count = len(samples.y)
     samples, final_test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
@@ -136,6 +137,11 @@ def run(samples: Samples, output_dir: str | Path,
     out.mkdir(parents=True, exist_ok=True)
     (out / "benchmark.json").write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf8")
     pd.DataFrame(rows).to_csv(out / "benchmark.csv", index=False)
+    from . import registry
+    registry.record_classification("benchmark", out, rows, samples, n_splits=n_splits, seeds=[seed],
+                                   spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m,
+                                   holdout=final_test, started=t_run,
+                                   protocol={"calibration_mode": calibration_mode, "holdout_fraction": holdout_fraction})
     return report
 
 
@@ -193,6 +199,7 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
     (`selection_samples`) and the same optional spatial buffer as training."""
     from .model import nested_cross_validate, split_final_holdout, tune
 
+    t_run = time.perf_counter()
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     candidates = candidates or DEFAULT_MODELS
@@ -284,6 +291,12 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
         "fold_signature": fold_signature(samples, spatial_block_m, n_splits, seed) if spatial_block_m else None,
         "note": "Same samples and spatial folds for every model; tuned models evaluated with nested CV."},
         indent=2, default=str), encoding="utf8")
+    from . import registry
+    registry.record_classification("benchmark-models", out, rows, samples, n_splits=n_splits,
+                                   seeds=[seed + 101 * r for r in range(repeats)], spatial_block_m=spatial_block_m,
+                                   spatial_buffer_m=spatial_buffer_m, holdout=test, candidate_key="model",
+                                   started=t_run, protocol={"repeats": repeats, "tuned": sorted(grids),
+                                                            "features": len(names)})
     return table
 
 
@@ -314,6 +327,7 @@ def segmentation(raster: str | Path, reference: str | Path, output_dir: str | Pa
     from . import segmenters
     from .segmentation_metrics import boundary_scores, object_scores
 
+    t_run = time.perf_counter()
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     ref = gpd.read_file(reference)
@@ -349,6 +363,9 @@ def segmentation(raster: str | Path, reference: str | Path, output_dir: str | Pa
                      "tolerance_px": tolerance_px})
     table = pd.DataFrame(rows)
     table.to_csv(out / "benchmark_segmentation.csv", index=False)
+    from . import registry
+    registry.record_segmentation(out, rows, raster, reference, tolerance_px=tolerance_px, iou_threshold=iou_threshold,
+                                 started=t_run)
     return table
 
 

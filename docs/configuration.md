@@ -23,6 +23,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `s1` | VV_dB, VH_dB, VHVV_dB | radar features |
 | | `deltas` | NDVI, NDRE, NDMI | consecutive-window differences (S2 or S1 feature names) |
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
+| | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md) |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
 | `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |
@@ -51,6 +52,8 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `conformal_alpha`, `min_aoa_fraction` | 0.1, 0.5 | conformal level for parcel sets; AOA share required for acceptance |
 | `validation` | `label_field`, `date_field`, `year` | `class_name`, `observed_at`, null | observation schema and season |
 | | `training_exclusion_m`, `window_px`, `bootstrap` | 0, 1, 1000 | leakage buffer, GNSS window, bootstrap replicates |
+| `data` | `source` | `local` | `local` or `odc-stac`; read by `geocrop cube load --config`, not by `geocrop run` (the pipeline always reads `paths.s2_scenes`), see [datacube](datacube.md) |
+| | `endpoint`, `collection`, `max_cloud`, `min_clear_fraction` | Earth Search v1, `sentinel-2-l2a`, 80, 0.2 | STAC defaults for `cube load` |
 | `resources` | `disk_guard` | true | free-space check before `composite`, `features`, `predict` ([preflight](preflight.md)) |
 | | `min_free_gb`, `safety_factor` | 5, 1.25 | space kept free per volume; multiplier (≥ 1) on the estimated stage size |
 | | `compression_ratio` | 0.8 | expected compressed / uncompressed raster size, in (0, 1] |

@@ -28,11 +28,13 @@ ALLOWED: dict[str, frozenset[str]] = {
 LAYERS: dict[str, frozenset[str]] = {
     # Pure geospatial/ML logic. Reads and writes local files only; no network, no subprocesses.
     CORE: frozenset({
-        "active_learning", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "estimators", "faultinject",
-        "features", "fieldwork", "ftw", "hashing",
-        "indices", "metrics", "model", "parcels", "plugins", "raster", "s1", "s2", "samples", "scenes",
+        "active_learning", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "embeddings", "estimators",
+        "faultinject", "features", "fieldwork", "ftw", "hashing",
+        "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
+        "calendars",     # data-driven crop calendars and phenological windows
+        "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
@@ -40,6 +42,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "adapters",      # LPIS / national schema mapping
         "catalog",       # Copernicus Data Space (OData, HTTP)
         "client",        # HTTP client for the web workspace
+        "embedding_sources",  # AlphaEarth / TESSERA windowed reads, pinned Presto checkpoint
         "export",        # COG, GeoParquet, STAC items, HCAT
         "ftw_weights",   # Fields of The World checkpoint download (HTTPS, sha256-pinned)
         "quicklook",     # STAC COG quicklooks
@@ -48,10 +51,14 @@ LAYERS: dict[str, frozenset[str]] = {
         "stac",          # STAC inventory (pystac-client)
         "stac_import",   # STAC COG import
         "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
+        "public_data",   # runtime download of public reference datasets (EuroCrops, WorldCereal calendars)
+        "datacube",      # external xarray/Zarr/NetCDF cubes and optional odc-stac loading <-> file contracts
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
+        "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
+        "registry",      # local file-based model and benchmark registry
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),

@@ -1,0 +1,100 @@
+# Frozen public benchmark protocol (G1, public transfer task).
+# Changing ANY value changes the protocol hash recorded in results; publish changes as a new version file.
+# Labels: EuroCrops Slovenia 2021 (CC-BY-SA-4.0), downloaded at run time, never committed.
+# Imagery: Sentinel-2 L2A COGs from Element 84 Earth Search (STAC), windowed reads on the study grid.
+schema: geocrop-public-benchmark-protocol/1
+protocol: eurocrops-si-2021-pomurje
+version: 1
+description: >-
+  Crop-type classification of declared parcels in four 10 x 10 km tiles of the Mura and Drava plains
+  (north-eastern Slovenia, ~100 km from the Bosnia and Herzegovina border region), 2021 season,
+  seven major HCAT-defined classes, spatial-block holdout.
+
+dataset:
+  name: EuroCrops
+  zenodo_record: "14094196"
+  archive: SI_2021.zip
+  checksum: md5:b2acea403d8372ccb9c5f5276130f23b
+  code_field: EC_hcat_c      # HCAT3 code of the declared crop
+  id_field: ID
+  licence: CC-BY-SA-4.0
+  citation: >-
+    Schneider, M., Schelte, T., Schmitz, F., Koerner, M. (2023). EuroCrops: The Largest Harmonized Open Crop
+    Dataset Across the European Union. Scientific Data 10, 612. Data: doi:10.5281/zenodo.14094196.
+
+year: 2021
+grid: {crs: EPSG:32633, resolution_m: 10}
+
+tiles:
+  size_m: 10000
+  origins:                     # lower-left corner (easting, northing) in grid.crs
+    SI-MS-S: [590000, 5164000] # Murska Sobota / Rakican
+    SI-LE-W: [600000, 5160000] # Beltinci / Lendava west
+    SI-LJ:   [578000, 5158000] # Ljutomer / Mura plain
+    SI-PT-E: [570000, 5136000] # Ptujsko polje
+
+classes:                       # HCAT3 codes; exact = code only, subtree = code and descendants
+  maize: {exact: ["3301010600", "3301090400"]}               # grain (incl. sweet corn) and silage maize
+  winter_cereals:
+    exact: ["3301010101", "3301010201", "3301010301", "3301010401", "3301010501", "3301010801",
+            "3301011001", "3301011101", "3301011501"]
+  grassland: {exact: ["3302000000", "3301090100"]}           # permanent grassland, temporary grass
+  oil_pumpkin: {exact: ["3301140400"]}                        # pumpkin_squash_gourd (Styrian oil pumpkin)
+  winter_rapeseed: {exact: ["3301060401"]}
+  soybean: {exact: ["3301160000"]}
+  vegetables: {exact: ["3301070000"]}                         # fresh_vegetables (mixed)
+
+sampling:
+  min_area_m2: 5000            # >= 0.5 ha (>= ~50 pixels before the inner buffer)
+  parcels_per_class: 150       # stratified random draw over all tiles, without replacement
+  seed: 2021
+  inner_buffer_m: 10           # drop mixed boundary pixels
+  max_pixels_per_parcel: 60
+
+split:
+  spatial_block_m: 2000        # parcels are grouped by the 2 km block of their centroid
+  test_fraction: 0.3           # share of blocks held out (class-stratified group split)
+  calibration_fraction: 0.25   # share of the remaining blocks used for conformal / review-threshold calibration
+  buffer_m: 200                # training/calibration parcels whose centroid is within 200 m of a test parcel are dropped
+  seed: 42
+
+imagery:
+  endpoint: https://earth-search.aws.element84.com/v1
+  collection: sentinel-2-l2a
+  max_cloud: 50                # eo:cloud_cover of the whole granule, %
+  scenes_per_window: 3         # least cloudy acquisitions per window (after dedup) with >= min_clear_fraction
+  min_clear_fraction: 0.5      # clear share of the tile according to SCL
+  max_candidates: 12           # candidates tried per window before giving up
+
+windows:
+  P1: {start: "2021-03-15", end: "2021-04-30"}
+  P2: {start: "2021-05-01", end: "2021-05-31"}
+  P3: {start: "2021-06-01", end: "2021-06-30"}
+  P4: {start: "2021-07-01", end: "2021-07-31"}
+  P5: {start: "2021-08-01", end: "2021-08-31"}
+  P6: {start: "2021-09-01", end: "2021-10-15"}
+
+compositing: {statistic: median, mask_dilation_px: 2, min_valid_observations: 1}
+
+features:
+  s2_bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  s2_indices: [NDVI, EVI, MSAVI2, NDRE, RECI, GCVI, NDMI, BSI]
+  deltas: [NDVI, NDRE, NDMI]
+  seasonal: [NDVI]
+
+models:                        # unavailable optional backends are reported as skipped, never dropped silently
+  rf: {algorithm: rf, n_estimators: 300, max_features: sqrt, class_weight: balanced_subsample, n_jobs: -1}
+  extra_trees: {algorithm: extra_trees, n_estimators: 300, max_features: sqrt, class_weight: balanced_subsample,
+                n_jobs: -1}
+  hist_gb: {algorithm: hist_gb, n_estimators: 300, learning_rate: 0.05}
+  lightgbm: {algorithm: lightgbm, n_estimators: 400, learning_rate: 0.05, num_leaves: 31, class_weight: balanced,
+             n_jobs: -1}
+  catboost: {algorithm: catboost, n_estimators: 500, max_depth: 6, class_weight: balanced}
+
+evaluation:
+  unit: parcel                 # parcel class = argmax of the mean pixel probability
+  bootstrap: 1000              # resampling spatial blocks of test parcels
+  bootstrap_seed: 7
+  confidence: 0.95
+  conformal_alpha: 0.1         # Mondrian split conformal on calibration parcels; target coverage 90 %
+  target_accuracy: 0.95        # review threshold chosen on calibration parcels so accepted accuracy >= 95 %

@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in GeoCrop Engine fails or produces wrong results
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for reporting. Please do not attach satellite products, parcel/LPIS data, field observations,
+        credentials or personal data; describe them or share a minimal synthetic example instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you run, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Exact command(s) or Python code, and the configuration (YAML) with paths anonymised.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message / log output
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: GeoCrop version and commit
+      description: Output of `geocrop --version` (and `git rev-parse --short HEAD` for a source install).
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, installed extras (e.g. stac, boost, deep, web), data source (CDSE, Earth Search, SAFE).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Data import (SAFE / STAC / CDSE / Sentinel-1)
+        - Compositing, clouds, time series
+        - Features, training, prediction
+        - Parcels, CbM markers, traffic light
+        - Segmentation
+        - Validation, metrics, benchmarks
+        - Export (COG, STAC, GeoParquet, HCAT)
+        - Web workspace / CLI
+        - Documentation
+        - Other

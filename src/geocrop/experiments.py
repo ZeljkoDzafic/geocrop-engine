@@ -8,13 +8,14 @@ ready for a manuscript table) and `ablation.json` (full metrics, per-class F1, f
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from . import metrics
-from .features import Feature, select
+from .features import GROUPS, Feature, select
 from .model import cross_validate, cv_groups, selection_samples, spatial_blocks, transfer_validation
 from .samples import Samples
 
@@ -25,6 +26,14 @@ DEFAULT_EXPERIMENTS = {
     "E2_S2_full_temporal": {"groups": ["s2_band", "s2_index", "delta", "seasonal"]},
     "E3_S1_only": {"groups": ["s1"]},
     "E4_S1_S2_fusion": {"groups": ["s2_band", "s2_index", "s1", "delta", "seasonal"]},
+}
+# Added to the defaults only when the stack carries an `emb` group (geocrop.embeddings): handcrafted vs
+# foundation-model embeddings vs both, on the same samples and folds.
+HANDCRAFTED_GROUPS = [g for g in GROUPS if g != "emb"]
+EMBEDDING_EXPERIMENTS = {
+    "E5_handcrafted_all": {"groups": HANDCRAFTED_GROUPS},
+    "E6_embeddings_only": {"groups": ["emb"]},
+    "E7_handcrafted_plus_embeddings": {"groups": [*HANDCRAFTED_GROUPS, "emb"]},
 }
 
 
@@ -46,19 +55,23 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
     from .estimators import predict_labels
     from .model import make_estimator, split_final_holdout
 
+    t_run = time.perf_counter()
     samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                                    calibration_mode, calibration_fraction)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    experiments = experiments or DEFAULT_EXPERIMENTS
+    available = [f for f in manifest if f.name in samples.features]
+    if not experiments:
+        experiments = dict(DEFAULT_EXPERIMENTS)
+        if any(f.group == "emb" for f in available):
+            experiments.update(EMBEDDING_EXPERIMENTS)
     params = params or {"n_estimators": 300, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1}
     groups = spatial_blocks(samples, spatial_block_m)
     spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
                "spatial_buffer_m": spatial_buffer_m}
     transfer_groups = None if cv_strategy == "spatial_blocks" else cv_groups(samples, cv_strategy, spatial_block_m)
     ref_hold = None
-    available = [f for f in manifest if f.name in samples.features]
     rows, full = [], {}
     reference_name, reference_oof = None, None   # first successful experiment is the paired-test baseline
     for name, spec in experiments.items():
@@ -112,6 +125,12 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
         "holdout_fraction": holdout_fraction, "holdout_samples": 0 if test is None else int(len(test.y)),
         "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups))), "experiments": full},
         indent=2, default=str), encoding="utf8")
+    from . import registry
+    registry.record_classification("ablation", out, rows, samples, n_splits=n_splits, seeds=[seed],
+                                   spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m, holdout=test,
+                                   strategies=() if cv_strategy == "spatial_blocks" else (cv_strategy,),
+                                   candidate_key="experiment", started=t_run,
+                                   protocol={"params": params, "calibration_mode": calibration_mode})
     return table
 
 
@@ -200,6 +219,7 @@ def transfer(samples: Samples, output_dir: str | Path, features: list[str] | Non
     Writes ``transfer.csv`` (one row per strategy and held-out group, plus a pooled ``ALL`` row per strategy)
     and ``transfer.json`` (full metrics). Strategies whose metadata are missing are reported as skipped.
     """
+    t_run = time.perf_counter()
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
@@ -238,6 +258,10 @@ def transfer(samples: Samples, output_dir: str | Path, features: list[str] | Non
         "seed": seed, "params": params, "n_samples": int(len(samples.y)), "features": len(features),
         "in_domain_spatial_cv": {k: in_domain[k] for k in ("overall_accuracy", "kappa", "macro_f1")},
         "strategies": full}, indent=2, default=str), encoding="utf8")
+    from . import registry
+    registry.record_transfer(out, rows, samples, features=features, strategies=strategies, n_splits=n_splits,
+                             seed=seed, spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m,
+                             params=params, started=t_run)
     return table
 
 

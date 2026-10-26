@@ -7,7 +7,24 @@
 * **GeoParquet** parcel table (`pip install pyarrow`);
 * a **STAC 1.0 Item** (`item.json`) with the projection and classification extensions; class values carry
   EuroCrops **HCAT** codes when a mapping is supplied (`configs/hcat_mapping.template.csv`; codes from
-  <https://github.com/maja601/EuroCrops>).
+  <https://github.com/maja601/EuroCrops>). A populated mapping for the Republic of Srpska / BiH classes is
+  `configs/hcat/hcat_mapping_rs_bih.csv` (`--hcat configs/hcat/hcat_mapping_rs_bih.csv`).
+
+### HCAT class harmonisation (transfer training)
+`configs/hcat/rs_bih_hcat_harmonisation.csv` maps HCAT3 codes to the engine classes (`exact` codes and whole
+`subtree`s, e.g. every permanent-grassland code under `3302000000`). `geocrop.hcat` applies it, so parcels of any
+EuroCrops country can be relabelled into a study's classes:
+
+```python
+from geocrop import hcat
+rules = hcat.read_rules("configs/hcat/rs_bih_hcat_harmonisation.csv")
+parcels["class_name"] = hcat.harmonise(parcels["EC_hcat_c"], rules).to_numpy()
+print(hcat.coverage_report(parcels["EC_hcat_c"], rules))   # mapped / unmapped codes
+```
+
+Both tables are derived from the HCAT taxonomy and are therefore **CC-BY-SA-4.0** data (attribution and mapping
+decisions in `configs/hcat/LICENSE-HCAT.md`), separate from the Apache-2.0 code. Labels produced from EuroCrops
+parcels inherit the ShareAlike terms; they are used at run time and never committed.
 
 Any STAC browser, QGIS, GDAL, openEO back-end or data catalogue can consume the output; platforms such as ETFarm
 import the GeoPackage/GeoParquet parcel table and COG layers.
