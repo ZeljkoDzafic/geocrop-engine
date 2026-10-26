@@ -2,6 +2,11 @@
 
 ## Unreleased
 ### Added
+- `tools/fresh_user_check.sh`: independent-user installation check in a pristine Ubuntu container (ordinary sudo
+  user, README steps only: apt packages, Python 3.12 via apt or uv, pinned pip install, demo, offline acceptance,
+  real Sentinel-2 quicklook, `serve` + `/api/v1/health` with a token); record in
+  docs/release-gates/fresh-user-ubuntu.md. `tools/linux_benchmark.sh`: `tools/scale_benchmark.py` in an Ubuntu
+  image with explicit `--cpus/--memory`; Linux (container) measurements in docs/performance.md.
 - Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
   (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
   season that starts before the series) no longer removes polygons; sample files record the classes of the
@@ -265,6 +270,18 @@
   subprocess-running code.
 
 ### Fixed
+- OBIA segmentation: the global 2–98 % stretch is computed from a block-wise regular subsample; the former
+  decimated whole-raster read of the pixel-interleaved feature stack thrashed GDAL's block cache (5 % of the
+  container's memory) and had not finished after 39 min at 500 km² in a 4 GB Ubuntu container (now ~10 s).
+- `geocrop preflight`: the RAM check uses the cgroup memory limit when it is below installed RAM (Docker
+  `--memory`, systemd `MemoryMax`, Kubernetes); the training runtime estimate grows by 8 / usable CPUs below 8
+  (CPU affinity or cgroup quota), after training ran 2.1x the 8-core estimate on 2 CPUs.
+- README: installation on a fresh Ubuntu 24.04/26.04 (system packages incl. `libexpat1`, Python 3.12 via uv on
+  26.04, pinned pip install), offline acceptance and quicklook in the quick start, token generation and a health
+  request for `geocrop serve`; getting-started no longer claims "~40 tests".
+- `deploy/vm_acceptance.sh --system` installs `libexpat1` explicitly (rasterio's GDAL needs it with uv's Python);
+  `deploy/setup_ubuntu.sh` gives the data/scratch directories to the run user (`GEOCROP_USER`, default the sudo
+  user) instead of leaving them root-owned with mode 750.
 - STAC imports (Sentinel-2 Earth Search, Sentinel-1 RTC Planetary Computer) set GDAL HTTP connect/total
   timeouts and a low-speed abort, so a stalled HTTPS connection fails that item instead of hanging the import
   (observed: > 1 h hang in a 1000 km² Sentinel-1 import).
