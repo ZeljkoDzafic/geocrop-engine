@@ -6,6 +6,12 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- Web workspace: the CLI console is now a macOS Terminal-style session with live syntax colouring,
+  editor-style completion (commands, flags, choices, workspace paths), ghost-text hints, signature help,
+  history with reverse search, streamed job output with coloured exit status, Ctrl+C cancellation and the
+  built-ins `help`, `clear`, `history` and `jobs`.
+- `GET /api/files?prefix=...`: authenticated workspace path completion (at most 200 entries; no absolute
+  paths, `..`, hidden files, web state directory or symlinks leaving the workspace).
 
 ### Fixed
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
