@@ -13,6 +13,7 @@ A scene whose valid reflectance is implausibly negative is rejected instead of i
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +32,26 @@ ASSET_KEYS = {  # Earth Search v1 names; CDSE/others can pass their own mapping
 }
 GDAL_ENV = {"AWS_NO_SIGN_REQUEST": "YES", "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
             "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif,.tiff", "GDAL_HTTP_MAX_RETRY": "4", "GDAL_HTTP_RETRY_DELAY": "2"}
+
+
+def grid_identity(reference: str | Path) -> str:
+    """Fingerprint of the study grid (CRS, transform, shape) a scene folder was cropped to."""
+    import hashlib
+    with rasterio.open(reference) as ref:
+        body = f"{ref.crs.to_wkt()}|{tuple(ref.transform)[:6]}|{ref.shape}"
+    return hashlib.sha256(body.encode()).hexdigest()[:20]
+
+
+def cached_scene_valid(folder: Path, grid_id: str) -> bool:
+    """A cached scene is reused only if it was imported for the same grid and all band files are present."""
+    meta = folder / scene_meta.SIDE_CAR
+    if not meta.exists():
+        return False
+    try:
+        recorded = json.loads(meta.read_text(encoding="utf8")).get("grid_id")
+    except ValueError:
+        return False
+    return recorded == grid_id and all((folder / f"{b}.tif").is_file() for b in (*S2_BANDS, "SCL"))
 
 
 def radiometry(item, asset) -> tuple[float, float]:
@@ -99,6 +120,7 @@ def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: di
                      platform=p.get("platform"), processing_baseline=p.get("s2:processing_baseline"),
                      boa_offset_applied=p.get("earthsearch:boa_offset_applied"), source=item.id,
                      stac_self=item.get_self_href(), clear_fraction=round(clear_fraction, 4),
+                     grid_id=grid_identity(reference),
                      note="Windowed COG import on the reference grid")
     return {"item": item.id, "status": "imported", "path": str(out), "clear_fraction": clear_fraction}
 
@@ -117,11 +139,13 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
     items = Client.open(endpoint).search(collections=[collection], bbox=list(bbox), datetime=f"{start}/{end}",
                                          query=query, max_items=max_items).items()
     results = []
+    grid_id = grid_identity(reference)
     for item in sorted(items, key=lambda i: i.properties.get("datetime", "")):
         target = Path(out_root) / item.id
-        if (target / scene_meta.SIDE_CAR).exists():
+        if cached_scene_valid(target, grid_id):
             results.append({"item": item.id, "status": "cached", "path": str(target)})
             continue
+        (target / scene_meta.SIDE_CAR).unlink(missing_ok=True)   # stale grid or incomplete: re-import
         try:
             results.append(import_item(item, reference, target, asset_keys, min_clear_fraction))
         except (ValueError, rasterio.errors.RasterioIOError) as exc:

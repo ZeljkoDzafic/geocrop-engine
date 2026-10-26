@@ -155,3 +155,21 @@ def test_import_safe_onto_reference_grid(tmp_path):
     out = s2.import_safe(safe, tmp_path / "cropped", reference=ref)
     with rasterio.open(out / "B04.tif") as ds:
         assert ds.shape == (2, 2) and np.allclose(ds.read(1), 0.2)
+
+
+def test_stac_cache_requires_same_grid_and_complete_bands(tmp_path):
+    from geocrop import stac_import
+    g1, g2 = tmp_path / "g1.tif", tmp_path / "g2.tif"
+    for path, x0 in ((g1, 500000), (g2, 500100)):
+        with rasterio.open(path, "w", driver="GTiff", height=6, width=6, count=1, dtype="uint8", crs="EPSG:32634",
+                           transform=from_origin(x0, 5000000, 10, 10)) as dst:
+            dst.write(np.ones((6, 6), "uint8"), 1)
+    scene = tmp_path / "scene"
+    _scene(scene, 0.1, np.full((6, 6), 4), "2023-06-01T10:00:00")
+    meta = json.loads((scene / "scene.json").read_text())
+    meta["grid_id"] = stac_import.grid_identity(g1)
+    (scene / "scene.json").write_text(json.dumps(meta))
+    assert stac_import.cached_scene_valid(scene, stac_import.grid_identity(g1))
+    assert not stac_import.cached_scene_valid(scene, stac_import.grid_identity(g2))     # moved grid
+    (scene / "B11.tif").unlink()
+    assert not stac_import.cached_scene_valid(scene, stac_import.grid_identity(g1))     # missing band

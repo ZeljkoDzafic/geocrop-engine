@@ -37,3 +37,27 @@ def test_job_layers_reports_broken_files(tmp_path):
     bad.write_text("not a geopackage")
     payload = job_layers([bad])
     assert payload["layers"] == [] and payload["skipped"]
+
+
+def test_imagery_layers_from_scene_folders(tmp_path):
+    from geocrop.demo import generate_scenes
+    from geocrop.web_map import imagery_folders, job_layers
+    data = generate_scenes(tmp_path / "s")
+    files = [p for p in Path(data["scene_root"]).rglob("*") if p.is_file()]
+    folders = imagery_folders(files, limit=5)
+    assert len(folders) == 5 and all(len(label) == 10 for _, label in folders)      # labelled by ISO date
+    payload = job_layers([f for f in files if f.parent in {d for d, _ in folders}], max_px=128)
+    products = {layer["product"] for layer in payload["layers"] if layer.get("group") == "imagery"}
+    assert products == {"True colour", "False colour (NIR)", "NDVI"}
+    assert sum(layer["visible"] for layer in payload["layers"]) == 1                  # one default image
+
+
+def test_quicklook_windows_and_validation():
+    from datetime import date
+
+    from geocrop.quicklook import monthly_windows, quicklook, utm_epsg
+    w = monthly_windows(date(2023, 4, 15), date(2023, 6, 10))
+    assert list(w) == ["2023-04", "2023-05", "2023-06"] and w["2023-04"][0] == date(2023, 4, 15)
+    assert utm_epsg(19.1, 44.7) == 32634 and utm_epsg(16.5, 44.9) == 32633
+    with pytest.raises(ValueError):
+        quicklook([19.2, 44.7, 19.1, 44.8], "2023-06-01", "2023-06-30", "/tmp/never")

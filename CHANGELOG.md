@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+### Added
+- `geocrop quicklook`: real Sentinel-2 imagery for a bounding box and period (windowed COG reads, monthly
+  cloud-screened composites), available from the CLI and the web workspace.
+- Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
+  cloudless (EOX) and OpenStreetMap basemaps.
+
+### Fixed
+- `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
+- `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
+- `stac-import` reuses cached scenes only for the same study grid and with all bands present.
+- Map responses of a previously selected job are discarded.
+
 ## 0.9.0 — 2026-10-26
 Hardening release: leakage-free validation for ML and DL, reliable resumable execution, seam-free
 segmentation, reproducible benchmarks, real-data integration tests and VM deployment; plus the web

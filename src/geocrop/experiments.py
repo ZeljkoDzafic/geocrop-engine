@@ -40,12 +40,9 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
       are used, so calibration objects never influence feature selection.
     * spatial_buffer_m purges training polygons near test samples in every fold.
     """
-    from .model import _subset, holdout_mask, make_estimator
+    from .model import make_estimator, split_final_holdout
 
-    test = None
-    if holdout_fraction:
-        test_mask = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), holdout_fraction, seed)
-        test, samples = _subset(samples, test_mask), _subset(samples, ~test_mask)
+    samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                                    calibration_mode, calibration_fraction)
     out = Path(output_dir)

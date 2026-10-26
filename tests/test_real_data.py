@@ -71,3 +71,15 @@ def test_real_composite_and_ndvi(season, grid, tmp_path):
     # July arable land: mostly vegetated, NDVI in the physical range
     assert ok.mean() > 0.5 and np.all((ndvi[ok] >= -1) & (ndvi[ok] <= 1))
     assert 0.3 < np.median(ndvi[ok]) < 0.95
+
+
+def test_quicklook_real_semberija(tmp_path):
+    pytest.importorskip("pystac_client")
+    from geocrop.quicklook import quicklook
+    try:
+        r = quicklook([19.12, 44.73, 19.14, 44.745], "2023-07-01", "2023-08-31", tmp_path / "ql", max_items=10)
+    except Exception as exc:
+        pytest.skip(f"STAC service unavailable: {exc}")
+    if not r["composites"]:
+        pytest.skip("no clear acquisitions")
+    assert r["crs"] == "EPSG:32634" and set(r["composites"]) <= {"2023-07", "2023-08"}

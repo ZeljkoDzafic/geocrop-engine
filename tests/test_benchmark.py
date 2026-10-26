@@ -184,3 +184,19 @@ def test_segmentation_benchmark_with_unet(demo, tmp_path):
     segmentation.unet_train(tmp_path / "x.npy", tmp_path / "y.npy", tmp_path / "m.pt", epochs=1, groups=["a", "b"])
     t = benchmark.segmentation(raster, demo["parcels"], tmp_path / "b", unet_model=tmp_path / "m.pt", tile_size=96)
     assert "unet_watershed" in set(t.method)
+
+
+def test_strict_benchmark_excludes_final_holdout(samples, tmp_path):
+    from geocrop.model import split_final_holdout
+    dev, test = split_final_holdout(samples, 500, 0.25, 42)
+    rep = benchmark.run(samples, tmp_path, {"rf": {"algorithm": "rf", "n_estimators": 10, "n_jobs": 1}},
+                        n_splits=2, spatial_block_m=500, holdout_fraction=0.25)
+    assert rep["holdout_samples_excluded"] == len(test.y) and rep["samples"] == len(dev.y)
+
+
+def test_tuned_benchmark_fits_selected_parameters(samples, tmp_path):
+    cands = {"rf": {"algorithm": "rf", "n_estimators": 10, "n_jobs": 1}}
+    benchmark.models(samples, tmp_path, candidates=cands, grids={"rf": {"max_features": ["sqrt", 0.5]}},
+                     n_splits=2, spatial_block_m=500, repeats=1, holdout_fraction=0.25)
+    details = json.loads((tmp_path / "benchmark_models.json").read_text())["details"]["rf"]["runs"][0]
+    assert details["selected_params"]["max_features"] in ("sqrt", 0.5) and "holdout_macro_f1" in details

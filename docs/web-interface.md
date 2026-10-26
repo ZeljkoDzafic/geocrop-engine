@@ -114,8 +114,23 @@ Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /a
 | Max class probability, normalised entropy | `uncertainty.tif` bands 1 and 3 | off |
 | Inside area of applicability | `aoa.tif` band 2 | off |
 | Other vector outputs (segments, reference layers, observations) | `.gpkg` / `.geojson` | off |
+| Satellite imagery: true colour (B4-B3-B2), false colour (B8-B4-B3), NDVI | every window composite and scene folder of the job | latest cloud-free composite (true colour) when the job has no classification |
+
+Imagery is chosen with one compact control (date or window, product, opacity), so only one image is drawn at a time.
+
+### Real imagery in two minutes
+```bash
+geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-04-01 --end 2023-09-30 --out outputs/semberija-2023
+```
+reads only the area of interest from public Sentinel-2 L2A COGs (no account needed), keeps acquisitions with at
+least 30 % clear pixels in the area, builds monthly cloud-screened composites and shows them on the map. The same
+command is available in the web workspace.
+
+### Basemaps
+None (default), Sentinel-2 cloudless 2023 / 2024 (EOX IT Services GmbH, contains modified Copernicus Sentinel data,
+CC BY-NC-SA 4.0 — non-commercial use) or OpenStreetMap. Enabling a basemap sends tile requests for the viewed area to
+the provider.
 
 Rasters are warped to WGS 84 and downsampled (≤ 1024 px) into PNG previews; vectors are simplified and capped at
 20,000 features. Previews are for orientation only — download the files for analysis. Leaflet is bundled with the
-package (no CDN). The OpenStreetMap basemap is off by default; enabling it sends tile requests for the viewed area to
-OpenStreetMap.
+package (no CDN).

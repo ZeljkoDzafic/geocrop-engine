@@ -275,6 +275,21 @@ class JobManager:
                     return files
         return files
 
+    def output_files(self, job_id, limit: int = 5000) -> list[Path]:
+        """All files under the job's declared outputs (workspace-confined), for server-side map previews."""
+        job = self.get(job_id)
+        files = []
+        for raw in job["outputs"]:
+            root = Path(raw)
+            for path in ([root] if root.is_file() else sorted(root.rglob("*")) if root.is_dir() else []):
+                resolved = path.resolve()
+                if (path.is_file() and resolved.is_relative_to(self.workspace)
+                        and not resolved.is_relative_to(self.state_dir)):
+                    files.append(resolved)
+                    if len(files) >= limit:
+                        return files
+        return files
+
     def artifact(self, job_id, relative):
         allowed = {item["path"] for item in self.artifacts(job_id)}
         if relative not in allowed:

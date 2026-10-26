@@ -57,7 +57,7 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data: https://tile.openstreetmap.org; "
+            "img-src 'self' data: https://tile.openstreetmap.org https://tiles.maps.eox.at; "
             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         return response
 
@@ -127,7 +127,7 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
         """Map-ready previews (WGS 84) of the job's rasters and vector outputs."""
         from .web_map import job_layers
         manager = jobs(request)
-        files = [manager.artifact(job_id, item["path"]) for item in manager.artifacts(job_id)]
+        files = manager.output_files(job_id)
         return job_layers(files, max_px)
 
     @app.get("/api/openapi.json", dependencies=[Depends(authenticate)])
