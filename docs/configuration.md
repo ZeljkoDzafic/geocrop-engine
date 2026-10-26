@@ -38,6 +38,9 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
 | | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
+| `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop ablation --config` |
+| | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids; CLI `geocrop samples --region-field/--year-field/--year` |
+| `predict` | `smoothing: {enabled, window, smoothness}` | false, 7, 10 | edge-aware probability smoothing before argmax and parcel aggregation; used by `geocrop predict --config` |
 | `experiments` | `<id>: {groups, periods, features, exclude}` | E0–E4 ladder | ablation definitions |
 | `parcels` | `id_field`, `declared_field`, `crop_mapping` | `parcel_id`, `declared_crop`, null | parcel schema |
 | | `strategy` | `mean_probability` | `majority`, `mean_probability`, `combined` |

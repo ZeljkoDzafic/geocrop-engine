@@ -2,6 +2,15 @@
 
 ## Unreleased
 ### Added
+- Transfer validation (gap G8): leave-one-region-out, leave-one-year-out and region-year CV
+  (`cv_strategy` in `model.cross_validate` / `nested_cross_validate` / `train`, `experiments.run`;
+  `geocrop train|ablation --cv-strategy`, `geocrop transfer`) with per-held-out-group metrics and the transfer
+  gap to spatial-block CV; sample region/year ids (`geocrop samples --region-field/--year-field/--year`) and a
+  multi-year sample store (`geocrop samples-merge`) that refuses mismatched feature manifests; config sections
+  `cv` and `predict`; docs/validation-protocols.md.
+- Optional edge-aware probability smoothing before argmax and parcel aggregation (gap G15,
+  `geocrop predict --smooth`, `predict.smoothing`) and a synthetic accuracy/conformal-coverage comparison
+  (`geocrop smoothing-experiment`).
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
@@ -23,6 +32,7 @@
   subprocess-running code.
 
 ### Fixed
+- Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
 - `benchmark-models` fits the tuned parameters (selected on development data) before holdout scoring and timing.
 - `stac-import` reuses cached scenes only for the same study grid and with all bands present.
