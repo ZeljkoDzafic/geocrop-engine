@@ -146,7 +146,7 @@ Sentinel-1 scene records its source items, licence and attribution.
 
 | Report | Engine | Area | Verdict |
 |---|---|---|---|
-| [acceptance-0.10-dev-2026-10-26](acceptance/acceptance-0.10-dev-2026-10-26.md) | 0.10 development (after 0.9.0) | Semberija, June–September 2023 | see report |
+| [acceptance-0.10-dev-2026-10-26](acceptance/acceptance-0.10-dev-2026-10-26.md) | 0.10 development (`v0.9.0-5-g56d14bc`) | Semberija, 4.2 km², June–September 2023; 15 Sentinel-2 + 38 Sentinel-1 acquisitions | PASS, 21/21 checks |
 
 Large data are never committed; re-run the command to reproduce a report (STAC items are listed by id).
 
