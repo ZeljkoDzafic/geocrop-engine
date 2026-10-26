@@ -67,6 +67,27 @@ Downloads made at run time (checkpoints, weights, public datasets) are cached un
 [docs/licences-and-weights.md](docs/licences-and-weights.md).
 ESA SNAP (for Sentinel-1 preprocessing) is installed separately: <https://step.esa.int/main/download/snap-download/>.
 
+### On Ubuntu with pip (pinned)
+
+A fresh Ubuntu 26.04 or 24.04 machine, as an ordinary user with `sudo` (checked end to end, including the quick
+start below, by [`tools/fresh_user_check.sh`](docs/release-gates/fresh-user-ubuntu.md)):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends git curl ca-certificates libgomp1 libexpat1
+# Python 3.12, the interpreter of constraints/py312.txt:
+sudo apt-get install -y --no-install-recommends python3.12 python3.12-venv      # Ubuntu 24.04
+# Ubuntu 26.04 ships Python 3.14 and no python3.12 package; install 3.12 with uv instead (no root needed):
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH" && uv python install 3.12
+git clone https://github.com/ZeljkoDzafic/geocrop-engine.git && cd geocrop-engine
+python3.12 -m venv .venv && . .venv/bin/activate
+python -m pip install -c constraints/py312.txt -e '.[all,stac,web]'
+geocrop --version
+```
+`libexpat1` is needed by the GDAL inside the rasterio wheel (it is missing from minimal images when Python does
+not come from the distribution, e.g. with uv); `libgomp1` by the LightGBM wheel of the `boost` extra. Activate the
+environment (`. .venv/bin/activate`) in every new shell.
+
 ## Quick start (synthetic data, ~10 s)
 
 ```bash
@@ -75,6 +96,15 @@ geocrop demo --root outputs/demo
 Generates a synthetic six-class scene with phenological NDVI trajectories and Sentinel-1 backscatter,
 then runs features → spatial CV → prediction → parcels → independent validation → ablation.
 **Synthetic metrics verify the software only; they say nothing about real-world accuracy.**
+
+```bash
+geocrop acceptance --out outputs/acceptance-ci --offline      # whole chain and its 21 checks, synthetic, ~20 s
+geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-08-31 \
+    --out outputs/semberija-2023                              # real Sentinel-2 monthly composites, no account, ~2 min
+```
+`quicklook` reads public Sentinel-2 L2A COGs (Earth Search) for a small area of Semberija and writes monthly
+cloud-masked composites; it is imagery for orientation, not a crop map. The [web workspace](#html-workspace-and-jupyter)
+shows them on a map.
 
 ## Real data in eight commands
 
@@ -118,9 +148,12 @@ actual web, CLI and QGIS captures. Preview it with `python3 -m http.server 8080 
 ### HTML workspace and Jupyter
 
 ```bash
-pip install -e '.[web]'
-# Set GEOCROP_WEB_TOKEN securely to a random token of at least 32 characters.
+pip install -e '.[web]'                     # already included in the pinned Ubuntu install above
+# A random token of at least 32 characters; keep it out of files, notebooks and Git.
+export GEOCROP_WEB_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
 geocrop serve --workspace /path/to/your/study --port 8765
+# second shell (same GEOCROP_WEB_TOKEN): the API answers only with the token
+curl -H "Authorization: Bearer $GEOCROP_WEB_TOKEN" http://127.0.0.1:8765/api/v1/health
 ```
 
 The optional local web interface adds command forms, an engine CLI console, queued jobs, logs,

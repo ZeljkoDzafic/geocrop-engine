@@ -45,13 +45,17 @@ RUNTIME = {
     "composite_s1_s_per_mpx_scene": 0.3,   # per million grid pixels per S1 acquisition
     "features_s_per_mpx_feature": 0.1,     # per million pixels per output feature (measured 0.08)
     "timeseries_s_per_mpx_scene_series": 0.5,
-    "train_s_per_msample_tree": 1.5,       # per million samples per tree, per CV fold + final fit (measured 1.2)
+    "train_s_per_msample_tree": 1.5,       # per million samples per tree, per CV fold + final fit (measured 1.2),
+                                           # wall time on >= TRAIN_REFERENCE_CPUS cores (scaled up on fewer)
     "predict_s_per_mpx_tree": 0.1,         # per million pixels per tree, RF probabilities + uncertainty bands
     # Area-of-applicability map: nearest-neighbour search of every pixel among up to 20 000 training points
     # (applicability.fit max_points) on one core. Measured 98-148 s per Mpx with 97 features on real Semberija
     # stacks (tools/scale_benchmark.py, docs/performance.md); scaled linearly with the feature count.
     "aoa_s_per_mpx_100_features": 150.0,
 }
+# Training (parallel tree building) was timed on 8 cores; with fewer usable CPUs its wall time grows in proportion
+# (measured 2.1x the 8-core estimate in a 2-CPU Ubuntu container, docs/performance.md). More cores are not credited.
+TRAIN_REFERENCE_CPUS = 8
 # Python interpreter, GDAL block cache and imported libraries: measured ~1 GB above the per-stage working sets
 # on 25-1000 km2 real runs (docs/performance.md).
 RAM_OVERHEAD_BYTES = 1.0 * GB
@@ -68,6 +72,7 @@ ASSUMPTIONS = [
     "samples / min_samples_leaf nodes x (64 + 8 x classes) bytes; aoa.json ~ 2 x the float32 sample matrix.",
     "Runtime uses rough per-pixel coefficients (see RUNTIME in geocrop.preflight; prediction includes the "
     "single-core area-of-applicability map); order of magnitude only. Scene import (network) is not estimated.",
+    "Training wall time is scaled by 8 / usable CPUs below 8 (affinity set or cgroup quota); more cores are not credited.",
     "Class support uses polygon centroids; training uses sampled pixel centres, so buffered folds may differ slightly.",
     "Coverage uses SCL/CLDPRB/CLOUDMASK/SHADOW at reduced resolution without mask dilation or temporal screening.",
 ]
@@ -92,6 +97,65 @@ def _existing_ancestor(path: Path) -> Path:
 def free_bytes(path) -> int:
     """Free bytes on the volume that will hold `path` (nearest existing ancestor)."""
     return int(shutil.disk_usage(_existing_ancestor(Path(path))).free)
+
+
+CGROUP_MEMORY_FILES = ("/sys/fs/cgroup/memory.max",                       # cgroup v2 (Docker, systemd, k8s)
+                       "/sys/fs/cgroup/memory/memory.limit_in_bytes")     # cgroup v1
+
+
+def memory_limit_bytes(cgroup_files=CGROUP_MEMORY_FILES) -> tuple[int | None, str]:
+    """Memory this process may use: installed RAM, or a smaller cgroup limit (container, systemd MemoryMax).
+
+    Returns ``(bytes or None, source)``; ``source`` is ``"installed"`` or the cgroup file that lowered it. On
+    Linux, ``SC_PHYS_PAGES`` reports the host's (or VM's) RAM even inside a container started with ``--memory``.
+    """
+    try:
+        total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        total = None
+    source = "installed"
+    for name in cgroup_files:
+        try:
+            raw = Path(name).read_text(encoding="ascii").strip()
+        except OSError:
+            continue
+        if raw.isdigit() and int(raw) > 0 and (total is None or int(raw) < total):
+            total, source = int(raw), name           # "max" or a huge v1 sentinel means: no limit
+        break
+    return total, source
+
+
+CGROUP_CPU_FILES = ("/sys/fs/cgroup/cpu.max",                                         # cgroup v2: "quota period"
+                    ("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us"))  # v1
+
+
+def available_cpus(cgroup_files=CGROUP_CPU_FILES) -> tuple[float, str]:
+    """CPUs this process may use: the CPU affinity set, or a smaller cgroup quota (``docker run --cpus``).
+
+    Returns ``(cpus, source)``; ``source`` is ``"cpu_count"``, ``"affinity"`` or the cgroup file that lowered it.
+    """
+    try:
+        cpus, source = float(len(os.sched_getaffinity(0))), "affinity"
+    except (AttributeError, OSError):
+        cpus, source = float(os.cpu_count() or 1), "cpu_count"
+    for entry in cgroup_files:
+        try:
+            if isinstance(entry, str):
+                quota, period = Path(entry).read_text(encoding="ascii").split()[:2]
+                name = entry
+            else:
+                quota, period = (Path(f).read_text(encoding="ascii").strip() for f in entry)
+                name = entry[0]
+        except (OSError, ValueError):
+            continue
+        try:
+            limit = int(quota) / int(period)
+        except ValueError:                      # "max": no quota
+            break
+        if 0 < limit < cpus:
+            cpus, source = limit, name
+        break
+    return cpus, source
 
 
 def _volume(path) -> str:
@@ -629,8 +693,9 @@ def _rf_model_bytes(cfg, n_samples, n_classes) -> int:
     return int(trees * 2 * 0.63 * n_samples / leaf * (64 + 8 * n_classes))
 
 
-def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = None) -> dict:
-    """Rough grid, feature, disk, RAM and runtime figures (see ASSUMPTIONS)."""
+def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = None,
+             cpus: float | None = None) -> dict:
+    """Rough grid, feature, disk, RAM and runtime figures (see ASSUMPTIONS); `cpus` defaults to the usable CPUs."""
     r = cfg["resources"]
     px = layout["pixels"]
     n_classes = n_classes or _n_classes(cfg)
@@ -674,6 +739,9 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
     out["peak_ram_gb"]["max"] = round(max(ram.values()) / GB, 2)
     mpx = px / 1e6
     trees = int(cfg["model"]["n_estimators"] or 100)
+    if cpus is None:
+        cpus = available_cpus()[0]
+    out["cpus"] = round(cpus, 2)
     s1_scenes = sum(len(v) for v in layout["s1_by_window"].values())
     s2_scenes = sum(len(v) for v in layout["s2_by_window"].values())
     secs = {
@@ -682,7 +750,8 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
         "features": mpx * fw * RUNTIME["features_s_per_mpx_feature"],
         "timeseries": mpx * ts["scenes"] * max(1, ts["series"]) * RUNTIME["timeseries_s_per_mpx_scene_series"]
         if ts["features"] else 0.0,
-        "train": n_samples / 1e6 * trees * RUNTIME["train_s_per_msample_tree"] * (cfg["model"]["cv_folds"] + 1),
+        "train": n_samples / 1e6 * trees * RUNTIME["train_s_per_msample_tree"] * (cfg["model"]["cv_folds"] + 1)
+        * TRAIN_REFERENCE_CPUS / min(TRAIN_REFERENCE_CPUS, max(1.0, cpus)),
         "predict": mpx * trees * RUNTIME["predict_s_per_mpx_tree"]
         + mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100,
     }
@@ -722,16 +791,15 @@ def _check_resources(cfg, est, rep: _Report) -> list[dict]:
         else:
             rep.add("resources.disk", "resources", "pass",
                     f"{row['path']}: {row['free_gb']} GB free, about {row['need_gb']} GB needed.", **row)
-    try:
-        total_ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / GB
-    except (ValueError, OSError, AttributeError):
-        total_ram = None
+    limit, source = memory_limit_bytes()
+    total_ram = limit / GB if limit else None
     peak = est["peak_ram_gb"]["max"]
     if total_ram:
         status = "error" if peak > total_ram else ("warn" if peak > 0.7 * total_ram else "pass")
+        what = "installed" if source == "installed" else f"allowed by the cgroup limit ({source})"
         rep.add("resources.ram", "resources", status,
-                f"Rough peak RAM {peak} GB vs {total_ram:.1f} GB installed.", peak_gb=peak,
-                installed_gb=round(total_ram, 1))
+                f"Rough peak RAM {peak} GB vs {total_ram:.1f} GB {what}.", peak_gb=peak,
+                installed_gb=round(total_ram, 1), memory_source=source)
     return rows
 
 
