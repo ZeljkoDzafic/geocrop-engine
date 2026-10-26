@@ -139,6 +139,7 @@ class Sampler(threading.Thread):
                 last_disk = now
             if now - last_net >= self.net_every:
                 self.net_lower()
+                self.psutil.net_io_counters()        # frequent calls let psutil correct 32-bit counter wraps
                 last_net = now
             cpu = self.psutil.cpu_percent(None)
             with self.lock:
@@ -218,8 +219,7 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
     from rasterio.warp import transform_bounds
     from shapely.geometry import box
 
-    from geocrop import config as cfgmod
-    from geocrop import features, model, parcels, preflight, s1_stac, s2, scenes, segmentation, stac_import
+    from geocrop import features, model, parcels, s1_stac, s2, scenes, segmentation, stac_import
     from geocrop import s1 as s1mod
     from geocrop.acceptance import pseudo_reference, windows_for
     from geocrop.raster import NODATA, make_grid
@@ -317,21 +317,9 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
                                    aoa=pred / "aoa.tif")
             rec["parcels"] = ps["parcels"]
         # preflight estimate for the same layout (scenes, grid, features, samples) to compare with the measurement
-        cfg = cfgmod.load(None, {
-            "grid": {"crs": CRS, "resolution_m": 10, "reference": str(grid)},
-            "windows": {p: {"start": a, "end": b} for p, (a, b) in info["windows"].items()},
-            "paths": {"s2_scenes": str(out / "scenes" / "s2"), "s1_scenes": str(out / "scenes" / "s1"),
-                      "composites": str(comp), "features": str(stack), "output": str(out / "run"),
-                      "training": str(train_path)},
-            "compositing": {"mask_dilation_px": 1},
-            "model": {"n_estimators": RF["n_estimators"], "cv_folds": 3}})
-        layout = preflight.plan(cfg)
-        info["preflight_estimate"] = preflight.estimate(cfg, layout, n_samples=info["samples"],
-                                                        n_classes=info["classes"])
-        info["preflight_layout"] = {"window_features": layout["window_features"],
-                                    "s2_scenes": sum(len(v) for v in layout["s2_by_window"].values()),
-                                    "s1_scenes": sum(len(v) for v in layout["s1_by_window"].values()),
-                                    "pixels": layout["pixels"]}
+        est, layout = preflight_estimates(out, info)
+        info["preflight_estimate"] = est["current"]
+        info["preflight_layout"] = layout
         info["output_sizes_mb"] = {name: round(_dir_bytes(out / name) / MB, 1) for name in
                                    ("scenes", "composites", "features", "segmentation", "model", "prediction",
                                     "parcels")}
@@ -350,6 +338,41 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
                                        "upper": "host interface counters (psutil.net_io_counters; all traffic)"}}
     (out / "benchmark.json").write_text(json.dumps(result, indent=2, default=str), encoding="utf8")
     return result
+
+
+# Coefficients of geocrop.preflight before the recalibration documented in docs/performance.md.
+PRE_CALIBRATION = {"runtime": {"predict_s_per_mpx_tree": 0.7, "aoa_s_per_mpx_100_features": 0.0},
+                   "ram_overhead_bytes": 0.0}
+
+
+def preflight_estimates(out: Path, info: dict) -> tuple[dict, dict]:
+    """`geocrop preflight` estimates for a measured area: current coefficients and pre-calibration ones."""
+    from geocrop import config as cfgmod
+    from geocrop import preflight
+    cfg = cfgmod.load(None, {
+        "grid": {"crs": CRS, "resolution_m": 10, "reference": str(out / "grid.tif")},
+        "windows": {p: {"start": a, "end": b} for p, (a, b) in info["windows"].items()},
+        "paths": {"s2_scenes": str(out / "scenes" / "s2"), "s1_scenes": str(out / "scenes" / "s1"),
+                  "composites": str(out / "composites"), "features": str(out / "features" / "stack.tif"),
+                  "output": str(out / "run"), "training": str(out / "reference" / "pseudo_training.gpkg")},
+        "compositing": {"mask_dilation_px": 1},
+        "model": {"n_estimators": RF["n_estimators"], "cv_folds": 3}})
+    layout = preflight.plan(cfg)
+    kw = {"n_samples": info["samples"], "n_classes": info["classes"]}
+    current = preflight.estimate(cfg, layout, **kw)
+    saved = dict(preflight.RUNTIME), preflight.RAM_OVERHEAD_BYTES
+    try:
+        preflight.RUNTIME.update(PRE_CALIBRATION["runtime"])
+        preflight.RAM_OVERHEAD_BYTES = PRE_CALIBRATION["ram_overhead_bytes"]
+        before = preflight.estimate(cfg, layout, **kw)
+    finally:
+        preflight.RUNTIME.clear()
+        preflight.RUNTIME.update(saved[0])
+        preflight.RAM_OVERHEAD_BYTES = saved[1]
+    summary = {"window_features": layout["window_features"],
+               "s2_scenes": sum(len(v) for v in layout["s2_by_window"].values()),
+               "s1_scenes": sum(len(v) for v in layout["s1_by_window"].values()), "pixels": layout["pixels"]}
+    return {"current": current, "pre_calibration": before}, summary
 
 
 def _ram_bytes() -> int:
@@ -419,11 +442,13 @@ def _fit(x, y):
     return float(a), float(b)
 
 
-def report(out: Path, images: Path) -> dict:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def _upper(s: dict):
+    """Host-counter upper bound of a stage, None when it is below the per-process lower bound (32-bit wrap)."""
+    hi, lo = s["net_in_mb_host_upper"], s["net_in_mb_lower"] or 0
+    return None if hi is None or hi < lo else hi
 
+
+def report(out: Path, images: Path) -> dict:
     res = [r for r in load_results(out) if not r.get("error")]
     images.mkdir(parents=True, exist_ok=True)
     lines = []
@@ -437,15 +462,18 @@ def report(out: Path, images: Path) -> dict:
                      "peak_rss": max(s["peak_rss_mb"] for s in r["stages"]),
                      "disk": max(s["dir_peak_mb"] for s in r["stages"]),
                      "net_lo": sum(s["net_in_mb_lower"] or 0 for s in r["stages"]),
-                     "net_hi": sum(s["net_in_mb_host_upper"] for s in r["stages"]), "stages": st,
-                     "est": i.get("preflight_estimate", {}), "sizes": i.get("output_sizes_mb", {})})
+                     "net_hi": (None if any(_upper(s) is None for s in r["stages"])
+                                else sum(_upper(s) for s in r["stages"])), "stages": st,
+                     "est": i.get("preflight_estimate", {}), "sizes": i.get("output_sizes_mb", {}),
+                     "info": i, "area_requested": r["area"]})
     lines.append("| Area km² | Grid Mpx | S2 / S1 scenes | Features | Train samples | Wall min | CPU min | "
                  "Peak RSS GB | Output peak GB | Network in GB (lower–upper) |")
     lines.append("|---|---|---|---|---|---|---|---|---|---|")
     for w in rows:
         lines.append(f"| {w['area']:g} | {w['mpx']:.2f} | {w['s2']} / {w['s1']} | {w['features']} | {w['samples']} | "
                      f"{w['wall'] / 60:.1f} | {w['cpu'] / 60:.1f} | {w['peak_rss'] / 1024:.2f} | "
-                     f"{w['disk'] / 1024:.2f} | {w['net_lo'] / 1024:.2f}–{w['net_hi'] / 1024:.2f} |")
+                     f"{w['disk'] / 1024:.2f} | {w['net_lo'] / 1024:.2f}–"
+                     f"{'n/a' if w['net_hi'] is None else format(w['net_hi'] / 1024, '.2f')} |")
     lines.append("")
     for w in rows:
         lines.append(f"**{w['area']:g} km²** (grid {w['mpx']:.2f} Mpx)")
@@ -457,34 +485,56 @@ def report(out: Path, images: Path) -> dict:
             s = w["stages"].get(name)
             if s:
                 lo = "n/a" if s["net_in_mb_lower"] is None else f"{s['net_in_mb_lower']:g}"
+                hi = "n/a" if _upper(s) is None else f"{_upper(s):g}"
                 lines.append(f"| {name} | {s['wall_s']:g} | {s['cpu_s']:g} | {s['avg_busy_cores']} | "
-                             f"{s['peak_rss_mb']:g} | {s['disk_written_mb']:g} | {lo}–{s['net_in_mb_host_upper']:g} | "
+                             f"{s['peak_rss_mb']:g} | {s['disk_written_mb']:g} | {lo}–{hi} | "
                              f"{s['host_load1_mean']} |")
         lines.append("")
     # preflight comparison
-    lines.append("| Area km² | Quantity | Preflight estimate | Measured | Measured / estimate |")
-    lines.append("|---|---|---|---|---|")
+    lines.append("| Area km² | Coefficients | Quantity | Preflight estimate | Measured | Measured / estimate |")
+    lines.append("|---|---|---|---|---|---|")
     comparisons = []
     for w in rows:
-        e, st, sz = w["est"], w["stages"], w["sizes"]
-        if not e.get("disk"):
-            continue
-        rt = e["runtime_hours_rough"]
-        meas = {
-            "composite runtime s": (rt["composite"] * 3600, sum(st[n]["wall_s"] for n in ("s2_composites", "s1_composites") if n in st)),
-            "features runtime s": (rt["features"] * 3600, st["features"]["wall_s"]),
-            "train runtime s": (rt["train"] * 3600, st["training"]["wall_s"]),
-            "predict runtime s": (rt["predict"] * 3600, st["prediction"]["wall_s"]),
-            "composites disk GB": (e["disk"]["composite"]["expected_gb"], sz.get("composites", 0) * MB / 1e9),
-            "feature stack disk GB": (e["disk"]["features"]["expected_gb"], sz.get("features", 0) * MB / 1e9),
-            "prediction disk GB": (e["disk"]["predict"]["expected_gb"], sz.get("prediction", 0) * MB / 1e9),
-            "peak RAM GB (max stage)": (e["peak_ram_gb"]["max"], w["peak_rss"] * MB / 1e9),
-        }
-        for q, (est, m) in meas.items():
-            ratio = m / est if est else float("nan")
-            comparisons.append({"area": w["area"], "quantity": q, "estimate": est, "measured": m, "ratio": ratio})
-            lines.append(f"| {w['area']:g} | {q} | {est:.3g} | {m:.3g} | {ratio:.2f} |")
+        st, sz = w["stages"], w["sizes"]
+        try:
+            ests = preflight_estimates(out / f"area_{w['area_requested']:g}km2", w["info"])[0]
+        except Exception as exc:  # noqa: BLE001 - scenes deleted: fall back to the estimate stored at run time
+            print(f"preflight re-estimate failed for {w['area']:g} km2: {exc}")
+            ests = {"current": w["est"]}
+        for label, e in ests.items():
+            if e.get("disk"):
+                w.setdefault("estimates", {})[label] = e
+        for label, e in w.get("estimates", {}).items():
+            _compare(lines, comparisons, w, label, e, st, sz)
     lines.append("")
+    _plots_and_fits(rows, images, out, comparisons, lines)
+    return json.loads((out / "scale_summary.json").read_text())
+
+
+def _compare(lines, comparisons, w, label, e, st, sz):
+    rt = e["runtime_hours_rough"]
+    composite_s = sum(st[n]["wall_s"] for n in ("s2_composites", "s1_composites") if n in st)
+    meas = {
+        "composite runtime s": (rt["composite"] * 3600, composite_s),
+        "features runtime s": (rt["features"] * 3600, st["features"]["wall_s"]),
+        "train runtime s": (rt["train"] * 3600, st["training"]["wall_s"]),
+        "predict runtime s": (rt["predict"] * 3600, st["prediction"]["wall_s"]),
+        "composites disk GB": (e["disk"]["composite"]["expected_gb"], sz.get("composites", 0) * MB / 1e9),
+        "feature stack disk GB": (e["disk"]["features"]["expected_gb"], sz.get("features", 0) * MB / 1e9),
+        "prediction disk GB": (e["disk"]["predict"]["expected_gb"], sz.get("prediction", 0) * MB / 1e9),
+        "peak RAM GB (max stage)": (e["peak_ram_gb"]["max"], w["peak_rss"] * MB / 1e9),
+    }
+    for q, (est, m) in meas.items():
+        ratio = m / est if est else float("nan")
+        comparisons.append({"area": w["area"], "coefficients": label, "quantity": q, "estimate": est,
+                            "measured": m, "ratio": ratio})
+        lines.append(f"| {w['area']:g} | {label} | {q} | {est:.3g} | {m:.3g} | {ratio:.2f} |")
+
+
+def _plots_and_fits(rows, images, out, comparisons, lines):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
     # plots
     if rows:
         a = [w["area"] for w in rows]
@@ -524,12 +574,11 @@ def report(out: Path, images: Path) -> dict:
                                "net_mb": _fit([p[0] for p in pts], [p[1]["net_in_mb_lower"] or 0 for p in pts])}
         extra["peak_rss_mb"] = _fit([w["area"] for w in rows], [w["peak_rss"] for w in rows])
         extra["dir_peak_mb"] = _fit([w["area"] for w in rows], [w["disk"] for w in rows])
-    summary = {"rows": [{k: v for k, v in w.items() if k != "stages"} for w in rows], "comparisons": comparisons,
-               "linear_fits_a_plus_b_area": extra}
+    summary = {"rows": [{k: v for k, v in w.items() if k not in ("stages", "info")} for w in rows],
+               "comparisons": comparisons, "linear_fits_a_plus_b_area": extra}
     (out / "scale_summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
     (out / "scale_tables.md").write_text("\n".join(lines), encoding="utf8")
     print("\n".join(lines))
-    return summary
 
 
 def main(argv=None):
