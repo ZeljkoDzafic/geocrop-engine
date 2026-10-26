@@ -310,9 +310,9 @@
 - `geocrop preflight`: the RAM check uses the cgroup memory limit when it is below installed RAM (Docker
   `--memory`, systemd `MemoryMax`, Kubernetes); the training runtime estimate grows by 8 / usable CPUs below 8
   (CPU affinity or cgroup quota), after training ran 2.1x the 8-core estimate on 2 CPUs.
-- README: installation on a fresh Ubuntu 24.04/26.04 (system packages incl. `libexpat1`, Python 3.12 via uv on
-  26.04, pinned pip install), offline acceptance and quicklook in the quick start, token generation and a health
-  request for `geocrop serve`; getting-started no longer claims "~40 tests".
+- README: the exact commands for a fresh Ubuntu 24.04/26.04 (system packages incl. `libexpat1`, without which
+  rasterio fails with uv's Python, Python 3.12 via uv on 26.04, pinned pip install) and an authenticated
+  `/api/v1/health` request after `geocrop serve`.
 - `deploy/vm_acceptance.sh --system` installs `libexpat1` explicitly (rasterio's GDAL needs it with uv's Python);
   `deploy/setup_ubuntu.sh` gives the data/scratch directories to the run user (`GEOCROP_USER`, default the sudo
   user) instead of leaving them root-owned with mode 750.

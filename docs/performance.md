@@ -173,6 +173,105 @@ sample count) with the coefficients before and after the recalibration in this r
 * Composite, feature and training runtimes are conservative by 1.0–2.7x; they are left unchanged because they
   are upper bounds on a busier machine. Scene import (network) is not estimated by preflight; use the rates below.
 
+## Linux (container) measurements
+
+The same tool on Ubuntu, as a proxy for a VM (no Ubuntu VM was available). **This is a resource-limited container
+on a shared laptop, not a dedicated server**: read the numbers as "what a 2-CPU / 4 GB Linux box does", not as
+the speed of Linux versus macOS.
+
+```bash
+tools/linux_benchmark.sh --sizes 100 500 --cpus 2 --memory 4g --max-hours 2 --out outputs/scale-linux
+```
+
+`tools/linux_benchmark.sh` builds an image from `ubuntu:26.04` with the README installation (Python 3.12 from uv,
+`pip install -c constraints/py312.txt -e '.[all,stac,web]'`, plus psutil) and runs `tools/scale_benchmark.py`
+with `docker run --cpus 2 --memory 4g --memory-swap 4g` (no swap); outputs go to a Docker volume (the VM's ext4
+disk, not a bind mount of the host).
+
+| Item | Value |
+|---|---|
+| Container | Ubuntu 26.04.1 LTS, aarch64, CPython 3.12.15 (uv), cgroup v2 `cpu.max 200000 100000` (2 CPUs), `memory.max` 4 GiB, no swap |
+| Docker VM | Rancher Desktop (Docker Engine 29.5.3, Lima, kernel 6.18 `-virt`): 2 vCPUs, 5.8 GiB, shared with ~1.5 GiB of other running containers |
+| Host | Apple M5 Pro laptop (15 cores, 48 GB), macOS; other jobs running (host 1-min load 4–57 during run 2) |
+| Network | ordinary broadband; inside the container `psutil.net_io_counters` counts only the container's interface, so the "upper" bound is the container's own received bytes (the macOS per-flow lower bound is unavailable on Linux) |
+
+**100 km² (grid 1.00 Mpx, 15 S2 / 38 S1 scenes, 97 features, 112 500 training samples), two runs:**
+
+| Run | Code | Wall min | CPU min | Peak RSS GB | Output peak GB | Network in GB | macOS (same area) |
+|---|---|---|---|---|---|---|---|
+| 1 | 3a05477 | 10.2 | 8.6 | 1.64 | 1.18 | 1.08 | wall 8.0, CPU 6.7, RSS 2.41, output 1.20, net 1.34–1.93 |
+| 2 | 0075e35 | 12.6 | 12.2 | 1.59 | 1.18 | 1.09 | |
+
+| Stage | Run 1 wall s | Run 1 CPU s | Run 2 wall s | Run 2 CPU s | Peak RSS MB (run 1) | Disk written MB | macOS wall s |
+|---|---|---|---|---|---|---|---|
+| s2_import | 179.7 | 14.0 | 183.7 | 24.9 | 316 | 421.5 | 256.0 |
+| s1_import | 51.2 | 10.3 | 43.8 | 17.4 | 308 | 236.5 | 71.5 |
+| s2_composites | 10.8 | 10.6 | 17.3 | 17.1 | 608 | 112.9 | 10.7 |
+| s1_composites | 2.4 | 2.4 | 4.7 | 4.6 | 553 | 24.1 | 2.9 |
+| features | 6.8 | 6.7 | 13.0 | 12.6 | 666 | 278.5 | 7.8 |
+| segmentation | 21.6 | 21.5 | 36.9 | 35.9 | 645 | 4.3 | 14.2 |
+| pseudo_labels | 5.4 | 5.3 | 7.3 | 7.3 | 599 | 3.0 | 1.8 |
+| training | 145.4 | 250.9 | 222.0 | 376.8 | 1258 | 98.4 | 25.0 |
+| prediction | 189.1 | 192.1 | 226.0 | 229.7 | 1680 | 23.8 | 89.7 |
+| parcels | 1.9 | 1.9 | 3.8 | 3.6 | 907 | 6.7 | 1.2 |
+
+* Run 2 ran while the macOS host was heavily loaded (1-min load 27–39 on 15 cores at its start); its CPU
+  seconds rose with its wall time (a vCPU that the host does not schedule still counts as busy inside the guest),
+  so **run 1 is the better figure and run-to-run spread on a shared host is up to ~1.7x per CPU-bound stage**.
+  Segmentation changed between the runs (see below) but is a 1-tile area at 100 km², where the change is minor.
+* Disk and output sizes are identical on Linux and macOS (±2 %); network volume is the same order (1.1 GB measured
+  on the container interface vs a 1.34 GB lower bound on macOS; the difference was not investigated).
+* Peak RSS is lower than on macOS (1.6 vs 2.4 GiB), probably because fewer trees are built concurrently on 2 CPUs
+  and the operating systems account RSS differently (not investigated). A 4 GB container is ample at 100 km².
+* Training is the stage that depends on cores: 251 CPU s took 145 s on 2 CPUs (1.7 busy cores) vs 25 s on the
+  15-core laptop. Prediction is dominated by the single-core AOA map and ran 2.1x slower than on the laptop's
+  faster cores.
+
+**500 km²: not completed.** A first attempt (code 3a05477) stalled in OBIA segmentation: its global stretch made
+a decimated whole-raster read of the 97-band pixel-interleaved stack, and with GDAL's block cache at 5 % of the
+container memory (~205 MB) every output row re-decompressed a whole row of 25 MB tiles; after 39 min the stage
+had not finished and was stopped. This is fixed in this release (block-wise regular subsample, ~10 s for that
+stack, identical percentiles to three decimals; the whole OBIA stage then took 146 s in a 1-CPU repro). The
+re-run (code 0075e35) completed every stage up to the pseudo-labels:
+
+| Stage (500 km², 5.0 Mpx) | Wall s | CPU s | Peak RSS MB | Disk written MB | macOS wall s |
+|---|---|---|---|---|---|
+| s2_import | 433.2 | 95.4 | 673 | 2099.4 | 581.2 |
+| s1_import | 418.0 | 60.8 | 580 | 1179.1 | 948.1 |
+| s2_composites | 78.8 | 77.9 | 673 | 562.0 | 46.7 |
+| s1_composites | 20.6 | 20.3 | 673 | 120.4 | 12.0 |
+| features | 44.7 | 44.2 | 774 | 1390.5 | 36.3 |
+| segmentation | 161.6 | 159.6 | 797 | 21.9 | 62.7 |
+| pseudo_labels | 33.3 | 33.0 | 960 | 15.4 | 7.8 |
+
+During its training stage the Docker daemon of the laptop's VM stopped (the client lost the connection; no
+container exit status or OOM record survived), so training, prediction and parcels at 500 km² were **not
+measured on Linux**. The macOS run peaked at 6.0 GiB in training at this size and the recalibrated preflight
+estimates 8.3 GB, i.e. above this container's 4 GiB: preflight now reports that as an error inside the container
+(see below), and a 500 km² run should get ≥ 8 GB.
+
+### Preflight on Linux
+
+The estimates stored with run 2 (code with the changes below), measured / estimate:
+
+| Quantity (100 km²) | Estimate | Measured (run 1 / run 2) | Ratio |
+|---|---|---|---|
+| composites, feature stack, prediction disk | 0.16 / 0.31 / 0.03 GB | 0.14 / 0.29 / 0.025 GB | 0.83–0.94 |
+| composite runtime | 25 s | 13 / 22 s | 0.5–0.9 |
+| features runtime | 11 s | 7 / 13 s | 0.6–1.2 |
+| train runtime | 270 s (2 CPUs) | 145 / 222 s | 0.5–0.8 |
+| predict runtime | 155 s | 189 / 226 s | 1.2–1.5 |
+| peak RAM | 2.58 GB | 1.76 / 1.71 GB | 0.66–0.68 |
+
+* Disk estimates hold on Linux as on macOS (within 17 %).
+* **Training was under-estimated 2.1x** before this release (68 s estimated, 145 s measured): the coefficient is an
+  8-core wall time. The estimate now scales by 8 / usable CPUs below 8, where usable CPUs honour the CPU affinity
+  and the cgroup quota (`docker run --cpus`, systemd `CPUQuota`).
+* **The RAM check compared with the VM's 5.8 GiB, not the container's 4 GiB**: `SC_PHYS_PAGES` ignores cgroup
+  limits. It now uses the cgroup v2/v1 memory limit when that is smaller (Docker `--memory`, systemd `MemoryMax`,
+  Kubernetes limits).
+* Prediction stays within 1.5x (single-core AOA on slower cores); RAM is conservative.
+
 ## Extrapolation to the 25-municipality region
 
 Assumptions (state them with any number you quote): **AOI ≈ 10 000 km²** (the planning figure of
