@@ -121,6 +121,25 @@ the in-domain control and the four target domains, and coverage and mean set siz
 geocrop benchmark-transfer --protocol configs/benchmarks/si_transfer_pomurje.v1.yaml --work outputs/transfer-v1
 ```
 
+Results of that run (real data, declared labels; see the linked page for all signals):
+
+| Domain | Verdict | Coverage % none / conservative / weighted | Mean set size none / conservative / weighted |
+|---|---|---|---|
+| Pomurje 2021, in-domain test | in-domain | 89.7 / 96.1 / 100 | 0.95 / 1.39 / 4.29 |
+| Podravje 2021 | severe | 89.2 / 97.4 / 100 | 0.99 / 1.48 / 5.00 |
+| Posavje 2021 | severe | 84.7 / 93.8 / 100 | 0.96 / 1.58 / 5.00 |
+| Gorenjska 2021 | severe | 82.1 / 96.7 / 100 | 0.92 / 1.53 / 5.00 |
+| Pomurje 2025 | severe | 84.8 / 98.3 / 100 | 0.93 / 1.65 / 5.00 |
+
+- The detection flags Posavje (domain-classifier AUC 0.97), although only 1.9 % of its pixels are outside the AOA.
+  It also flags Podravje, whose coverage held. The in-domain control (AUC 0.65) is not flagged, but it is close to
+  the 0.70 limit.
+- `conservative` restored ≥ 90 % marginal coverage on every target, at 1.5–1.7 classes per set. Per-class
+  coverage of winter cereals in Posavje stayed at 84 %.
+- `weighted` collapsed to "all classes" (effective calibration size 5–17 of 147 parcels), because the domain
+  classifier separates the domains almost perfectly. It is kept for settings with milder shift and larger
+  calibration sets. For region or year transfer, prefer `conservative` plus local calibration parcels.
+
 ## Limitations
 
 - The limits are a-priori conventions. They are not calibrated false-alarm rates. A domain classifier on about
@@ -128,6 +147,10 @@ geocrop benchmark-transfer --protocol configs/benchmarks/si_transfer_pomurje.v1.
   nominal coverage". It does not say how wrong the coverage is.
 - The check samples pixels, not parcels: object weights are means of pixel likelihood ratios. That is a heuristic.
 - Without parcels the whole-map sample mixes land covers and the signals lose specificity.
+- Cost: one check fits two grouped 5-fold gradient-boosting domain classifiers on up to about 9,000 pixels × the
+  model features. On a heavily loaded 15-core workstation (load average about 35), one cross-validated classifier
+  on 9,000 × 127 synthetic pixels took 73 s with 4 threads. The transfer benchmark runs the check for five parcel
+  sets. Set `shift_detection: false` to skip it.
 - Models trained before this feature have no `domain_reference.npz`. Their report says "unavailable" until they
   are retrained.
 - The `geocrop predict` / `geocrop parcels` CLI commands do not run the check yet; it runs in `geocrop run`

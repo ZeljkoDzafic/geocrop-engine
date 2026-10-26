@@ -7,7 +7,7 @@ public part of gap G1; the private Semberija field-data study follows the same p
 | Protocol | Labels | Imagery | Result |
 |---|---|---|---|
 | [`eurocrops_si_2021_pomurje.v1.yaml`](../../configs/benchmarks/eurocrops_si_2021_pomurje.v1.yaml) | EuroCrops Slovenia 2021 (CC-BY-SA-4.0) | Sentinel-2 L2A, Earth Search STAC | [eurocrops-si-2021-pomurje.v1.md](eurocrops-si-2021-pomurje.v1.md) ([JSON](eurocrops-si-2021-pomurje.v1.json)) |
-| [`si_transfer_pomurje.v1.yaml`](../../configs/benchmarks/si_transfer_pomurje.v1.yaml) (region/year **transfer**) | EuroCrops Slovenia 2021 (CC-BY-SA-4.0) + MKGP KMRS 2025 (open, citation required) | Sentinel-2 L2A, Earth Search STAC | [si-transfer-pomurje.v1.md](si-transfer-pomurje.v1.md) ([JSON](si-transfer-pomurje.v1.json)), [summary below](#transfer-protocol-si-transfer-pomurje-v1) |
+| [`si_transfer_pomurje.v1.yaml`](../../configs/benchmarks/si_transfer_pomurje.v1.yaml) (region/year **transfer**) | EuroCrops Slovenia 2021 (CC-BY-SA-4.0) + MKGP KMRS 2025 (open, citation required) | Sentinel-2 L2A, Earth Search STAC | [si-transfer-pomurje.v1.md](si-transfer-pomurje.v1.md) ([JSON](si-transfer-pomurje.v1.json)), [summary below](#transfer-protocol-si-transfer-pomurje-v1); shift analysis [v1.1](si-transfer-pomurje.v1.1.md) ([JSON](si-transfer-pomurje.v1.1.json)) |
 
 ### v1 result in brief (2026-10-26)
 
@@ -169,3 +169,31 @@ Reading:
 
 Limitations: declared, not field-verified labels; five classes; ~150 parcels per class and domain; one
 season pair; one model family; imagery time of the first run 32 min for 13 tiles (re-runs reuse the stacks).
+
+### v1.1: domain-shift safeguards on the same protocol (2026-10-26, engine commit `eff2d0c`)
+
+The protocol hash is unchanged and every v1 score was reproduced exactly. The run adds the prediction-time shift
+check of [`geocrop.shift`](../domain-shift.md), with limits fixed before the run, and coverage for three threshold
+modes. Full tables: [si-transfer-pomurje.v1.1.md](si-transfer-pomurje.v1.1.md).
+
+| Domain | Shift verdict | Domain-classifier AUC (class-mix adjusted) | Outside AOA % (CV ref. 2.1) | Coverage % none / conservative / weighted | Mean set size none / conservative / weighted |
+|---|---|---|---|---|---|
+| Pomurje 2021, in-domain test | in-domain | 0.65 | 2.3 | 89.7 / 96.1 / 100 | 0.95 / 1.39 / 4.29 |
+| Podravje 2021 | severe | 0.89 | 5.0 | 89.2 / 97.4 / 100 | 0.99 / 1.48 / 5.00 |
+| Posavje 2021 | severe | 0.97 | 1.9 | 84.7 / 93.8 / 100 | 0.96 / 1.58 / 5.00 |
+| Gorenjska 2021 | severe | 0.99 | 16.6 | 82.1 / 96.7 / 100 | 0.92 / 1.53 / 5.00 |
+| Pomurje 2025 | severe | 0.99 | 9.3 | 84.8 / 98.3 / 100 | 0.93 / 1.65 / 5.00 |
+
+* **Detection.** The in-domain control is not flagged. All four shifted domains are flagged *severe*, including
+  Posavje, where the AOA flags almost nothing (1.9 % of pixels outside): the domain classifier separates it from
+  the source (AUC 0.97). Podravje is also *severe* although its coverage held (89.2 %). The check says "coverage
+  not established". It does not predict how much coverage is lost.
+* **Conservative thresholds** (max of class-wise and pooled quantile at 1 − α/2) restored ≥ 90 % marginal coverage
+  in every target (93.8–98.3 %). The cost is 1.5–1.7 classes per set instead of about 0.95, and no empty sets.
+  Winter cereals remain under-covered in Posavje (84 %). This is an empirical result on this task, not a
+  guarantee.
+* **Weighted conformal** (Tibshirani et al. 2019) degenerates here. The domains are almost perfectly separable,
+  so the likelihood ratios are extreme: the effective calibration size falls from 147 to 5–17 parcels. Every
+  class-wise quantile then becomes "include all", with 100 % coverage and all 5 classes in the set, and
+  4.3 classes even in-domain. With about 150 calibration parcels, `weighted` is not useful for region or year
+  transfer. Use `conservative` and local calibration data.
