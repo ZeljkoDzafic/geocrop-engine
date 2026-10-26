@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from . import cbm_markers, indices
+from . import cbm_markers, indices, temporal_quality
 
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
@@ -62,6 +62,8 @@ DEFAULTS: dict[str, Any] = {
         "harmonic_order": 2,
         "min_observed_fraction": 0,
         "max_gap_days": None,
+        # per-pixel observed-vs-interpolated support raster next to the stack (geocrop.temporal_quality)
+        "temporal_support": False,
     },
     "cbm": {
         "enabled": False,
@@ -72,6 +74,8 @@ DEFAULTS: dict[str, Any] = {
         # (RULE_DEFAULTS); rules are off by default so existing outputs are unchanged.
         "events": copy.deepcopy(cbm_markers.EVENT_DEFAULTS),
         "rules": copy.deepcopy(cbm_markers.RULE_DEFAULTS),
+        # temporal-support routing (LOW_OBS, LONG_GAP_AT_PEAK, INTERPOLATED_PHENOLOGY ...); off by default
+        "temporal_support": copy.deepcopy(temporal_quality.RULE_DEFAULTS),
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -248,6 +252,8 @@ def validate(cfg: dict) -> dict:
         if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                 or not 0 <= value <= upper):
             raise ConfigError(f"Invalid timeseries.{key}")
+    if not isinstance(t.get("temporal_support", False), bool):
+        raise ConfigError("timeseries.temporal_support must be true or false")
     buffer = cfg["model"]["spatial_buffer_m"]
     if isinstance(buffer, bool) or not isinstance(buffer, (int, float)) or not math.isfinite(buffer) or buffer < 0:
         raise ConfigError("model.spatial_buffer_m must be a finite nonnegative distance in metres")
@@ -271,6 +277,7 @@ def validate(cfg: dict) -> dict:
     try:
         cbm_markers.resolve_event_params(cfg["cbm"]["events"])
         cbm_markers.resolve_rules(cfg["cbm"]["rules"])
+        temporal_quality.resolve(cfg["cbm"]["temporal_support"])
     except ValueError as exc:
         raise ConfigError(f"cbm: {exc}") from exc
     from .splits import STRATEGIES

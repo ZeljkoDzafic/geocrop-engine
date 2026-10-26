@@ -18,6 +18,8 @@ SCHEMA_VERSIONS: dict[str, int] = {
     "run_manifest": 1,      # run_manifest.json (geocrop manifest)
     "model": 1,             # model.joblib payload metadata
     "feature_manifest": 1,  # <stack>.features.json (stamping pending; see ADR 0003)
+    "temporal_support": 1,  # <stack>_temporal_support.json (per-pixel observed vs interpolated support)
+    "evidence": 1,          # parcel evidence package <id>/evidence.json (geocrop evidence)
 }
 
 #: (contract, from_version) -> function upgrading a body to from_version + 1.
