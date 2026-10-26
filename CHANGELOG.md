@@ -23,6 +23,9 @@ workspace, QGIS integration and audit tooling.
 - Test tiers: golden-value feature regression, bounded-memory benchmark (`slow`), integration tests on real
   Sentinel-2 data over Semberija, July 2023 (`network`, weekly workflow).
 - VM deployment: `deploy/setup_ubuntu.sh`, systemd run template, Dockerfile, runbook.
+- Web workspace fully in English, with a results map (bundled Leaflet): crop classes, uncertainty and
+  area-of-applicability overlays, parcels outlined by traffic light, layer switcher, legend and popups;
+  `/api/jobs/{id}/map` endpoint. GitHub Pages deployment is manual-only.
 - Standalone QGIS Processing plugin with command/demo/job workflows, authenticated API access and GIS-layer downloads.
 - Optional HTML workspace, authenticated HTTP job API, persistent job logs/cancellation and notebook client.
 - Per-parcel non-exclusive decision reasons and separate evidence warnings, with summary counts.
