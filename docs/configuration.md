@@ -23,6 +23,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `s1` | VV_dB, VH_dB, VHVV_dB | radar features |
 | | `deltas` | NDVI, NDRE, NDMI | consecutive-window differences (S2 or S1 feature names) |
 | | `seasonal` | NDVI | max/min/range/argmax over windows |
+| | `embeddings` | null | optional `emb` group: `{source: alphaearth\|tessera\|presto, year, ...}`, see [embeddings](embeddings.md) |
 | `compositing` | `temporal_screening` | false | drop multi-temporal outliers (residual clouds/shadows) |
 | `timeseries` | `enabled`, `start`, `end` | false, –, – | build time-series features from scene folders and merge them into the stack |
 | | `s2_indices`, `s1_indices` | NDVI, NDRE, NDMI; VHVV_dB | series to smooth |

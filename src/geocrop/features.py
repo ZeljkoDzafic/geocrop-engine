@@ -13,6 +13,7 @@ describing every feature (group, sensor, period, formula). Feature groups:
     s1         radar feature (dB / ratio)         P2_VH_dB, P2_ASC_VHVV_dB
     delta      change between consecutive windows delta_NDVI_P1_P2
     seasonal   statistic across all windows       season_NDVI_max
+    emb        foundation-model embedding (annual) emb_00 (optional, see geocrop.embeddings)
 """
 from __future__ import annotations
 
@@ -28,8 +29,8 @@ import rasterio
 from . import indices
 from .raster import NODATA, blocks, ensure_parent, float_profile
 
-GROUPS = ("s2_band", "s2_index", "s1", "delta", "seasonal", "ts", "phenology", "harmonic")
-SEASON_GROUPS = ("seasonal", "ts", "phenology", "harmonic")   # span the whole season
+GROUPS = ("s2_band", "s2_index", "s1", "delta", "seasonal", "ts", "phenology", "harmonic", "emb")
+SEASON_GROUPS = ("seasonal", "ts", "phenology", "harmonic", "emb")   # span the whole season
 SEASONAL_STATS = ("max", "min", "range", "argmax")
 
 
@@ -211,3 +212,18 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
         "stack": out.name, "periods": periods, "nodata": NODATA,
         "features": [asdict(f) for f in features]}, indent=2), encoding="utf8")
     return out
+
+
+def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
+    """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place."""
+    import shutil
+    import tempfile
+
+    from .tsfeatures import merge_stacks
+
+    stack = Path(stack)
+    with tempfile.TemporaryDirectory(dir=stack.parent) as tmp:
+        merged = merge_stacks([stack, embeddings], Path(tmp) / stack.name)
+        shutil.move(merged, stack)
+        shutil.move(manifest_path(merged), manifest_path(stack))
+    return stack

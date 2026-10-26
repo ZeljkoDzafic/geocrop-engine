@@ -28,8 +28,8 @@ ALLOWED: dict[str, frozenset[str]] = {
 LAYERS: dict[str, frozenset[str]] = {
     # Pure geospatial/ML logic. Reads and writes local files only; no network, no subprocesses.
     CORE: frozenset({
-        "applicability", "cbm", "clouds", "contracts", "estimators", "features", "fieldwork", "hashing",
-        "indices", "metrics", "model", "parcels", "plugins", "raster", "s1", "s2", "samples", "scenes",
+        "applicability", "cbm", "clouds", "contracts", "embeddings", "estimators", "features", "fieldwork", "hashing",
+        "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
     }),
@@ -38,6 +38,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "adapters",      # LPIS / national schema mapping
         "catalog",       # Copernicus Data Space (OData, HTTP)
         "client",        # HTTP client for the web workspace
+        "embedding_sources",  # AlphaEarth / TESSERA windowed reads, pinned Presto checkpoint
         "export",        # COG, GeoParquet, STAC items, HCAT
         "quicklook",     # STAC COG quicklooks
         "snap",          # ESA SNAP gpt runner (subprocess)

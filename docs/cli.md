@@ -126,6 +126,20 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
 
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
+
 ## `geocrop s2-composite`
 
 Cloud-masked temporal composite of S2 scene folders
@@ -530,6 +544,25 @@ Concatenate feature stacks on one grid
 |---|---|---|---|
 | `--stacks` | yes |  |  |
 | `--out` | yes |  |  |
+
+## `geocrop embeddings`
+
+Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` |  |  | features.embeddings, grid.reference and paths sections |
+| `--source` |  |  | override features.embeddings.source |
+| `--year` |  |  | override features.embeddings.year |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference) |
+| `--out` |  |  | output directory (default <features dir>/embeddings) |
+| `--monthly` |  |  | Presto: monthly composites root <YYYY-MM>/B02.tif ... VV.tif |
+| `--start` |  |  | Presto: first month YYYY-MM (default <year>-01) |
+| `--months` |  |  | Presto: number of months (default 12) |
+| `--parcels` |  |  | Presto: also write parcel-level embeddings for this layer |
+| `--id-field` |  |  | parcel id field (default parcels.id_field) |
+| `--checkpoint` |  |  | Presto: local checkpoint instead of the pinned download |
+| `--make-monthly` |  |  | Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes |
 
 ## `geocrop signatures`
 

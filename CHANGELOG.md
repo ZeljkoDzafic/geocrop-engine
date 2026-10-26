@@ -2,6 +2,12 @@
 
 ## Unreleased
 ### Added
+- Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
+  `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
+  TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
+  GeoCrop monthly S2/S1 composites (pixel and parcel level; official MIT checkpoint pinned by SHA-256).
+  `features.embeddings` config key, `features.attach_embeddings`, and ablation rows E5–E7 (handcrafted vs
+  embeddings vs both) when the stack carries `emb`.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.

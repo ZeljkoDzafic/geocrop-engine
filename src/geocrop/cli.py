@@ -367,6 +367,21 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--stacks", nargs="+", required=True)
     x.add_argument("--out", required=True)
 
+    x = cmd("embeddings", "Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid")
+    x.add_argument("--config", help="features.embeddings, grid.reference and paths sections")
+    x.add_argument("--source", choices=["alphaearth", "tessera", "presto"], help="override features.embeddings.source")
+    x.add_argument("--year", type=int, help="override features.embeddings.year")
+    x.add_argument("--reference", help="study grid GeoTIFF (default grid.reference)")
+    x.add_argument("--out", help="output directory (default <features dir>/embeddings)")
+    x.add_argument("--monthly", help="Presto: monthly composites root <YYYY-MM>/B02.tif ... VV.tif")
+    x.add_argument("--start", help="Presto: first month YYYY-MM (default <year>-01)")
+    x.add_argument("--months", type=int, help="Presto: number of months (default 12)")
+    x.add_argument("--parcels", help="Presto: also write parcel-level embeddings for this layer")
+    x.add_argument("--id-field", default=None, help="parcel id field (default parcels.id_field)")
+    x.add_argument("--checkpoint", help="Presto: local checkpoint instead of the pinned download")
+    x.add_argument("--make-monthly", action="store_true",
+                   help="Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes")
+
     x = cmd("signatures", "Parcel-mean time series (CbM signatures) from S2 scene folders")
     x.add_argument("--scenes", required=True)
     x.add_argument("--parcels", required=True)
@@ -534,7 +549,18 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             cfg = load(a.config)
             opts = {k: cfg["features"][k] for k in ("s2_bands", "s2_indices", "s1", "deltas", "seasonal")}
             opts["periods"] = list(parse_windows(cfg["windows"])) or None
-        print(build_stack(a.composites, a.out, **opts))
+        out = build_stack(a.composites, a.out, **opts)
+        if a.config:
+            from .config import embedding_options
+            eo = embedding_options(cfg)
+            if eo and eo["attach"]:
+                from .embeddings import output_path
+                from .features import attach_embeddings
+                raster = output_path(eo["dir"], eo["source"], eo["year"])
+                if not raster.exists():
+                    raise FileNotFoundError(f"{raster} missing; run geocrop embeddings --config {a.config} first")
+                attach_embeddings(out, raster)
+        print(out)
     elif c == "check":
         from .provenance import check_raster, check_vector
         out = {"rasters": [check_raster(r) for r in a.raster]}
@@ -725,6 +751,32 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "merge-stacks":
         from .tsfeatures import merge_stacks
         print(merge_stacks(a.stacks, a.out))
+    elif c == "embeddings":
+        from .config import ConfigError, embedding_options, load
+        from .embedding_sources import extract
+        cfg = load(a.config)
+        eo = embedding_options(cfg, always=True)
+        eo.update({k: v for k, v in (("source", a.source), ("year", a.year), ("dir", a.out), ("monthly", a.monthly),
+                                     ("start", a.start), ("months", a.months), ("checkpoint", a.checkpoint))
+                   if v is not None})
+        if not eo["source"] or not eo["year"]:
+            raise ConfigError("Set features.embeddings.source/year in the config or pass --source and --year")
+        reference = a.reference or cfg["grid"].get("reference")
+        if not reference:
+            raise ConfigError("A study grid is needed: grid.reference in the config or --reference")
+        monthly = eo["monthly"] or str(Path(eo["dir"]) / "monthly")
+        if eo["source"] == "presto" and a.make_monthly:
+            from .embeddings import monthly_composites
+            comp = cfg["compositing"]
+            monthly_composites(reference, monthly, eo["start"] or f"{eo['year']}-01", eo["months"],
+                               cfg["paths"]["s2_scenes"], cfg["paths"]["s1_scenes"], statistic=comp["statistic"],
+                               scl_invalid=comp["scl_invalid"], cloud_probability_max=comp["cloud_probability_max"],
+                               mask_dilation_px=comp["mask_dilation_px"])
+        parcels = a.parcels or (cfg["paths"]["parcels"] if eo["parcels"] else None)
+        _print(extract(eo["source"], reference, eo["dir"], eo["year"], monthly=monthly, start=eo["start"],
+                       months=eo["months"], parcels=parcels, id_field=a.id_field or cfg["parcels"]["id_field"],
+                       checkpoint=eo["checkpoint"], mirror=eo["mirror"], index=eo["index"],
+                       resampling=eo["resampling"]))
     elif c == "signatures":
         from datetime import date
 
