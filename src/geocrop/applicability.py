@@ -25,6 +25,7 @@ class Applicability:
         self.train_points = np.asarray(train_points)
         self.mean_distance, self.threshold, self.features = float(mean_distance), float(threshold), list(features)
         self._tree = cKDTree(self.train_points)
+        self.train_di = None
 
     def transform(self, X) -> np.ndarray:
         return (np.asarray(X, dtype="float64") - self.mean) / self.std * self.weights
@@ -71,7 +72,9 @@ def fit(X, folds_index, features, importance=None, max_points: int = 20000, seed
     q1, q3 = np.percentile(di, [25, 75])
     upper = q3 + 1.5 * (q3 - q1)
     threshold = float(di[di <= upper].max())
-    return Applicability(mean, std, w, Z, mean_distance, threshold, features)
+    model = Applicability(mean, std, w, Z, mean_distance, threshold, features)
+    model.train_di = di      # cross-validated training DIs (reference for domain-shift checks; not serialised)
+    return model
 
 
 def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_size: int = 512) -> Path:

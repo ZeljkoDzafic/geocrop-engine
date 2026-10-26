@@ -85,6 +85,12 @@ not a guaranteed lower bound for residual autocorrelation or a proof that a bloc
 Consider response/error residuals, study geometry and deployment distances as well (Roberts et al.,
 2017; Ploton et al., 2020). Report the analysed variable and range with the CV design.
 
+## Domain shift
+Conformal coverage assumes exchangeable calibration and target parcels. A new region or season breaks that.
+`prediction/shift_report.json` checks for this at prediction time. Under any detected shift, coverage is reported as
+*not established* everywhere it is shown. Optional routing (`review`/`abstain`) and shift-adjusted thresholds
+(`conservative`/`weighted`) are available: see [domain shift](domain-shift.md).
+
 ## References
 Guo et al. (2017) ICML · Vovk, Gammerman & Shafer (2005) Algorithmic Learning in a Random World ·
 Angelopoulos & Bates (2023) Found. Trends ML 16:494–591 · Valle, Izbicki & Leite (2023) RSE 295:113682 ·

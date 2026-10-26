@@ -140,7 +140,7 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
               conformal: str | Path | dict | None = None, alpha: float = 0.1, aoa: str | Path | None = None,
               min_aoa_fraction: float = 0.5, markers: pd.DataFrame | None = None, calendar: dict | None = None,
               marker_rules: dict | None = None, temporal_support: pd.DataFrame | None = None,
-              temporal_rules: dict | None = None) -> dict:
+              temporal_rules: dict | None = None, domain_shift: dict | None = None) -> dict:
     """Summarise the probability raster per parcel and write GeoPackage + CSV + summary JSON.
 
     crop_mapping   maps declaration codes to model class names (e.g. {"1101": "soybean"}).
@@ -158,6 +158,11 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                    copied into the output.
     temporal_rules enabled `cbm.temporal_support` (`geocrop.temporal_quality.RULE_DEFAULTS`): weakly
                    supported parcels are routed to review with reason codes (needs `temporal_support`).
+    domain_shift   ``shift_report.json`` of the prediction (`geocrop.shift`): adds ``domain_shift`` and
+                   ``conformal_coverage`` columns (coverage "not established" under any detected shift), uses
+                   shift-adjusted thresholds when ``shift_conformal`` is not ``none`` and routes parcels by
+                   ``shift_policy`` (review: yellow ``DOMAIN_SHIFT``; abstain: also grey for out-of-AOA
+                   parcels under severe shift, ``model_decision_withheld``). Without it the output is unchanged.
     """
     from . import cbm
 
@@ -171,6 +176,10 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         if str(alpha) not in cp["thresholds"]:
             raise ValueError(f"alpha {alpha} not calibrated; available {list(cp['thresholds'])}")
         cp = cp["thresholds"][str(alpha)]
+    from . import shift as shiftmod
+    adjusted = shiftmod.applied_thresholds(domain_shift, alpha) if cp is not None else None
+    if adjusted is not None:
+        cp = adjusted
     gdf = gpd.read_file(parcels) if not isinstance(parcels, gpd.GeoDataFrame) else parcels.copy()
     if id_field not in gdf:
         raise ValueError(f"Parcels need {id_field!r}")
@@ -285,6 +294,8 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         table["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
     else:
         table["traffic_light"] = cbm.traffic_light(table)
+    if domain_shift is not None:
+        table = _apply_shift(table, domain_shift, alpha if cp is not None else None, min_aoa_fraction)
     result = gdf.drop(columns=[c for c in table.columns if c in gdf.columns]).reset_index(drop=True)
     result = gpd.GeoDataFrame(pd.concat([result, table], axis=1), geometry=gdf.geometry.name, crs=gdf.crs)
     out = Path(output)
@@ -311,11 +322,43 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                                      if result["declared_class"].notna().any() else {}),
         "note": "Review flags support inspection prioritisation; they are not findings of non-compliance.",
     }
-    if rules_on or tq_on:
+    if domain_shift is not None:
+        summary["domain_shift"] = {
+            "verdict": domain_shift.get("verdict"), "level": domain_shift.get("level"),
+            "policy": domain_shift.get("policy"),
+            "conformal_mode": domain_shift.get("conformal_mode"),
+            "conformal_thresholds": "shift-adjusted (" + domain_shift["conformal"]["applied"] + ")"
+            if adjusted is not None else "conformal.json",
+            "conformal_coverage": shiftmod.coverage_statement(domain_shift, alpha if cp is not None else None),
+            "reasons": [r["message"] for r in domain_shift.get("reasons", [])],
+            "parcels_withheld": int(table.get("model_decision_withheld", pd.Series(dtype=bool)).sum())}
+    if rules_on or tq_on or "traffic_light_reasons" in table:
         summary["traffic_light_reason_counts"] = dict(sorted(Counter(
             code for codes in table["traffic_light_reasons"] for code in codes.split(";") if code).items()))
     out.with_suffix(".summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
     return summary
+
+
+def _apply_shift(table: pd.DataFrame, report: dict, alpha: float | None, min_aoa_fraction: float) -> pd.DataFrame:
+    """Domain-shift columns and policy routing (`geocrop.shift.apply_policy`)."""
+    from . import cbm
+    from . import shift as shiftmod
+    table = table.copy()
+    table["domain_shift"] = report.get("verdict")
+    if alpha is not None:
+        table["conformal_coverage"] = shiftmod.coverage_statement(report, alpha)
+    if not report.get("level") or report.get("policy", "warn") == "warn":
+        return table
+    if "traffic_light_reasons" in table:
+        codes = [[c for c in str(r).split(";") if c] for r in table["traffic_light_reasons"]]
+    else:
+        codes = [[c for c in str(r).split(";") if c] for r in cbm.traffic_light_details(table)["traffic_light_reasons"]]
+    light, codes, withheld = shiftmod.apply_policy(table, table["traffic_light"], codes, report, min_aoa_fraction)
+    table["traffic_light"] = light.to_numpy()
+    table["traffic_light_reasons"] = [";".join(c) for c in codes]
+    if report.get("policy") == "abstain":
+        table["model_decision_withheld"] = withheld
+    return table
 
 
 # --------------------------------------------------------------------------- parcel-level model

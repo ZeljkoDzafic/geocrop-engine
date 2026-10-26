@@ -2,6 +2,18 @@
 
 ## Unreleased
 ### Added
+- Domain-shift safeguards (`geocrop.shift`, docs/domain-shift.md). Training writes `model/domain_reference.npz`.
+  Prediction writes `prediction/shift_report.json` with the verdict `in-domain | mild | severe` and its reasons:
+  AOA share and dissimilarity shift, class-mix adjusted domain-classifier AUC with grouped folds, standardised
+  mean differences, predicted class-prior shift, and year/region metadata. Under any detected shift, conformal
+  coverage is reported as "not established" in the prediction manifest, the parcel table/summary
+  (`conformal_coverage`, `domain_shift`), the evidence packages and the web review. New config section
+  `uncertainty`: `shift_policy: warn | review | abstain` (yellow `DOMAIN_SHIFT`; grey and
+  `model_decision_withheld` for out-of-AOA parcels under a severe shift) and
+  `shift_conformal: none | conservative | weighted` (weighted = covariate-shift weighted Mondrian split
+  conformal after Tibshirani et al. 2019). The default `warn` leaves decisions and traffic lights unchanged, and
+  the section is fingerprint-neutral at its defaults. `geocrop benchmark-transfer` reports the shift verdicts and
+  coverage per threshold mode; result in docs/benchmarks/si-transfer-pomurje.v1.1.md (same protocol hash as v1).
 - Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
   (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
   season that starts before the series) no longer removes polygons; sample files record the classes of the

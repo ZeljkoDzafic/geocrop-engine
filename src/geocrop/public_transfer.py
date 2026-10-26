@@ -174,8 +174,12 @@ def _aoa_folds(blocks: np.ndarray, k: int, seed: int) -> np.ndarray:
     return np.array([fold_of[b] for b in blocks])
 
 
-def score(est_proba, classes, X, poly, truth, block, thresholds, aoa, p, labels=None) -> dict:
-    """Parcel-level metrics with block-bootstrap CIs, conformal coverage and AOA shares for one parcel set."""
+def score(est_proba, classes, X, poly, truth, block, thresholds, aoa, p, labels=None, shift_ref=None,
+          domain_meta=None) -> dict:
+    """Parcel-level metrics with block-bootstrap CIs, conformal coverage and AOA shares for one parcel set.
+
+    With `shift_ref` (`geocrop.shift.build_reference` of the source) the parcel set is also checked for domain
+    shift and the conformal sets are scored with the none / conservative / weighted thresholds."""
     ev = p["evaluation"]
     proba = est_proba(X)
     pt = pb.parcel_probabilities(proba, poly, classes)
@@ -220,7 +224,31 @@ def score(est_proba, classes, X, poly, truth, block, thresholds, aoa, p, labels=
         ok = (frac >= float(ev["aoa_min_fraction"])).to_numpy()
         out["aoa"]["oa_inside_parcels"] = float((pred[ok] == y[ok]).mean()) if ok.any() else None
         out["aoa"]["oa_outside_parcels"] = float((pred[~ok] == y[~ok]).mean()) if (~ok).any() else None
+    if shift_ref is not None:
+        out["shift"] = shift_eval(shift_ref, est_proba, classes, X, poly, pt, y, thresholds, aoa, ev, domain_meta)
     return out
+
+
+def shift_eval(ref, est_proba, classes, X, poly, pt, y, thresholds, aoa, ev, meta) -> dict:
+    """Shift report of one parcel set and conformal coverage per threshold mode (`geocrop.shift`)."""
+    from . import shift
+    alpha = float(ev["conformal_alpha"])
+    rep = shift.detect(ref, X, poly, est_proba, aoa=aoa,
+                       conformal={"alphas": [alpha], "thresholds": {str(alpha): thresholds}},
+                       metadata=meta, seed=int(ev.get("bootstrap_seed", 7)))
+    modes = {}
+    for mode, thr in rep["conformal"]["thresholds"][str(alpha)].items():
+        sets = uncertainty.prediction_sets(pt.to_numpy(), classes, thr)
+        cov = uncertainty.coverage(sets, y)
+        cov["per_class_coverage"] = {c: float(np.mean([c in st for st, t in zip(sets, y) if t == c]))
+                                     for c in classes if (y == c).any()}
+        modes[mode] = cov
+    return {"verdict": rep["verdict"], "reasons": [r["message"] for r in rep["reasons"]],
+            "signals": {k: {kk: v.get(kk) for kk in ("value", "level", "unadjusted_auc", "target_outside_share",
+                                                     "reference_outside_share") if kk in v}
+                        for k, v in rep["signals"].items()},
+            "conformal_status": rep["conformal"]["status"], "weights": rep["conformal"]["weights"],
+            "coverage_by_mode": modes}
 
 
 def _fit(params, X, y, seed):
@@ -248,7 +276,7 @@ def _calibrated(est, classes, X_cal, poly_cal, truth, alpha):
 # --------------------------------------------------------------------------- run
 
 def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | None = None, workers: int = 4,
-        layers: dict | None = None, skip_transfer_cv: bool = False, log=None) -> dict:
+        layers: dict | None = None, skip_transfer_cv: bool = False, log=None, shift_check: bool = True) -> dict:
     """Execute a transfer protocol; write ``results.json``/``results.md`` into `work_dir` and return the report."""
     from . import applicability
     from .experiments import transfer
@@ -340,13 +368,25 @@ def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | Non
     imp = getattr(est, "feature_importances_", None)
     aoa = applicability.fit(S.X[fit], _aoa_folds(block.reindex(S.polygon[fit]).to_numpy(), int(ev["aoa_folds"]), seed),
                             S.features, imp, seed=seed)
+    shift_ref = None
+    if shift_check:
+        from . import shift
+        pc = pb.parcel_probabilities(_proba_fn(est, classes)(S.X[cal]), S.polygon[cal], classes)
+        pool = fit | cal
+        shift_ref = shift.build_reference(S.X[pool], S.polygon[pool], S.features, classes, pc.index, pc.to_numpy(),
+                                          truth.reindex(pc.index).to_numpy(), train_di=aoa.train_di,
+                                          aoa_threshold=aoa.threshold, importance=imp, region=S.region[pool],
+                                          year=S.year[pool], seed=seed)
     stage("source_model")
 
     proba = _proba_fn(est, classes)
     results = {}
     test = role == "test"
+    def meta(name):
+        return {"region": p["domains"][name]["region"], "year": str(p["domains"][name]["year"])}
     results[src] = {"kind": "in-domain (source test parcels)",
-                    **score(proba, classes, S.X[test], S.polygon[test], truth, block, thresholds, aoa, p)}
+                    **score(proba, classes, S.X[test], S.polygon[test], truth, block, thresholds, aoa, p,
+                            shift_ref=shift_ref, domain_meta=meta(src))}
     for domain in p["domains"]:
         if domain == src:
             continue
@@ -354,7 +394,8 @@ def run(protocol_path: str | Path, work_dir: str | Path, cache: str | Path | Non
         d = p["domains"][domain]
         kind = "other year, same region" if d["region"] == p["domains"][src]["region"] else "other region"
         r = {"kind": f"out-of-domain ({kind})",
-             "all_parcels": score(proba, classes, S.X[m], S.polygon[m], truth, block, thresholds, aoa, p)}
+             "all_parcels": score(proba, classes, S.X[m], S.polygon[m], truth, block, thresholds, aoa, p,
+                                  shift_ref=shift_ref, domain_meta=meta(domain))}
         # local baseline on the same target test parcels
         tp = allp[allp["domain"] == domain].reset_index(drop=True)
         try:
@@ -431,6 +472,10 @@ def _ci(v):
     return "" if not v else f" [{100 * v[0]:.1f}, {100 * v[1]:.1f}]"
 
 
+def _f2(v):
+    return "n/a" if v is None else f"{v:.2f}"
+
+
 def _pct(v):
     return "n/a" if v is None else f"{100 * v:.1f}"
 
@@ -493,6 +538,39 @@ def markdown(r: dict) -> str:
                      f"{_pct(b['macro_f1'])}{_ci(b['macro_f1_ci'])} | {100 * (b['macro_f1'] - a['macro_f1']):+.1f} | "
                      f"{_pct(a['overall_accuracy'])} | {_pct(b['overall_accuracy'])} | "
                      f"{_pct(a['conformal']['coverage'])} / {_pct(b['conformal']['coverage'])} |")
+    shift_rows = [(k, v if k == src else v["all_parcels"]) for k, v in r["results"].items()]
+    if any("shift" in s for _, s in shift_rows):
+        lines += ["", "## Domain-shift detection and shift-aware conformal sets", "",
+                  "Shift report of each evaluated parcel set against the source training/calibration pixels "
+                  "(`geocrop.shift`, a-priori limits; docs/domain-shift.md). AUC = grouped-CV domain-classifier "
+                  "AUC after re-weighting the source to the target's predicted class mix (unadjusted in brackets); "
+                  "SMD = importance-weighted mean |standardised mean difference|; outside AOA = share of target "
+                  "pixels outside the AOA (source training CV in brackets); TVD = predicted class-mix distance.", "",
+                  "| Domain | Verdict | AUC | SMD | Outside AOA % | DI median ratio | TVD | Metadata | Reasons |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for k, s in shift_rows:
+            if "shift" not in s:
+                continue
+            g = s["shift"]["signals"]
+            dc, a = g["domain_classifier"], g.get("aoa", {})
+            lines.append(
+                f"| {k} | **{s['shift']['verdict']}** | {_f2(dc['value'])} ({_f2(dc.get('unadjusted_auc'))}) | "
+                f"{_f2(g['feature_smd']['value'])} | {_pct(a.get('target_outside_share'))} "
+                f"({_pct(a.get('reference_outside_share'))}) | {_f2(g.get('dissimilarity', {}).get('value'))} | "
+                f"{_f2(g['class_prior']['value'])} | {'differs' if g['metadata']['level'] else 'same'} | "
+                f"{'; '.join(s['shift']['reasons']) or '-'} |")
+        lines += ["", f"Conformal coverage % / mean set size by threshold mode (target "
+                      f"{_pct(r['results'][src]['conformal']['target'])} %):", "",
+                  "| Domain | none | conservative | weighted | Effective calibration size (weighted) |",
+                  "|---|---|---|---|---|"]
+        for k, s in shift_rows:
+            if "shift" not in s:
+                continue
+            c = s["shift"]["coverage_by_mode"]
+            lines.append(f"| {k} | " + " | ".join(f"{_pct(c[m]['coverage'])} / {c[m]['mean_set_size']:.2f}"
+                                                for m in ("none", "conservative", "weighted")) +
+                         f" | {s['shift']['weights']['effective_sample_size']:.0f} of "
+                         f"{s['shift']['weights']['calibration_objects']} |")
     cv = r.get("transfer_cv")
     if cv:
         lines += ["", "## Engine transfer CV (pixel level, pooled samples of all domains)", "",

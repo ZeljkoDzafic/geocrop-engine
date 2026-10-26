@@ -176,3 +176,33 @@ def test_scale_benchmark_square_dir_bytes_and_report(tmp_path):
         assert (tmp_path / "img" / "scale_benchmark.png").is_file()
     a, b = summary["linear_fits_a_plus_b_area"]["features"]["wall"]
     assert b == pytest.approx(0.4) and a == pytest.approx(0, abs=1e-9)
+
+
+def test_score_with_shift_reference_flags_far_domain_and_scores_modes():
+    from geocrop import shift
+    rng = np.random.default_rng(1)
+    classes = ["a", "b", "c"]
+    p = {"evaluation": {"bootstrap": 20, "bootstrap_seed": 1, "confidence": 0.9, "conformal_alpha": 0.1,
+                        "aoa_min_fraction": 0.5}}
+    train, Xt, pt = _domain(rng, 90, 0.0, classes, "src")
+    cal, Xc, pc = _domain(rng, 60, 0.0, classes, "cal")
+    near, Xn, pn = _domain(rng, 30, 0.0, classes, "near")
+    far, Xf, pf = _domain(rng, 30, 2.5, classes, "far")
+    allp = pd.concat([train, cal, near, far]).set_index("uid")
+    from sklearn.ensemble import RandomForestClassifier
+    est = RandomForestClassifier(n_estimators=30, random_state=0).fit(Xt, allp["class_name"].reindex(pt).to_numpy())
+    proba = public_transfer._proba_fn(est, classes)
+    thresholds = public_transfer._calibrated(est, classes, Xc, pc, allp["class_name"], 0.1)
+    aoa = applicability.fit(Xt, np.arange(len(Xt)) % 3, [f"f{i}" for i in range(4)])
+    cp = pd.DataFrame(proba(Xc)).groupby(pc).mean()
+    ref = shift.build_reference(np.vstack([Xt, Xc]), np.r_[pt, pc], aoa.features, classes, cp.index, cp.to_numpy(),
+                                allp["class_name"].reindex(cp.index).to_numpy(), train_di=aoa.train_di,
+                                aoa_threshold=aoa.threshold, region=np.full(len(Xt) + len(Xc), "r"),
+                                year=np.full(len(Xt) + len(Xc), "2021"))
+    kw = dict(shift_ref=ref, domain_meta={"region": "r", "year": "2021"})
+    a = public_transfer.score(proba, classes, Xn, pn, allp["class_name"], allp["block"], thresholds, aoa, p, **kw)
+    b = public_transfer.score(proba, classes, Xf, pf, allp["class_name"], allp["block"], thresholds, aoa, p, **kw)
+    assert a["shift"]["verdict"] == "in-domain" and b["shift"]["verdict"] == "severe"
+    assert set(b["shift"]["coverage_by_mode"]) == {"none", "conservative", "weighted"}
+    assert b["shift"]["coverage_by_mode"]["none"]["coverage"] == pytest.approx(b["conformal"]["coverage"])
+    assert b["shift"]["coverage_by_mode"]["conservative"]["mean_set_size"] >= b["conformal"]["mean_set_size"]
