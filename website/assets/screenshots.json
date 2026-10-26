@@ -1,16 +1,17 @@
 {
   "schema": "geocrop-presentation-captures/1",
-  "recorded_utc": "2026-10-25T13:25:36.166786+00:00",
+  "recorded_utc": "2026-10-26T00:01:04.686862+00:00",
   "note": "Actual application captures. Synthetic results demonstrate software behavior only; CLI image shows help/version without study data. No credentials are included.",
   "screenshots": [
     {
       "interface": "web",
       "file": "assets/images/web.png",
-      "sha256": "4a8f5cdddadad0426fc252e998729e11cf3aeb30f2839e757c0b5ec025bbed9c",
-      "source_commit": "78709351d46934543627c4439eaef79f7c1dd60a",
-      "capture_method": "Unmodified Chromium screenshot of the authenticated local GeoCrop web workspace; selected an existing succeeded demo job.",
+      "sha256": "f48832f3cd5a2e92ada62d61557f1425b529da249874a7999fa4e765adf03685",
+      "source_commit": "2aef995d9ef11964043bae353b078efd725f2a0d",
+      "capture_method": "Unmodified headless Chromium (Playwright) screenshot of the authenticated local GeoCrop web workspace, English interface; selected a succeeded synthetic demo job, map card with crop classes and parcels outlined by traffic light.",
       "commands_or_inputs": [
-        "geocrop serve --workspace <synthetic-demo-workspace> --port 8765"
+        "geocrop serve --workspace <synthetic-demo-workspace> --port 8765",
+        "geocrop demo --root outputs/web-demo --quick"
       ],
       "synthetic_data": true
     },

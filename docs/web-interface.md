@@ -103,3 +103,19 @@ or output locations, 401 missing/incorrect authentication, 403 cross-origin requ
 jobs/artifacts. Typed request validation can return 422. A job with engine exit code 0 succeeds; any
 other code is recorded as failed, including audit/readiness commands that intentionally use nonzero
 exit codes to report data problems. Use the logs to distinguish those outcomes.
+
+## Results map
+Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /api/jobs/{id}/map`):
+
+| Layer | Source | Default |
+|---|---|---|
+| Crop classes | `classes.tif` + `class_legend.json` | on |
+| Parcels — traffic light | parcel results with `traffic_light` (outline colour green/yellow/red/grey, popup with declared/predicted class, status and confidence) | on |
+| Max class probability, normalised entropy | `uncertainty.tif` bands 1 and 3 | off |
+| Inside area of applicability | `aoa.tif` band 2 | off |
+| Other vector outputs (segments, reference layers, observations) | `.gpkg` / `.geojson` | off |
+
+Rasters are warped to WGS 84 and downsampled (≤ 1024 px) into PNG previews; vectors are simplified and capped at
+20,000 features. Previews are for orientation only — download the files for analysis. Leaflet is bundled with the
+package (no CDN). The OpenStreetMap basemap is off by default; enabling it sends tile requests for the viewed area to
+OpenStreetMap.
