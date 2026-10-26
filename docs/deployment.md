@@ -22,6 +22,10 @@ Keep 20–25 % free space on scratch.
 `/scratch/geocrop` (SNAP temp, unpacked SAFE), `/data/geocrop/outputs`. Run long jobs in `tmux`/`systemd`;
 SNAP: set `-c` cache (e.g. 8–16 GB) and `snap.dataio.reader.tileWidth/Height`, put `java.io.tmpdir` on NVMe.
 
+**Preflight**: `geocrop preflight --config ...` estimates grid size, feature count, stack size, peak RAM, rough
+runtime and free space per output volume, and blocks on missing windows, CRS problems or impossible class
+splits ([preflight](preflight.md)). During runs a disk guard (`resources.*`) stops heavy stages before they fill a volume.
+
 **Pilot before scaling**: one S2 tile and a few S1 scenes over a representative 500–1 000 km² (plain + fragmented
 parcels); measure download size, scratch peak, RAM peak, runtime per stage (`stages.json` records seconds); then
 extrapolate by area and scene count.

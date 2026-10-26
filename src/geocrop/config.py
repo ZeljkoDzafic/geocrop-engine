@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from . import indices
+from . import cbm_markers, indices
 
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
@@ -47,6 +47,7 @@ DEFAULTS: dict[str, Any] = {
         "s1": list(indices.DEFAULT_S1_FEATURES),
         "deltas": ["NDVI", "NDRE", "NDMI"],
         "seasonal": ["NDVI"],
+        "embeddings": None,     # optional foundation-model feature group, see EMBEDDING_DEFAULTS
     },
     "timeseries": {
         "enabled": False,
@@ -67,6 +68,10 @@ DEFAULTS: dict[str, Any] = {
         "index": "NDVI",
         "calendar": None,
         "min_coverage": 0.5,
+        # Event/homogeneity markers (geocrop.cbm_markers.EVENT_DEFAULTS) and traffic-light marker rules
+        # (RULE_DEFAULTS); rules are off by default so existing outputs are unchanged.
+        "events": copy.deepcopy(cbm_markers.EVENT_DEFAULTS),
+        "rules": copy.deepcopy(cbm_markers.RULE_DEFAULTS),
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -88,6 +93,15 @@ DEFAULTS: dict[str, Any] = {
         "calibration_fraction": 0.2,
         "holdout_fraction": 0.0,
         "inner_splits": 3,
+    },
+    "cv": {
+        "strategy": "spatial_blocks",   # spatial_blocks | region | year | region_year (transfer validation)
+        "region_field": None,           # polygon attribute copied into sample region ids
+        "year_field": None,             # polygon attribute copied into sample year ids
+        "year": None,                   # constant year id for a single-season sample set
+    },
+    "predict": {
+        "smoothing": {"enabled": False, "window": 7, "smoothness": 10.0},
     },
     "experiments": {},
     "parcels": {
@@ -111,11 +125,69 @@ DEFAULTS: dict[str, Any] = {
         "window_px": 1,
         "bootstrap": 1000,
     },
+    # Optional openEO back-end (geocrop openeo-extract / openeo-graph); local processing stays the default.
+    "openeo": {
+        "url": "https://openeo.dataspace.copernicus.eu",
+        "products": ["s2_composites"],
+        "s2_collection": "SENTINEL2_L2A",
+        "s1_collection": "SENTINEL1_GRD",
+        "s1_coefficient": "sigma0-ellipsoid",
+        "s1_card4l": False,
+        "max_cloud_cover": None,
+        "signature_indices": ["NDVI", "BSI"],
+        "start": None,
+        "end": None,
+        "job_options": None,
+        "work_dir": "data/openeo",
+    },
+    # Machine protection: free-space guard before heavy stages (see docs/preflight.md).
+    "resources": {
+        "disk_guard": True,
+        "min_free_gb": 5.0,
+        "safety_factor": 1.25,
+        "compression_ratio": 0.8,
+    },
+    # Thresholds for `geocrop preflight` (warnings only; hard blockers are fixed by the pipeline's own rules).
+    "preflight": {
+        "min_s2_scenes_per_window": 3,
+        "min_s1_scenes_per_window": 2,
+        "max_unobserved_fraction": 0.05,
+        "coverage_max_px": 512,
+        "inventories": [],
+    },
 }
 
 
 class ConfigError(ValueError):
     pass
+
+
+#: Keys of the optional ``features.embeddings`` mapping (docs/embeddings.md).
+EMBEDDING_DEFAULTS: dict[str, Any] = {
+    "source": None,            # alphaearth | tessera | presto
+    "year": None,
+    "dir": None,               # default: <paths.features parent>/embeddings
+    "resampling": "nearest",   # pre-computed sources: nearest | bilinear
+    "mirror": "source.coop",   # AlphaEarth: source.coop | gcs
+    "index": None,             # AlphaEarth: local/remote aef_index.parquet override
+    "monthly": None,           # Presto: monthly composites root (<YYYY-MM>/B02.tif ..., VV.tif, VH.tif)
+    "start": None,             # Presto: first month YYYY-MM (default <year>-01)
+    "months": 12,              # Presto: number of monthly timesteps (1..24)
+    "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
+    "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
+    "attach": True,            # append the embeddings raster to the feature stack
+}
+
+
+def embedding_options(cfg: dict, always: bool = False) -> dict | None:
+    """Resolved ``features.embeddings`` options (None when the group is not configured, unless `always`)."""
+    raw = cfg["features"].get("embeddings")
+    if not raw and not always:
+        return None
+    opts = {**EMBEDDING_DEFAULTS, **(raw or {})}
+    if not opts["dir"]:
+        opts["dir"] = str(Path(cfg["paths"]["features"]).parent / "embeddings")
+    return opts
 
 
 def _merge(base: dict, override: dict, path: str = "") -> dict:
@@ -181,15 +253,95 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("model.calibration_fraction must be a finite fraction between 0 and 1")
     for name in cfg["features"]["s2_indices"] + cfg["features"]["s1"]:
         indices.get(name)
+    _validate_embeddings(cfg["features"].get("embeddings"))
     if cfg["compositing"]["statistic"] not in ("median", "mean") and not str(
             cfg["compositing"]["statistic"]).startswith("p"):
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    try:
+        cbm_markers.resolve_event_params(cfg["cbm"]["events"])
+        cbm_markers.resolve_rules(cfg["cbm"]["rules"])
+    except ValueError as exc:
+        raise ConfigError(f"cbm: {exc}") from exc
+    from .splits import STRATEGIES
+    cv = cfg["cv"]
+    if cv["strategy"] not in STRATEGIES:
+        raise ConfigError(f"cv.strategy must be one of {', '.join(STRATEGIES)}")
+    if cv["year_field"] and cv["year"] is not None:
+        raise ConfigError("Set cv.year_field or cv.year, not both")
+    sm = cfg["predict"]["smoothing"]
+    if not isinstance(sm["enabled"], bool):
+        raise ConfigError("predict.smoothing.enabled must be true or false")
+    w = sm["window"]
+    if isinstance(w, bool) or not isinstance(w, int) or w < 3 or w % 2 == 0:
+        raise ConfigError("predict.smoothing.window must be an odd integer >= 3")
+    k = sm["smoothness"]
+    if isinstance(k, bool) or not isinstance(k, (int, float)) or not math.isfinite(k) or k <= 0:
+        raise ConfigError("predict.smoothing.smoothness must be a positive number")
+    o = cfg["openeo"]
+    unknown = sorted(set(o["products"]) - {"s2_composites", "s1_composites", "s2_scenes", "signatures"})
+    if unknown:
+        raise ConfigError(f"Unknown openeo.products {unknown}")
+    if o["s1_coefficient"] not in ("sigma0-ellipsoid", "gamma0-terrain"):
+        raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
+    _validate_resources(cfg["resources"], cfg["preflight"])
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
     return cfg
+
+
+def _validate_embeddings(raw) -> None:
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ConfigError("features.embeddings must be a mapping {source: ..., year: ...}")
+    unknown = set(raw) - set(EMBEDDING_DEFAULTS)
+    if unknown:
+        raise ConfigError(f"Unknown configuration key: features.embeddings.{sorted(unknown)[0]}")
+    if raw.get("source") not in ("alphaearth", "tessera", "presto"):
+        raise ConfigError("features.embeddings.source must be alphaearth, tessera or presto")
+    year = raw.get("year")
+    if isinstance(year, bool) or not isinstance(year, int) or not 2015 <= year <= 2100:
+        raise ConfigError("features.embeddings.year must be a year, e.g. 2023")
+    if raw.get("resampling", "nearest") not in ("nearest", "bilinear"):
+        raise ConfigError("features.embeddings.resampling must be nearest or bilinear")
+    if raw.get("mirror", "source.coop") not in ("source.coop", "gcs"):
+        raise ConfigError("features.embeddings.mirror must be source.coop or gcs")
+    months = raw.get("months", 12)
+    if isinstance(months, bool) or not isinstance(months, int) or not 1 <= months <= 24:
+        raise ConfigError("features.embeddings.months must be an integer in 1..24")
+    start = raw.get("start")
+    if start is not None:
+        try:
+            y, m = (int(p) for p in str(start).split("-"))
+            date(y, m, 1)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError("features.embeddings.start must be YYYY-MM") from exc
+
+
+def _number(value) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _validate_resources(r: dict, p: dict) -> None:
+    if not isinstance(r["disk_guard"], bool):
+        raise ConfigError("resources.disk_guard must be true or false")
+    if not _number(r["min_free_gb"]) or r["min_free_gb"] < 0:
+        raise ConfigError("resources.min_free_gb must be a finite nonnegative number of gigabytes")
+    if not _number(r["safety_factor"]) or r["safety_factor"] < 1:
+        raise ConfigError("resources.safety_factor must be a finite number >= 1")
+    if not _number(r["compression_ratio"]) or not 0 < r["compression_ratio"] <= 1:
+        raise ConfigError("resources.compression_ratio must be in (0, 1]")
+    for key in ("min_s2_scenes_per_window", "min_s1_scenes_per_window", "coverage_max_px"):
+        if isinstance(p[key], bool) or not isinstance(p[key], int) or p[key] < (16 if key == "coverage_max_px" else 0):
+            raise ConfigError(f"preflight.{key} must be a nonnegative integer" +
+                              (" of at least 16" if key == "coverage_max_px" else ""))
+    if not _number(p["max_unobserved_fraction"]) or not 0 <= p["max_unobserved_fraction"] <= 1:
+        raise ConfigError("preflight.max_unobserved_fraction must be in [0, 1]")
+    if not isinstance(p["inventories"], list) or not all(isinstance(x, str) for x in p["inventories"]):
+        raise ConfigError("preflight.inventories must be a list of CSV paths")
 
 
 def load(path: str | Path | None = None, overrides: dict | None = None) -> dict:

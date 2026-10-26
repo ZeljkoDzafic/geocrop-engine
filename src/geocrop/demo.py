@@ -216,3 +216,94 @@ def run(root: str | Path, quick: bool = False) -> dict:
     }
     (root / "demo_summary.json").write_text(json.dumps(result, indent=2), encoding="utf8")
     return result
+
+
+def synthetic_parcel_series(n_side: int = 12, cell_px: int = 10, start=None, end=None, revisit_days: int = 5,
+                            cloud_fraction: float = 0.3, pixel_noise: float = 0.08, shift_days: float = 12.0,
+                            amplitude_sd: float = 0.08, mixed_fraction: float = 0.15, step_days: int = 5,
+                            output_step_days: int = 15, lam: float = 20.0, seed: int = 11) -> dict:
+    """SYNTHETIC parcel signatures and matching pixel time series (no rasters; for parcel-level tests).
+
+    Every parcel follows its class's NDVI curve (`class_curve`) shifted by a parcel-specific sowing offset
+    (sd `shift_days`) and scaled by a parcel amplitude (sd `amplitude_sd`). `mixed_fraction` of each
+    parcel's pixels is contaminated 50/50 with another class (boundary/weed mixing); each observation has
+    iid pixel noise `pixel_noise`; on each acquisition a parcel is fully clouded with `cloud_fraction`.
+
+    Returns ``parcels`` (GeoDataFrame: parcel_id, true_class, declared_crop with ~10 % wrong declarations,
+    rectangles of random size inside a grid of `cell_px` 10 m cells), ``signatures`` (long table in the
+    `cbm.parcel_signatures` layout, index NDVI), ``pixels`` (`Samples` of Whittaker-smoothed per-pixel
+    ``ts_NDVI_d<doy>`` features, polygon = parcel id), ``start`` and ``end``. Software tests only.
+    """
+    from datetime import date, timedelta
+
+    import pandas as pd
+
+    from . import timeseries as ts
+    from .samples import Samples
+
+    start = start or date(2023, 3, 15)
+    end = end or date(2023, 10, 31)
+    rng = np.random.default_rng(seed)
+    names = list(PROFILES)
+    acq = [start + timedelta(days=k) for k in range(0, (end - start).days + 1, revisit_days)]
+    doy = np.array([d.timetuple().tm_yday for d in acq], dtype=float)
+    grid = ts.make_grid(start, end, step_days)
+    gdoy = np.array([d.timetuple().tm_yday for d in grid])
+    keep = np.arange(0, len(grid), output_step_days // step_days)
+    parcels, sig_rows, X, y, pid, xs, ys = [], [], [], [], [], [], []
+    for iy in range(n_side):
+        for ix in range(n_side):
+            k = int(rng.integers(len(names)))
+            cls = names[k]
+            w, h = (int(v) for v in rng.integers(cell_px // 2, cell_px + 1, size=2))
+            x0, y0 = ORIGIN[0] + ix * cell_px * 10, ORIGIN[1] - iy * cell_px * 10
+            ident = f"S{iy:02d}{ix:02d}"
+            declared = cls if rng.random() > 0.1 else names[int(rng.integers(len(names)))]
+            parcels.append({"parcel_id": ident, "true_class": cls, "declared_crop": declared,
+                            "geometry": box(x0, y0 - h * 10, x0 + w * 10, y0)})
+            n = w * h
+            curve = class_curve(cls, doy - rng.normal(0, shift_days)) * rng.normal(1, amplitude_sd)
+            values = np.repeat(curve[None, :], n, axis=0)
+            mixed = rng.random(n) < mixed_fraction
+            if mixed.any():
+                other = names[int(rng.choice([j for j in range(len(names)) if j != k]))]
+                values[mixed] = 0.5 * values[mixed] + 0.5 * class_curve(other, doy)[None, :]
+            values = np.clip(values + rng.normal(0, pixel_noise, values.shape), -0.2, 1.0)
+            clear = rng.random(len(acq)) >= cloud_fraction
+            for j, d in enumerate(acq):
+                v = values[:, j]
+                sig_rows.append({"parcel_id": ident, "date": d.isoformat(), "index": "NDVI",
+                                 "mean": float(v.mean()) if clear[j] else np.nan,
+                                 "std": float(v.std()) if clear[j] else np.nan,
+                                 "n_valid": n if clear[j] else 0, "n_pixels": n})
+            yb, wb = ts.bin_to_grid(acq, values, np.broadcast_to(clear, values.shape), grid)
+            X.append(ts.whittaker(yb, wb, lam=lam, min_valid=4)[:, keep])
+            y += [cls] * n
+            pid += [ident] * n
+            cols, rows = np.meshgrid(np.arange(w), np.arange(h))
+            xs.append(x0 + (cols.ravel() + 0.5) * 10)
+            ys.append(y0 - (rows.ravel() + 0.5) * 10)
+    feats = [f"ts_NDVI_d{int(gdoy[k])}" for k in keep]
+    Xa = np.concatenate(X).astype("float32")
+    ok = np.isfinite(Xa).all(axis=1)
+    pixels = Samples(Xa[ok], np.array(y)[ok], np.array(pid)[ok], np.concatenate(xs)[ok], np.concatenate(ys)[ok],
+                     feats, CRS)
+    return {"parcels": gpd.GeoDataFrame(parcels, crs=CRS), "signatures": pd.DataFrame(sig_rows),
+            "pixels": pixels, "start": start, "end": end, "classes": names}
+
+
+def write_parcel_series(root: str | Path, **kwargs) -> dict:
+    """Write `synthetic_parcel_series` to ``parcels.gpkg``, ``signatures.csv`` and ``pixel_samples.npz``."""
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    data = synthetic_parcel_series(**kwargs)
+    paths = {"parcels": root / "parcels.gpkg", "signatures": root / "signatures.csv",
+             "pixels": root / "pixel_samples.npz"}
+    paths["parcels"].unlink(missing_ok=True)
+    data["parcels"].to_file(paths["parcels"], driver="GPKG")
+    data["signatures"].to_csv(paths["signatures"], index=False)
+    data["pixels"].save(paths["pixels"])
+    (root / "SYNTHETIC_DATA.txt").write_text("Synthetic parcel series generated by geocrop. Not real imagery.\n")
+    return {**{k: str(v) for k, v in paths.items()}, "start": data["start"].isoformat(),
+            "end": data["end"].isoformat(), "parcels_count": int(len(data["parcels"])),
+            "pixels_count": int(len(data["pixels"].y))}

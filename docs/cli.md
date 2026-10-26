@@ -41,6 +41,29 @@ Validate a configuration file and print the resolved config
 |---|---|---|---|
 | `--config` | yes |  |  |
 
+## `geocrop preflight`
+
+Check whether a configured run can succeed and estimate its cost (no data changed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--inventory` |  | `[]` | catalog/stac-search CSVs to count planned scenes |
+| `--out` |  |  | save the JSON report |
+| `--markdown` |  |  | save a Markdown report |
+| `--strict` |  |  | exit 2 also on warnings (default: only when blocked) |
+
+## `geocrop clean`
+
+Remove temporary files, quarantined partial outputs and (optionally) regenerable intermediates
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--dry-run` |  |  | list paths and sizes without removing anything |
+| `--all-intermediates` |  |  | also composites, feature stacks, samples and hash cache (regenerated on the next run) |
+| `--include-results` |  |  | also model/prediction/parcels/cbm/validation/experiments outputs of the run directory |
+
 ## `geocrop indices`
 
 Print the spectral/radar index table (name, formula, reference)
@@ -139,6 +162,21 @@ Real Sentinel-2 imagery for an area and period: monthly cloud-free composites fo
 | `--max-cloud` |  | `60` |  |
 | `--min-clear` |  | `0.3` |  |
 | `--max-items` |  | `60` |  |
+
+## `geocrop acceptance`
+
+End-to-end acceptance run on real Sentinel-1/2 data (or --offline synthetic) with a pass/fail report
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  | output directory (acceptance_report.json/.md) |
+| `--bbox` |  | `[19.12, 44.73, 19.145, 44.748]` | degrees; default ~2 x 2 km in Semberija |
+| `--start` |  | `2023-06-01` |  |
+| `--end` |  | `2023-09-30` | monthly windows between start and end |
+| `--offline` |  |  | synthetic scenes, no network (CI) |
+| `--seed` |  | `42` |  |
+| `--k` |  | `4` | number of pseudo-classes (k-means) |
+| `--no-s1-coregistration` |  |  | keep Sentinel-1 geolocation as delivered (no offset correction to Sentinel-2) |
 
 ## `geocrop s2-composite`
 
@@ -276,6 +314,9 @@ Extract training samples from a stack and reference polygons
 | `--id-field` |  | `polygon_id` |  |
 | `--max-per-polygon` |  | `250` |  |
 | `--inner-buffer-m` |  |  |  |
+| `--region-field` |  |  | polygon attribute stored as sample region id (leave-one-region-out) |
+| `--year-field` |  |  | polygon attribute stored as sample year id (leave-one-year-out) |
+| `--year` |  |  | constant year id for all samples of this single-season stack |
 
 ## `geocrop train`
 
@@ -297,6 +338,7 @@ Spatial CV + final Random Forest
 | `--holdout` |  |  | fraction of spatial blocks locked as final test |
 | `--calibration-mode` |  | `oof` | holdout freezes a predictor without fitting on calibration polygons |
 | `--calibration-fraction` |  | `0.2` | fraction of spatial groups held out |
+| `--cv-strategy` |  | `spatial_blocks` | add leave-one-region/year-out transfer validation to the report |
 
 ## `geocrop benchmark`
 
@@ -323,6 +365,10 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--features` | yes |  |  |
 | `--model` | yes |  |  |
 | `--out` | yes |  |  |
+| `--config` |  |  | use the predict.smoothing section |
+| `--smooth` |  |  | edge-aware smoothing of probabilities before argmax |
+| `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
+| `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
 
 ## `geocrop ablation`
 
@@ -339,6 +385,7 @@ Feature-group ablation experiments on identical folds
 | `--folds` |  |  | override config model.cv_folds (default 5) |
 | `--buffer-m` |  |  | override config model.spatial_buffer_m (default 0) |
 | `--seed` |  |  | override config seed (default 42) |
+| `--cv-strategy` |  |  | override config cv.strategy: add leave-one-group-out transfer columns |
 
 ## `geocrop reduce-features`
 
@@ -388,6 +435,62 @@ Second-stage parcel classifier on aggregated descriptors
 | `--label-field` | yes |  |  |
 | `--out` | yes |  |  |
 | `--block-m` |  | `5000` |  |
+
+## `geocrop parcel-classify`
+
+Classify parcels directly from their signatures (parcel-grouped spatial CV, calibration, conformal sets, traffic light)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` | yes |  | signatures .csv/.parquet from geocrop signatures |
+| `--parcels` | yes |  | parcel polygons with ids (and reference labels for training) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | output directory |
+| `--label-field` |  |  | independent reference label column; required unless --model is given |
+| `--model` |  |  | existing parcel model directory (skip training) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` |  |
+| `--indices` |  |  | signature indices to use (default: all in the table) |
+| `--stats` |  | `['mean', 'std']` | signature columns per date |
+| `--groups` |  | `['ts', 'stats', 'windows', 'shape']` | feature groups for tabular models (temporal models use ts only) |
+| `--step-days` |  | `5` |  |
+| `--output-step-days` |  | `15` |  |
+| `--window-days` |  | `30` |  |
+| `--lam` |  | `20.0` | Whittaker smoothing parameter |
+| `--algorithm` |  | `rf` | any registered estimator, e.g. rf, hist_gb, tempcnn, ltae |
+| `--params` |  |  | JSON estimator settings |
+| `--block-m` |  | `5000` |  |
+| `--buffer-m` |  |  |  |
+| `--folds` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--holdout` |  |  | fraction of spatial blocks locked as final test |
+| `--calibration-mode` |  | `oof` |  |
+| `--calibration-fraction` |  | `0.2` |  |
+| `--bootstrap` |  | `200` |  |
+| `--alpha` |  | `0.1` | conformal level 1-alpha for prediction sets |
+| `--min-pixels` |  | `4` |  |
+| `--min-confidence` |  |  |  |
+| `--min-margin` |  |  |  |
+| `--min-aoa-fraction` |  | `0.5` |  |
+| `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--markers` |  |  | markers.csv from geocrop markers |
+| `--calendar` |  |  | crop calendar YAML |
+| `--compare-pixels` |  |  | pixel samples .npz (polygon = parcel id): compare with pixel->parcel aggregation on the same parcels and folds |
+| `--pixel-algorithm` |  | `rf` |  |
+| `--pixel-params` |  |  |  |
+
+## `geocrop parcel-series-demo`
+
+Write SYNTHETIC parcel signatures, parcels and pixel samples (software tests)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--n-side` |  | `12` | parcels per grid side |
+| `--seed` |  | `11` |  |
+| `--pixel-noise` |  | `0.08` |  |
+| `--cloud-fraction` |  | `0.3` |  |
 
 ## `geocrop validate`
 
@@ -545,6 +648,25 @@ Concatenate feature stacks on one grid
 | `--stacks` | yes |  |  |
 | `--out` | yes |  |  |
 
+## `geocrop embeddings`
+
+Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` |  |  | features.embeddings, grid.reference and paths sections |
+| `--source` |  |  | override features.embeddings.source |
+| `--year` |  |  | override features.embeddings.year |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference) |
+| `--out` |  |  | output directory (default <features dir>/embeddings) |
+| `--monthly` |  |  | Presto: monthly composites root <YYYY-MM>/B02.tif ... VV.tif |
+| `--start` |  |  | Presto: first month YYYY-MM (default <year>-01) |
+| `--months` |  |  | Presto: number of months (default 12) |
+| `--parcels` |  |  | Presto: also write parcel-level embeddings for this layer |
+| `--id-field` |  |  | parcel id field (default parcels.id_field) |
+| `--checkpoint` |  |  | Presto: local checkpoint instead of the pinned download |
+| `--make-monthly` |  |  | Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes |
+
 ## `geocrop signatures`
 
 Parcel-mean time series (CbM signatures) from S2 scene folders
@@ -559,6 +681,7 @@ Parcel-mean time series (CbM signatures) from S2 scene folders
 | `--out` | yes |  | .csv or .parquet |
 | `--indices` |  | `['NDVI', 'BSI']` |  |
 | `--id-field` |  | `parcel_id` |  |
+| `--moments` |  |  | add skewness and bimodality (homogeneity marker) |
 
 ## `geocrop markers`
 
@@ -624,7 +747,7 @@ Compare classifiers on identical spatial folds (nested tuning, repeats, holdout)
 |---|---|---|---|
 | `--samples` | yes |  |  |
 | `--out` | yes |  |  |
-| `--models` |  | `['rf', 'extra_trees', 'hist_gb', 'lightgbm', 'catboost']` |  |
+| `--models` |  | `['rf', 'extra_trees', 'hist_gb', 'lightgbm', 'catboost']` | model names; tempcnn and ltae need --groups ts (any registered algorithm name works) |
 | `--features` |  |  | feature stack (manifest) to restrict --groups |
 | `--groups` |  |  |  |
 | `--grids` |  |  | JSON {"rf": {"max_features": ["sqrt", 0.3]}} |
@@ -648,6 +771,36 @@ OBIA (with/without seam merging) vs U-Net against reference parcels
 | `--unet-bands` |  |  |  |
 | `--tile-size` |  | `1024` |  |
 | `--segments-per-km2` |  | `50` |  |
+| `--methods` |  |  | extra registry segmenters as JSON, e.g. '{"ftw": {"segmenter": "ftw", "model": "FTW_PRUE_EFNET_B3_CCBY"}}' |
+
+## `geocrop ftw-boundaries`
+
+Pretrained Fields of The World field boundaries (CC-BY checkpoints) -> parcels
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--window-a` |  |  | early-season composite/scene folder (B02..B08 reflectance) |
+| `--window-b` |  |  | late-season composite/scene folder |
+| `--stack` |  |  | existing 8-band FTW stack instead of --window-a/--window-b |
+| `--units` |  |  | scaling of --stack if it has no GeoCrop tag |
+| `--grid` |  |  | study grid raster (default: window A B04 grid) |
+| `--out` |  |  | output folder |
+| `--model` |  | `FTW_PRUE_EFNET_B3_CCBY` | FTW registry name (see --list-models) |
+| `--checkpoint` |  |  | local checkpoint file instead of a registry download |
+| `--allow-noncommercial` |  |  | permit FULL (non-commercial training data) checkpoints; prints a licence warning |
+| `--cache-dir` |  |  | checkpoint cache (default $GEOCROP_FTW_CACHE or ~/.cache/geocrop/ftw) |
+| `--no-download` |  |  | fail if the checkpoint is not cached |
+| `--download-only` |  |  |  |
+| `--list-models` |  |  |  |
+| `--patch` |  | `256` |  |
+| `--overlap` |  | `32` |  |
+| `--threads` |  |  |  |
+| `--threshold` |  | `0.5` | not-field probability below = field interior |
+| `--min-area-pixels` |  | `16` |  |
+| `--seed-percentile` |  |  |  |
+| `--min-seed-distance` |  | `1.0` | watershed seed distance from boundary (px) |
+| `--reference` |  |  | reference parcels: also write object-level segment metrics |
+| `--iou` |  | `0.5` |  |
 
 ## `geocrop benchmark-public`
 
@@ -698,3 +851,180 @@ Write a reproducibility manifest (versions, git, hashes)
 | `--config` |  |  |  |
 | `--inputs` |  | `[]` |  |
 | `--snap-gpt` |  |  |  |
+
+## `geocrop active-learning`
+
+Active-learning loop: batch selection, label ingestion, label-budget simulation
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `al_cmd` | yes |  |  |
+
+### `geocrop active-learning select`
+
+Select a diverse, spatially spread batch of uncertain parcels to label
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | output of geocrop parcels (entropy, p_<class>) |
+| `--out` | yes |  | selected parcels (.gpkg/.geojson); also writes *_label_form.csv |
+| `--budget` | yes |  | parcels to visit in this round |
+| `--features` |  |  | table keyed by parcel id (CSV/Parquet/GPKG) spanning the diversity space |
+| `--feature-columns` |  |  | columns of --features (or parcels) to use |
+| `--id-field` |  | `parcel_id` |  |
+| `--candidate-factor` |  | `3.0` | top-uncertain pool = factor x budget |
+| `--uncertainty-weight` |  | `0.3` | 0 = pure diversity, 1 = pure uncertainty |
+| `--min-spacing-m` |  | `1000` |  |
+| `--stratify` |  | `equal` | quota per predicted class |
+| `--trips` |  |  | group the batch into N field trips by area |
+| `--training` |  |  | current training polygons: their parcels are excluded and act as centres |
+| `--exclude` |  |  | parcels never to propose (e.g. validation sites): ids or geometries |
+| `--round` |  | `1` |  |
+| `--seed` |  | `42` |  |
+
+### `geocrop active-learning ingest`
+
+Merge field observations / analyst decisions into training with provenance
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--labels` | yes |  | CSV/GPKG: parcel_id, label, source, date, confidence[, purpose] |
+| `--parcels` | yes |  | parcel geometries with --id-field |
+| `--training` | yes |  | current training polygons (polygon_id, class_name) |
+| `--out` | yes |  | updated training polygons |
+| `--round` | yes |  |  |
+| `--validation` |  |  | validation observations kept out of training (points/polygons or ids) |
+| `--validation-buffer-m` |  |  |  |
+| `--provenance` |  |  | provenance CSV (default <out dir>/al_provenance.csv) |
+| `--min-confidence` |  |  |  |
+| `--conflict-policy` |  | `exclude` |  |
+| `--existing-policy` |  | `keep` |  |
+| `--inner-buffer-m` |  |  |  |
+| `--id-field` |  | `parcel_id` |  |
+| `--label-field` |  | `class_name` |  |
+
+### `geocrop active-learning simulate`
+
+Label-budget curves: uncertainty+diversity vs uncertainty vs random
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--samples` |  |  | samples.npz (aggregated to one unit per polygon); default SYNTHETIC pool |
+| `--strategies` |  | `['uncertainty_diversity', 'uncertainty', 'random']` |  |
+| `--initial` |  | `12` |  |
+| `--batch` |  | `12` |  |
+| `--rounds` |  | `8` |  |
+| `--repeats` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--block-m` |  | `1000` |  |
+| `--test-fraction` |  | `0.25` |  |
+| `--test-buffer-m` |  |  |  |
+| `--candidate-factor` |  | `3.0` |  |
+| `--uncertainty-weight` |  | `0.3` |  |
+| `--min-spacing-m` |  |  |  |
+| `--stratify` |  | `none` |  |
+| `--params` |  |  | classifier JSON, e.g. {"algorithm": "rf", "n_estimators": 200} |
+| `--synthetic-side` |  | `24` | SYNTHETIC pool: parcels per side |
+| `--synthetic-noise` |  | `0.1` |  |
+| `--no-figure` |  |  |  |
+
+## `geocrop s1-signatures`
+
+Parcel-mean Sentinel-1 VV/VH/VH-VV (dB) per acquisition with orbit geometry
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  | root of S1 scene folders (VV.tif, VH.tif, scene.json) |
+| `--parcels` | yes |  |  |
+| `--reference` | yes |  |  |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  | .csv or .parquet |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop event-markers`
+
+Harvest, tillage, mowing, homogeneity and data-sufficiency markers (S2 + S1)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--signatures` |  |  | S2 signatures (geocrop signatures, ideally with --moments) |
+| `--s1-signatures` |  |  | S1 signatures (geocrop s1-signatures) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--config` |  |  | use the cbm.events section of a config |
+
+## `geocrop traffic-light`
+
+Re-evaluate the traffic light of a parcels layer with marker rules and reason codes
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  | parcels.gpkg from geocrop parcels |
+| `--markers` | yes |  | event markers CSV from geocrop event-markers |
+| `--config` |  |  | cbm.rules section (applied even when rules.enabled is false) |
+| `--rules` |  |  | JSON rules overriding the config, e.g. '{"harvest_expected_classes": ["maize"]}' |
+| `--out` | yes |  | .gpkg (a .csv is written alongside) |
+| `--id-field` |  | `parcel_id` |  |
+
+## `geocrop samples-merge`
+
+Combine per-season sample files into one multi-year sample store
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--inputs` | yes |  | samples .npz files, one per season |
+| `--years` |  |  | year id per input (default: year metadata stored in each file) |
+| `--stacks` |  |  | feature stack per input; their feature manifests must match |
+| `--out` | yes |  |  |
+
+## `geocrop transfer`
+
+Leave-one-region-out / leave-one-year-out validation vs spatial CV
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  |  |
+| `--strategies` |  | `['region', 'year']` |  |
+| `--config` |  |  | inherit model settings |
+| `--params` |  |  | JSON estimator settings |
+| `--block-m` |  |  |  |
+| `--buffer-m` |  |  |  |
+| `--folds` |  |  |  |
+| `--seed` |  |  |  |
+
+## `geocrop smoothing-experiment`
+
+SYNTHETIC comparison of accuracy and conformal coverage with/without smoothing
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--out` | yes |  |  |
+| `--seed` |  | `42` |  |
+| `--alpha` |  | `0.1` |  |
+
+## `geocrop openeo-extract`
+
+Run composites, scenes or parcel signatures on an openEO back-end (CDSE) and write them in GeoCrop's file contracts (optional openeo extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--dry-run` |  |  | only write the process graphs; needs no credentials |
+| `--graphs` |  |  | directory for the process graph JSON; default <openeo.work_dir>/graphs |
+| `--auth` |  | `auto` | auto: CDSE_OPENEO_CLIENT_ID/SECRET if set, else the OIDC device flow |
+
+## `geocrop openeo-graph`
+
+Export the configured GeoCrop recipe as openEO process graphs (no credentials needed)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  |  |
+| `--products` |  |  | default: openeo.products of the config |
+| `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
+| `--stdout` |  |  | print the openEO process objects as one JSON document |
