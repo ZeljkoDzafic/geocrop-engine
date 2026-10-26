@@ -126,6 +126,20 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
 
+## `geocrop quicklook`
+
+Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` | yes |  |  |
+| `--max-cloud` |  | `60` |  |
+| `--min-clear` |  | `0.3` |  |
+| `--max-items` |  | `60` |  |
+
 ## `geocrop s2-composite`
 
 Cloud-masked temporal composite of S2 scene folders
@@ -634,6 +648,45 @@ OBIA (with/without seam merging) vs U-Net against reference parcels
 | `--unet-bands` |  |  |  |
 | `--tile-size` |  | `1024` |  |
 | `--segments-per-km2` |  | `50` |  |
+
+## `geocrop benchmark-public`
+
+Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--protocol` | yes |  | versioned protocol YAML, e.g. configs/benchmarks/*.yaml |
+| `--work` | yes |  | working directory (scenes, composites, results.json/.md) |
+| `--cache` |  |  | download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public |
+| `--models` |  |  | subset of the protocol's models (default all) |
+| `--workers` |  | `4` | parallel scene imports |
+| `--layer` |  |  | local copy of the EuroCrops layer instead of the pinned download |
+| `--publish` |  |  | directory to copy results.md/.json to (named after the protocol) |
+
+## `geocrop calendar`
+
+Derive a crop calendar and phenological windows from parcel markers, or read WorldCereal calendar priors
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `action` | yes |  |  |
+| `--markers` |  |  | derive: markers table from geocrop markers (CSV/Parquet) |
+| `--signatures` |  |  | derive: parcel signatures (CSV/Parquet); markers computed with --start/--end |
+| `--start` |  |  | derive with --signatures: season start (ISO date) |
+| `--end` |  |  | derive with --signatures: season end (ISO date) |
+| `--labels` |  |  | derive: parcels with labels (GPKG/GeoJSON/CSV) |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `parcel_id` |  |
+| `--year` |  |  | derive: year of the suggested windows |
+| `--percentiles` |  | `[10, 50, 90]` |  |
+| `--min-parcels` |  | `5` |  |
+| `--min-days` |  | `30` | derive: shortest suggested window |
+| `--max-windows` |  | `6` |  |
+| `--out` |  |  | derive: calendar YAML; worldcereal: JSON (default: print) |
+| `--windows-out` |  |  | derive: suggested windows YAML snippet |
+| `--lon` |  |  | worldcereal: longitude (WGS84) |
+| `--lat` |  |  | worldcereal: latitude (WGS84) |
+| `--cache` |  |  | worldcereal: download cache directory |
 
 ## `geocrop manifest`
 

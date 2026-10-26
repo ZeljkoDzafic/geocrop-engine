@@ -1,0 +1,37 @@
+# HCAT -> GeoCrop class harmonisation for the Republic of Srpska / Bosnia and Herzegovina class set.
+# Derived from the EuroCrops HCAT3 taxonomy (CC-BY-SA-4.0); this file is licensed CC-BY-SA-4.0, see LICENSE-HCAT.md.
+# match: exact = this code only; subtree = this code and all descendants. Exact rules win, then the longest prefix.
+class_name,hcat_code,match,hcat_name,note
+maize,3301010600,subtree,grain_maize_corn_popcorn,grain maize incl. sweet corn
+maize,3301090400,exact,green_silo_maize,silage maize harvested green; same canopy until harvest
+soybean,3301160000,subtree,soy_soybeans,
+sunflower,3301060500,subtree,sunflower,
+winter_crops,3301010101,exact,winter_common_soft_wheat,
+winter_crops,3301010201,exact,winter_durum_hard_wheat,
+winter_crops,3301010301,exact,winter_rye,
+winter_crops,3301010401,exact,winter_barley,
+winter_crops,3301010501,exact,winter_oats,
+winter_crops,3301010801,exact,winter_triticale,
+winter_crops,3301010901,exact,winter_millet_sorghum,
+winter_crops,3301011001,exact,winter_spelt,
+winter_crops,3301011101,exact,winter_meslin,
+winter_crops,3301011201,exact,winter_emmer,
+winter_crops,3301011301,exact,winter_einkorn,
+winter_crops,3301011501,exact,winter_unspecified_cereals,
+grassland,3302000000,subtree,pasture_meadow_grassland_grass,permanent grassland
+grassland,3301090100,subtree,temporary_grass,grass on arable land (BiH reference treats sown grass as grassland)
+vegetables,3301070000,subtree,fresh_vegetables,
+vegetables,3301140100,exact,cucumber_pickle,
+vegetables,3301140600,exact,zucchini_courgette,
+vegetables,3301210200,subtree,brassica_oleracea_cabbage,
+vegetables,3301220000,subtree,alliums,
+vegetables,3301260000,subtree,aubergine_eggplant,
+vegetables,3301280000,subtree,tomato,
+vegetables,3301300000,subtree,capsicum,
+vegetables,3301310000,subtree,salads_lettuce_leaf_vegetables,
+vegetables,3301290200,exact,beetroot_beets,
+vegetables,3301290300,exact,carrots_daucus,
+tobacco,3301060100,subtree,tobacco,
+forest,3306000000,subtree,tree_wood_forest,incl. short-rotation coppice
+water,,exact,,no HCAT equivalent (HCAT is a crop taxonomy)
+built_up,,exact,,no HCAT equivalent (HCAT is a crop taxonomy)
