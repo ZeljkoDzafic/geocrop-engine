@@ -33,3 +33,4 @@ venv/
 .coverage.*
 coverage.xml
 htmlcov/
+catboost_info/

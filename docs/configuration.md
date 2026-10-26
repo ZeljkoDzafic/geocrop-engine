@@ -40,6 +40,9 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
 | | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
+| `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop ablation --config` |
+| | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids; CLI `geocrop samples --region-field/--year-field/--year` |
+| `predict` | `smoothing: {enabled, window, smoothness}` | false, 7, 10 | edge-aware probability smoothing before argmax and parcel aggregation; used by `geocrop predict --config` |
 | `experiments` | `<id>: {groups, periods, features, exclude}` | E0–E4 ladder | ablation definitions |
 | `parcels` | `id_field`, `declared_field`, `crop_mapping` | `parcel_id`, `declared_crop`, null | parcel schema |
 | | `strategy` | `mean_probability` | `majority`, `mean_probability`, `combined` |
@@ -48,3 +51,12 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `conformal_alpha`, `min_aoa_fraction` | 0.1, 0.5 | conformal level for parcel sets; AOA share required for acceptance |
 | `validation` | `label_field`, `date_field`, `year` | `class_name`, `observed_at`, null | observation schema and season |
 | | `training_exclusion_m`, `window_px`, `bootstrap` | 0, 1, 1000 | leakage buffer, GNSS window, bootstrap replicates |
+| `resources` | `disk_guard` | true | free-space check before `composite`, `features`, `predict` ([preflight](preflight.md)) |
+| | `min_free_gb`, `safety_factor` | 5, 1.25 | space kept free per volume; multiplier (≥ 1) on the estimated stage size |
+| | `compression_ratio` | 0.8 | expected compressed / uncompressed raster size, in (0, 1] |
+| `preflight` | `min_s2_scenes_per_window`, `min_s1_scenes_per_window` | 3, 2 | warn below these scene counts |
+| | `max_unobserved_fraction` | 0.05 | warn when more of the AOI lacks `min_valid_observations` clear observations |
+| | `coverage_max_px`, `inventories` | 512, [] | decimated coverage grid size (≥ 16); inventory CSVs counted per window |
+
+Parallelism: there is no separate worker cap; model training follows `model.n_jobs`, raster stages are
+block-wise single-process (see [preflight](preflight.md#disk-guard-during-runs)).

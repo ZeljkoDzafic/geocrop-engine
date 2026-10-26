@@ -2,6 +2,42 @@
 
 ## Unreleased
 ### Added
+- Transfer validation (gap G8): leave-one-region-out, leave-one-year-out and region-year CV
+  (`cv_strategy` in `model.cross_validate` / `nested_cross_validate` / `train`, `experiments.run`;
+  `geocrop train|ablation --cv-strategy`, `geocrop transfer`) with per-held-out-group metrics and the transfer
+  gap to spatial-block CV; sample region/year ids (`geocrop samples --region-field/--year-field/--year`) and a
+  multi-year sample store (`geocrop samples-merge`) that refuses mismatched feature manifests; config sections
+  `cv` and `predict`; docs/validation-protocols.md.
+- Optional edge-aware probability smoothing before argmax and parcel aggregation (gap G15,
+  `geocrop predict --smooth`, `predict.smoothing`) and a synthetic accuracy/conformal-coverage comparison
+  (`geocrop smoothing-experiment`).
+- Optional openEO back-end (`geocrop.openeo_adapter`, gap G10): `geocrop openeo-extract` runs Sentinel-2/-1 window
+  composites, scene extraction or parcel signatures on CDSE openEO and writes them in GeoCrop's composite/scene/
+  signature contracts on the study grid; `geocrop openeo-graph` (and `--dry-run`) exports the recipe as openEO
+  process graphs without credentials. New optional `openeo:` configuration section; see `docs/openeo.md`.
+- `geocrop acceptance`: one versioned, automatically executable acceptance run of the whole chain on a ~2 × 2 km
+  real area in Semberija (2023, June–September), with real Sentinel-2 and Sentinel-1 data; 21 pass/fail checks
+  (grid identity, radiometry and backscatter plausibility, S1/S2 co-registration, coverage, no-data leakage,
+  index and probability ranges, reproducibility, parcel schema, held-out recovery of documented pseudo-classes,
+  COG/STAC/GeoParquet validity, run manifest), runtime and memory per stage, and a schema-versioned
+  `acceptance_report.json` + `acceptance_report.md`. `--offline` runs the same chain on synthetic scenes (CI).
+  First published report: `docs/acceptance/acceptance-0.10-dev-2026-10-26.md`.
+- `geocrop.s1_stac`: Sentinel-1 RTC (terrain-flattened γ⁰, linear) import from Microsoft Planetary Computer as
+  windowed COG reads onto the study grid, without SNAP; slices of an overpass are mosaicked; SAS signing via the
+  optional `planetary-computer` package or the public token endpoint; physical plausibility statistics.
+- Sentinel-1 to Sentinel-2 co-registration: `s1_stac.estimate_offsets` (sub-pixel NDVI / VH cross-correlation per
+  acquisition geometry) and `s1_stac.apply_offsets` (corrected copies of scene folders). The acceptance run found
+  systematic, orbit-dependent offsets of the Planetary Computer RTC scenes over Semberija (up to ≈ 50 m).
+
+- `geocrop preflight`: pass/warn/error checks and a ready / ready-with-warnings / blocked verdict (JSON and
+  Markdown) before long runs: scenes per window and S1 orbit (scene folders and inventory CSVs), decimated
+  clear-observation coverage, class support under the configured spatial blocks, folds and locked holdout,
+  grid/layer CRS and AOI overlap, the input audit, and rough disk/RAM/runtime estimates against free space.
+- Disk guard before `composite`, `features` and `predict` (`resources.disk_guard`, `min_free_gb`,
+  `safety_factor`, `compression_ratio`); stops with a clear message before writing.
+- Partial outputs of failed or interrupted stages are moved to `<output>/.quarantine`; `geocrop clean`
+  (`--dry-run`, `--all-intermediates`, `--include-results`) removes temporary files, quarantine and
+  regenerable intermediates while never touching scene folders, reference layers or configs.
 - Versioned REST API: every endpoint is also served under `/api/v1/...`, the documented stable contract;
   unversioned `/api/...` paths remain as compatibility aliases. `EngineClient` uses `/api/v1` and falls back to
   `/api` on older servers.
@@ -19,6 +55,11 @@
   `traffic-light`, `signatures --moments`.
 - Optional traffic-light marker rules (`cbm.rules`, off by default) with `traffic_light_reasons` reason codes
   (`cbm.traffic_light_details`, `parcels.aggregate(marker_rules=...)`); `cbm.events` holds marker parameters.
+- `geocrop ftw-boundaries` and the `ftw` segmenter: pretrained Fields of The World field-boundary models on
+  two-window GeoCrop composites (CC-BY checkpoints by default, non-commercial ones only with
+  `--allow-noncommercial`), SHA-256-pinned runtime download (`geocrop.ftw_weights`), seamless blockwise CPU
+  inference and watershed parcels; `benchmark-segmentation --methods` adds registry segmenters from the CLI;
+  `boundaries_to_parcels(min_seed_distance=...)`. See `docs/field-boundaries.md`.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
@@ -33,6 +74,18 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- Redesigned web workspace: the map as the main view, a guided *New analysis* sheet (area by coordinates or drawn on
+  the map, period presets, command preview) that runs `quicklook`, one-click Semberija and demo examples, an imagery
+  bar (composites/scenes, product, date stepping), layer switches and colour-ramp legends, a searchable command
+  palette (⌘K / Ctrl K), grouped command forms with a live command-line preview, a job history with durations and
+  relative times, file icons and sizes, notifications for finished and failed jobs, keyboard shortcuts (?),
+  light and dark appearance, and a phone layout with a tab bar. The Terminal view hosts the CLI console component.
+- Web workspace: the CLI console is now a macOS Terminal-style session with live syntax colouring,
+  editor-style completion (commands, flags, choices, workspace paths), ghost-text hints, signature help,
+  history with reverse search, streamed job output with coloured exit status, Ctrl+C cancellation and the
+  built-ins `help`, `clear`, `history` and `jobs`.
+- `GET /api/files?prefix=...`: authenticated workspace path completion (at most 200 entries; no absolute
+  paths, `..`, hidden files, web state directory or symlinks leaving the workspace).
 - Reliability gate `tests/test_reliability.py`: SIGKILL inside features/train/predict of a real `geocrop run`
   with recovery checked against an uninterrupted reference; corrupt-input matrix; reproducibility of two
   independent runs; (`slow`) memory bounded by the block size at 2048² and roughly linear runtime.
@@ -58,6 +111,9 @@
   subprocess-running code.
 
 ### Fixed
+- Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
+- CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
+  flattened through `estimators.predict_labels`.
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
   (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
   now stop and ask for the upstream stage to be rerun.
