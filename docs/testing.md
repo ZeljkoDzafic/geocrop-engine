@@ -1,26 +1,45 @@
 # Testing
 
-| Tier | Command | Content |
-|---|---|---|
-| Unit and integration (default) | `pytest` | every module on synthetic data, golden-value feature regression, pipeline resumption, web/QGIS |
-| Scale | `pytest -m slow` | larger rasters, bounded-memory feature stack (peak < 50 % of an in-memory stack) |
-| Real data | `pytest -m network` | Sentinel-2 L2A COGs over ~4 km² in Semberija, July 2023: radiometry plausibility, compositing with cloud screening, NDVI range; Sentinel-1 RTC (Planetary Computer) backscatter plausibility; the full real-data acceptance run |
-| Acceptance | `geocrop acceptance --out <dir>` (`--offline` in the default tier) | the whole chain STAC → S2 + S1 → QA → composites → features → training → prediction → segmentation → parcels → validation → export, with a pass/fail report; see [acceptance](acceptance.md) |
+The suite under `tests/` has three tiers selected with pytest markers. `pytest` without options runs the
+default tier (`addopts = -m 'not network'` in `pyproject.toml`).
 
-| Unit and integration (default) | `pytest` | every module on synthetic data, golden-value feature regression, pipeline resumption, reliability gate (below), web/QGIS |
-| Scale | `pytest -m slow` | larger rasters, bounded-memory feature stack (peak < 50 % of an in-memory stack); features + predict at 1024² and 2048² with peak traced memory independent of raster size and roughly linear runtime |
-| Real data | `pytest -m network` | Sentinel-2 L2A COGs over ~4 km² in Semberija, July 2023: radiometry plausibility, compositing with cloud screening, NDVI range |
+| Tier | Command | Tests (2026-10-26) | Content |
+|---|---|---|---|
+| Default | `pytest` | 984 | every module on synthetic data: golden-value feature regression, pipeline resumption, the reliability gate (below), offline acceptance run, web API security gate, QGIS plugin, plugin contracts, documentation consistency |
+| Scale | `pytest -m slow` | 3 (also in the default tier) | bounded-memory feature stack (peak < 50 % of an in-memory stack); features + predict at 1024² and 2048² with peak traced memory independent of raster size and roughly linear runtime |
+| Real data | `pytest -m network` | 14 | public Sentinel-2 L2A COGs over ~4 km² of Semberija, July 2023 (radiometry plausibility, compositing with cloud screening, NDVI range, quicklook); Sentinel-1 RTC from Planetary Computer (backscatter plausibility); the full real-data acceptance run; odc-stac vs `stac-import` equality; AlphaEarth/TESSERA windows; Presto, Galileo, AnySat and FTW checkpoint download and loading; EuroCrops mapping table reachability; CDSE openEO graph validation (only with `CDSE_OPENEO_*` credentials) |
+| Acceptance | `geocrop acceptance --out <dir>` (`--offline` runs in the default tier) | — | the whole chain STAC → S2 + S1 → QA → composites → features → training → prediction → segmentation → parcels → validation → export, with a pass/fail report; see [acceptance](acceptance.md) |
 
-The `tests` workflow runs the default tier on Python 3.10–3.12 for every push; the `integration` workflow runs the
-`slow` and `network` tiers weekly and on demand. Network failures of the public STAC service skip, rather than
-fail, the real-data tests.
+`pytest` selects every test except `network`, so the `slow` tests also run in the default tier;
+`pytest -m "not slow"` skips them for a quick local loop. Run `pytest --co -q` for the current counts.
 
-The offline acceptance run (`tests/test_acceptance.py`, synthetic scenes, ≈ 20–30 s) is part of the default
-tier; the real-data acceptance run is in the network tier and its Markdown report is published under
-[docs/acceptance/](acceptance.md#published-reports).
+CI: the `tests` workflow runs the default tier with coverage on Python 3.10, 3.11 and 3.12 (Ubuntu 26.04) for
+every push and pull request; the `integration` workflow runs `pytest -m "network or slow"` weekly and on demand
+on Python 3.11 with the `dev,stac` extras only, so network tests that need PyTorch, odc-stac or credentials
+skip there. Failures of the public STAC services skip, rather than fail, the real-data tests. The real-data
+acceptance report is published under [docs/acceptance/](acceptance.md#published-reports).
 
-`pytest` selects every test except `network`, so the `slow` tests also run in the default tier; `pytest -m "not slow"`
-skips them for a quick local loop.
+## What the tests establish, and what they do not
+
+* The default tier proves **software behaviour** on synthetic data with known answers (leakage-free folds,
+  hand-computed estimators, resumption, error messages, security). Its accuracy numbers mean nothing for real
+  crops.
+* The network tier and the acceptance run prove that real Sentinel-1/2 data flow through the chain with
+  physically plausible values on one small area and season. They use k-means **pseudo-labels**, so they do not
+  measure crop-map accuracy.
+* Classification accuracy, transfer and conformal coverage on real labels come from the
+  [public benchmarks](benchmarks/README.md) (declared labels, Slovenia), which are reproducible commands rather
+  than tests. Field-verified accuracy in the study region is still open; see [limitations](limitations.md).
+
+## Documentation consistency (`tests/test_check_docs.py`)
+
+`python tools/check_docs.py` (also run by the default tier) checks that every relative link and `#anchor` in the
+Markdown documents and in `website/index.html` resolves, that every `geocrop <command>` and `--option` written in
+code in the living documents exists in the CLI parser, that `docs/configuration.md` lists exactly the keys of
+`geocrop.config.DEFAULTS` (marker/rule groups are documented on their own pages), and that
+`docs/architecture.md` names every module of the layer map. A second test fails when `docs/cli.md` differs from
+`python tools/generate_cli_docs.py` output. Dated records (CHANGELOG, reviews, release-gate and acceptance
+reports) are checked for links only.
 
 ## Reliability gate (`tests/test_reliability.py`)
 
