@@ -2,114 +2,420 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="GeoCrop Engine: open Sentinel-1 and Sentinel-2 crop mapping, spatial validation and parcel-level evidence. Work through the browser, CLI, Jupyter or QGIS.">
-  <meta name="theme-color" content="#143c30">
-  <meta property="og:title" content="GeoCrop Engine — one engine, every way you work">
-  <meta property="og:description" content="Open satellite processing and inspectable parcel evidence. Explore the real web workspace, command line and QGIS integration.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="GeoCrop Engine is an open, local-first engine for Sentinel-1 and Sentinel-2 crop mapping and parcel verification, with spatially honest validation and explainable parcel decisions.">
+  <meta name="theme-color" content="#f4f5f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111312" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="GeoCrop Engine — From observation to decision">
+  <meta property="og:description" content="Open, local-first Sentinel-1/2 crop mapping and parcel verification. Spatial validation, conformal sets, reason-coded parcel decisions and open formats.">
   <meta property="og:type" content="website">
-  <title>GeoCrop Engine — Open fields. Inspectable evidence.</title>
+  <title>GeoCrop Engine</title>
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
   <link rel="stylesheet" href="assets/site.css">
-  <link rel="stylesheet" href="assets/setup.css">
+  <script src="assets/theme.js"></script>
   <script defer src="assets/site.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="#" aria-label="GeoCrop Engine home"><img src="assets/icon.svg" alt="" width="36" height="36"><span>GeoCrop<small>ENGINE</small></span></a>
-    <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="main-nav">Menu <span aria-hidden="true">☰</span></button>
-    <nav id="main-nav" aria-label="Main navigation"><a href="#workflow">Workflow</a><a href="#interfaces">Interfaces</a><a href="#evidence">Evidence</a><a href="#start">Get started</a></nav>
-    <a class="header-source" href="https://github.com/ZeljkoDzafic/geocrop-engine">GitHub <span aria-hidden="true">↗</span></a>
-  </header>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Zm0 0v14m6-12v14"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8.5 7-5 5 5 5m7-10 5 5-5 5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2m0 15v2M2.5 12h2m15 0h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11m0-11-11 11"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4.5 8h15M4.5 16h15"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+  <symbol id="i-raster" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16"/></symbol>
+  <symbol id="i-vector" viewBox="0 0 24 24"><path d="m6 7 10-2.5L19.5 15 9 19.5 4.5 13Z"/><circle cx="6" cy="7" r="1.2"/><circle cx="16" cy="4.5" r="1.2"/><circle cx="19.5" cy="15" r="1.2"/><circle cx="9" cy="19.5" r="1.2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4 4 9-9"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4.5m0 2.5v.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5m0-8.5v.2"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 4 8.5 4.5L12 13 3.5 8.5Z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
+  <symbol id="i-satellite" viewBox="0 0 24 24"><path d="m9.5 9.5 5 5m-8-8 3 3-3 3-3-3Zm11 11-3-3 3-3 3 3ZM12 12l2-2"/><path d="M15.5 4.5a4 4 0 0 1 4 4m-4-1.5a1.5 1.5 0 0 1 1.5 1.5"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.4 2.6 6.9 7.5 8.5-4.9 1.6-6.9 4.1-7.5 8.5-.6-4.4-2.6-6.9-7.5-8.5 4.9-1.6 6.9-4.1 7.5-8.5Z"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3.5 7.5 4.25v8.5L12 20.5l-7.5-4.25v-8.5Z"/><path d="M4.5 7.75 12 12l7.5-4.25M12 12v8.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.6 7 9 4.1-1.4 7-4.7 7-9V6Z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5S9.7 5.9 12 3.5Z"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5V8m6-4.5V8M6.5 8h11v3a5.5 5.5 0 0 1-11 0Zm5.5 8.5v4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z"/><circle cx="12" cy="9.5" r="2.3"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h5a3 3 0 0 1 3 3v6.5M6 8.5V15a3 3 0 0 0 3 3h6.5"/></symbol>
+</svg>
 
-  <main id="main">
-    <section class="hero section-shell" aria-labelledby="hero-heading">
-      <div class="hero-copy"><span class="eyebrow"><span class="live-dot"></span> OPEN GEOSPATIAL SOFTWARE</span><h1 id="hero-heading">One engine.<br>Every way<br><em>you work.</em></h1><p class="hero-description">Turn Sentinel time series into crop maps and inspectable parcel evidence. Local processing. Spatial validation. Tools that fit your workflow.</p><div class="hero-actions"><a class="button primary" href="#interfaces">Explore the interfaces <span aria-hidden="true">↘</span></a><a class="text-link" href="#start">Start with the engine <span aria-hidden="true">→</span></a></div><div class="hero-footnote"><span>Apache 2.0</span><span>Python</span><span>Research software</span></div></div>
-      <div class="hero-visual"><div class="visual-label"><span>ONE WORKFLOW · FOUR ENTRY POINTS</span><span class="coordinate">S1 + S2</span></div><div class="hero-screen"><div class="screen-bar"><span class="screen-dots" aria-hidden="true">● ● ●</span><span>GeoCrop / local workspace</span><span aria-hidden="true">↗</span></div><img src="assets/images/web.png" alt="Actual GeoCrop web workspace showing a successful synthetic engine job, command form, logs and output files" width="1500" height="1080" fetchpriority="high"></div><div class="floating-note"><span class="note-icon" aria-hidden="true">↗</span><div><strong>From pixels to parcels.</strong><span>Keep the evidence with the decision.</span></div></div><div class="visual-caption"><span class="small-square"></span> Real interface capture · synthetic software demonstration</div></div>
-    </section>
+<a class="skip-link" href="#main">Skip to content</a>
 
-    <div class="capability-strip"><div><span class="strip-number">01</span><strong>Sentinel-1 + Sentinel-2</strong><span>Optical and radar time series</span></div><div><span class="strip-number">02</span><strong>Local by design</strong><span>Workstation or single server</span></div><div><span class="strip-number">03</span><strong>Open file contracts</strong><span>GeoTIFF · GeoPackage · STAC</span></div><div><span class="strip-number">04</span><strong>Explicit review outcomes</strong><span>Evidence before acceptance</span></div></div>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="#top" aria-label="GeoCrop Engine, back to top"><img src="assets/icon.svg" alt="" width="28" height="28"><span>GeoCrop <span class="brand-soft">Engine</span></span></a>
+    <nav id="main-nav" class="main-nav" aria-label="Main navigation">
+      <a href="#workspace">Workspace</a>
+      <a href="#validation">Validation</a>
+      <a href="#parcels">Parcels</a>
+      <a href="#models">Models</a>
+      <a href="#platform">Platform</a>
+      <a href="#start">Get started</a>
+    </nav>
+    <div class="header-actions">
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle dark appearance" aria-pressed="false" title="Appearance">
+        <svg class="icon theme-light"><use href="#i-moon"/></svg><svg class="icon theme-dark"><use href="#i-sun"/></svg>
+      </button>
+      <a class="btn btn-secondary btn-small header-github" href="https://github.com/ZeljkoDzafic/geocrop-engine">GitHub</a>
+      <button id="menu-toggle" class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Menu"><svg class="icon"><use href="#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
 
-    <section class="workflow section-shell" id="workflow" aria-labelledby="workflow-title">
-      <div class="section-heading"><div><span class="eyebrow">THE COMPLETE CHAIN</span><h2 id="workflow-title">A clear path from<br>observations to evidence.</h2></div><p>One configurable workflow connects data preparation, classification and parcel review. Intermediate files stay accessible at every stage.</p></div>
-      <ol class="steps"><li><span class="step-number">01 /</span><h3>Prepare</h3><p>Discover imagery, import scenes and create cloud-screened composites on a common grid.</p><span class="step-tag">CDSE · STAC inventory</span></li><li><span class="step-number">02 /</span><h3>Describe</h3><p>Build spectral, radar and temporal features. Keep observation support separate from interpolation.</p><span class="step-tag">Features · temporal QA</span></li><li><span class="step-number">03 /</span><h3>Evaluate</h3><p>Compare classifiers with spatial folds. Reserve calibration groups when a frozen-model protocol is needed.</p><span class="step-tag">Spatial CV · calibration</span></li><li><span class="step-number">04 /</span><h3>Review</h3><p>Aggregate probabilities to parcels. Record uncertainty, applicability and the reasons behind review.</p><span class="step-tag">Parcel evidence</span></li><li><span class="step-number">05 /</span><h3>Share</h3><p>Inspect GIS layers and export interoperable products with manifests and reproducible settings.</p><span class="step-tag">COG · GeoPackage · STAC</span></li></ol>
-    </section>
+<main id="main">
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="container hero-copy">
+      <p class="eyebrow">Open source · Apache-2.0 · Sentinel-1 + Sentinel-2</p>
+      <h1 id="hero-title">From observation<br>to decision.</h1>
+      <p class="lede">An open, local-first engine for crop mapping and parcel verification. GeoCrop turns Copernicus time series into crop maps with probabilities, and those into parcel decisions that state their evidence.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-large" href="#start">Get started</a>
+        <a class="btn btn-secondary btn-large" href="https://github.com/ZeljkoDzafic/geocrop-engine">View source<svg class="icon"><use href="#i-arrow"/></svg></a>
+      </div>
+      <ul class="hero-facts" aria-label="Key facts">
+        <li>Workstation or a single server</li>
+        <li>No cloud account or GPU required</li>
+        <li>GeoTIFF · GeoPackage · STAC</li>
+      </ul>
+    </div>
+    <figure class="container hero-shot">
+      <button class="window" type="button" data-image="assets/images/web.webp" data-caption="Map view with a real Sentinel-2 quicklook of Semberija, June–August 2023. Contains modified Copernicus Sentinel data 2023.">
+        <img class="theme-light" src="assets/images/web.webp" alt="GeoCrop web workspace in light appearance: map view with a real Sentinel-2 composite of fields in Semberija, the imagery bar and layer switches" width="1440" height="900" fetchpriority="high">
+        <img class="theme-dark" src="assets/images/web-dark.webp" alt="The same GeoCrop map view in dark appearance with the real Sentinel-2 composite" width="1440" height="900" loading="lazy">
+      </button>
+      <figcaption>A real <code>quicklook</code> of Semberija, August 2023 composite. Contains modified Copernicus Sentinel data 2023.</figcaption>
+    </figure>
+  </section>
 
-    <section class="interfaces" id="interfaces" aria-labelledby="interfaces-title"><div class="section-shell"><div class="section-heading"><div><span class="eyebrow">MEET THE INTERFACES</span><h2 id="interfaces-title">Your tools.<br>The same engine.</h2></div><p>Use visual forms, reproducible commands, notebook code or a native GIS workflow. The web, Jupyter and QGIS clients share the engine’s job API.</p></div>
-      <div class="interface-tabs" role="tablist" aria-label="Choose an interface"><button id="tab-web" role="tab" aria-selected="true" aria-controls="panel-web" tabindex="0" data-interface="web"><span aria-hidden="true">▦</span> Web workspace</button><button id="tab-cli" role="tab" aria-selected="false" aria-controls="panel-cli" tabindex="-1" data-interface="cli"><span aria-hidden="true">&gt;_</span> Command line</button><button id="tab-qgis" role="tab" aria-selected="false" aria-controls="panel-qgis" tabindex="-1" data-interface="qgis"><span aria-hidden="true">◈</span> QGIS</button><button id="tab-jupyter" role="tab" aria-selected="false" aria-controls="panel-jupyter" tabindex="-1" data-interface="jupyter"><span aria-hidden="true">{ }</span> Jupyter & API</button></div>
+  <section class="chain" aria-labelledby="chain-title">
+    <div class="container">
+      <h2 id="chain-title" class="sr-only">The processing chain</h2>
+      <ol class="chain-steps">
+        <li><svg class="icon"><use href="#i-satellite"/></svg><strong>Observe</strong><span>STAC or CDSE scenes, cloud-screened composites, Sentinel-1 backscatter</span></li>
+        <li><svg class="icon"><use href="#i-layers"/></svg><strong>Describe</strong><span>Bands, indices, radar, phenology and harmonics on one grid</span></li>
+        <li><svg class="icon"><use href="#i-shield"/></svg><strong>Validate</strong><span>Spatial blocks, locked holdout, transfer, calibration</span></li>
+        <li><svg class="icon"><use href="#i-target"/></svg><strong>Decide</strong><span>Accept or review per parcel, with reason codes and markers</span></li>
+        <li><svg class="icon"><use href="#i-globe"/></svg><strong>Share</strong><span>COG, GeoPackage, GeoParquet, STAC and run manifests</span></li>
+      </ol>
+    </div>
+  </section>
 
-      <article class="interface-panel" id="panel-web" role="tabpanel" aria-labelledby="tab-web"><div class="interface-image"><img src="assets/images/web.png" alt="Real browser interface with an engine command form, completed synthetic-job log and downloadable outputs" width="1500" height="1080" loading="lazy"><button class="image-expand" data-image="assets/images/web.png" data-caption="Actual GeoCrop web workspace. The localized interface shows a synthetic software-check job; its metrics are not field accuracy.">View full screenshot <span aria-hidden="true">↗</span></button></div><div class="interface-copy"><span class="eyebrow">THE LOCAL WORKSPACE</span><h3>Launch a job.<br>Follow every step.</h3><p>Choose an existing engine command from a form or enter it in the browser console. Keep job history, logs and outputs together.</p><ul class="check-list"><li>Forms built from the real CLI parser</li><li>Queued jobs, exit codes and cancellation</li><li>Incremental logs and artifact downloads</li><li>Token-authenticated local HTTP API</li></ul><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/web-interface.md">Web setup and API guide <span aria-hidden="true">→</span></a><p class="capture-note">Actual screenshot. Localized UI shown in its current language. Synthetic demonstration data.</p></div></article>
+  <section class="section" id="workspace" aria-labelledby="workspace-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Web workspace</p>
+        <h2 id="workspace-title">Start with the map.<br><span class="soft">Everything else is a keystroke away.</span></h2>
+        <p class="section-lede">A local workspace served by the engine itself. Choose an area and a period and look at real Sentinel-2 imagery, then go as deep as the command line allows.</p>
+      </header>
 
-      <article class="interface-panel" id="panel-cli" role="tabpanel" aria-labelledby="tab-cli" hidden><div class="interface-image terminal-image"><img src="assets/images/cli.png" alt="Actual Xfce terminal displaying geocrop version and train help, including spatial buffer and held-out calibration options" width="1162" height="914" loading="lazy"><button class="image-expand" data-image="assets/images/cli.png" data-caption="Actual terminal capture of geocrop --version and geocrop train --help. Output is captured directly from the installed engine.">View full screenshot <span aria-hidden="true">↗</span></button></div><div class="interface-copy"><span class="eyebrow">REPRODUCIBLE BY DEFAULT</span><h3>Keep the workflow<br>in your command line.</h3><p>Run individual stages, repeat experiments or drive the pipeline from YAML. Existing CLI workflows stay available alongside every visual interface.</p><ul class="check-list"><li>Config-driven processing and stage resume</li><li>Spatial buffers and optional held-out calibration</li><li>Classifier benchmarks on identical folds</li><li>Machine-readable reports and manifests</li></ul><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/cli.md">Read the CLI reference <span aria-hidden="true">→</span></a><p class="capture-note">Actual terminal screenshot · no fabricated command output.</p></div></article>
+      <div class="bento">
+        <article class="tile tile-wide">
+          <div class="tile-copy">
+            <h3>A guided first analysis</h3>
+            <p>The <em>New analysis</em> sheet takes an area by coordinates or drawn on the map, a period preset, and shows the exact command before it runs <code>quicklook</code>: monthly cloud-screened composites from windowed COG reads, as true colour, false colour or NDVI.</p>
+          </div>
+          <button class="shot zoom-analysis" type="button" data-image="assets/images/analysis.webp" data-caption="The New analysis sheet: area, period presets and a live command preview.">
+            <img src="assets/images/analysis.webp" alt="New analysis sheet with bounding-box fields, period presets and a command preview" width="1440" height="900" loading="lazy">
+            <span class="shot-zoom" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
+          </button>
+        </article>
 
-      <article class="interface-panel" id="panel-qgis" role="tabpanel" aria-labelledby="tab-qgis" hidden><div class="interface-image qgis-image"><img src="assets/images/qgis.png" alt="Actual QGIS 3.40 desktop with synthetic crop-class raster, parcel review outlines and GeoCrop tools in the Processing Toolbox" width="1660" height="1020" loading="lazy"><button class="image-expand" data-image="assets/images/qgis.png" data-caption="Actual QGIS 3.40.6 session with the GeoCrop Processing provider. Crop classes and parcel evidence are synthetic demonstration outputs, styled in QGIS.">View full screenshot <span aria-hidden="true">↗</span></button></div><div class="interface-copy"><span class="eyebrow">INSIDE YOUR GIS</span><h3>Bring engine results<br>into the map.</h3><p>The standalone Processing plugin calls the engine API and downloads results into fresh local directories. QGIS keeps its own Python environment.</p><ul class="check-list"><li>Run commands or a synthetic demo</li><li>Reconnect to an existing engine job</li><li>Load raster and parcel outputs as layers</li><li>Environment or QGIS-managed authentication</li></ul><a class="button secondary" href="assets/downloads/geocrop-qgis-0.1.0.zip" download>Download QGIS plugin <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/qgis.md">Installation guide <span aria-hidden="true">→</span></a><p class="capture-note">Actual QGIS screenshot · synthetic layers · QGIS Processing plugin v0.1.0.</p></div></article>
+        <article class="tile tile-dark">
+          <div class="tile-copy">
+            <h3>A terminal that knows the engine</h3>
+            <p>Live syntax colouring and completion of commands, flags, choices and workspace paths, with ghost-text hints, history search, streamed job output and <kbd>Ctrl</kbd> <kbd>C</kbd> to cancel.</p>
+          </div>
+          <button class="shot zoom-terminal" type="button" data-image="assets/images/cli.webp" data-caption="The web terminal with the completion popup open and live syntax colouring.">
+            <img src="assets/images/cli.webp" alt="Web terminal with a geocrop command being typed, coloured flags and an open completion list" width="1440" height="900" loading="lazy">
+            <span class="shot-zoom" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
+          </button>
+        </article>
 
-      <article class="interface-panel notebook-panel" id="panel-jupyter" role="tabpanel" aria-labelledby="tab-jupyter" hidden><div class="notebook-code"><div class="code-heading"><span class="code-dots" aria-hidden="true">● ● ●</span><span>geocrop_notebook.py</span><span>PYTHON</span></div><pre><code><span class="syntax-muted"># Use the token from your notebook environment.</span>
-<span class="syntax-keyword">from</span> geocrop.client <span class="syntax-keyword">import</span> EngineClient
+        <article class="tile">
+          <div class="tile-copy">
+            <h3>Every command, searchable</h3>
+            <p>Press <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd>. Forms are generated from the real CLI parser, grouped, with a live command-line preview.</p>
+          </div>
+          <button class="shot zoom-palette" type="button" data-image="assets/images/palette.webp" data-caption="The command palette, opened with Command-K or Control-K.">
+            <img src="assets/images/palette.webp" alt="Command palette listing engine commands under a search field" width="1440" height="900" loading="lazy">
+            <span class="shot-zoom" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
+          </button>
+        </article>
 
-<span class="syntax-keyword">with</span> EngineClient() <span class="syntax-keyword">as</span> engine:
-    job = engine.submit([
-        <span class="syntax-string">"indices"</span>, <span class="syntax-string">"--format"</span>, <span class="syntax-string">"json"</span>
-    ])
+        <article class="tile tile-phone">
+          <div class="tile-copy">
+            <h3>Light, dark and pocket-sized</h3>
+            <p>Follows the system appearance or your choice, respects reduced motion, and becomes a phone layout with a tab bar.</p>
+          </div>
+          <button class="shot shot-phone" type="button" data-image="assets/images/phone.webp" data-caption="Phone layout of the workspace with the map and the tab bar. Contains modified Copernicus Sentinel data 2023.">
+            <img src="assets/images/phone.webp" alt="GeoCrop workspace on a phone-sized screen with the map and the tab bar" width="390" height="844" loading="lazy">
+          </button>
+        </article>
+      </div>
+      <p class="fineprint">Actual captures of the running workspace; provenance and checksums in <a href="assets/screenshots.json">screenshots.json</a>.</p>
+    </div>
+  </section>
 
-    result = engine.wait(job[<span class="syntax-string">"id"</span>], timeout=60)
-    print(engine.logs(job[<span class="syntax-string">"id"</span>])[<span class="syntax-string">"text"</span>])</code></pre><div class="code-footer">A runnable client example, not a notebook screenshot.</div></div><div class="interface-copy"><span class="eyebrow">NOTEBOOKS & AUTOMATION</span><h3>A small client.<br>Your own analysis.</h3><p>Submit the same engine commands from Jupyter Notebook, JupyterLab or a Python script. Poll jobs, read logs and download artifacts without embedding secrets in a notebook.</p><ul class="check-list"><li>Standard HTTP job API and OpenAPI schema</li><li>Python client built on requests</li><li>Explicit success, failure and timeout handling</li><li>Server paths stay separate from local downloads</li></ul><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/examples/web_notebook.ipynb">Open the example notebook <span aria-hidden="true">→</span></a></div></article>
-    </div></section>
+  <section class="section section-alt" id="validation" aria-labelledby="validation-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Validation rigour</p>
+        <h2 id="validation-title">Accuracy you can defend.</h2>
+        <p class="section-lede">Neighbouring pixels are not independent. GeoCrop evaluates with that in mind by default, and every number traces back to the split that produced it.</p>
+      </header>
+      <div class="cards cards-3">
+        <article class="card"><svg class="icon card-icon"><use href="#i-raster"/></svg><h3>Spatial-block CV</h3><p>Class-stratified spatial blocks, optional buffers that drop training polygons near held-out pixels, leakage assertions and nested tuning.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-lock"/></svg><h3>Locked holdout</h3><p>Whole spatial blocks set aside before model selection and scored once. In holdout calibration mode the predictor stays frozen.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-globe"/></svg><h3>Transfer: LORO and LOYO</h3><p>Leave-one-region-out, leave-one-year-out and region-year CV report per-group metrics and the gap to spatial-block CV.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-sparkle"/></svg><h3>Conformal prediction sets</h3><p>Temperature-scaled probabilities and class-conditional conformal sets: an ambiguous parcel says which crops it could be.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-pin"/></svg><h3>Area of Applicability</h3><p>Flags predictions in feature space the model never saw. Parcels below the AOA threshold go to review instead of being accepted.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-check"/></svg><h3>Independent evaluation</h3><p>Field points near training polygons are excluded automatically; bootstrap CIs, area-adjusted estimates and calibration error.</p></article>
+      </div>
 
-    <section class="evidence section-shell" id="evidence" aria-labelledby="evidence-title"><div class="section-heading"><div><span class="eyebrow">EVIDENCE, WITH ITS LIMITS</span><h2 id="evidence-title">Make uncertainty<br>part of the output.</h2></div><p>A crop label is a starting point. GeoCrop keeps spatial evaluation, observation support and parcel review reasons visible.</p></div><div class="evidence-grid"><article><span class="feature-icon" aria-hidden="true">↔</span><h3>Spatial evaluation</h3><p>Keep reference polygons grouped, optionally separate sampled training and test support, and distinguish internal selection from independent field validation.</p></article><article><span class="feature-icon" aria-hidden="true">◷</span><h3>Observation support</h3><p>Inspect valid-observation counts, temporal coverage and gaps before relying on a reconstructed time series.</p></article><article><span class="feature-icon" aria-hidden="true">≋</span><h3>Inspectable parcel outcomes</h3><p>Export decision reasons, evidence warnings and applicability support. Missing requested AOA evidence leads to review.</p></article></div><aside class="research-note"><span class="research-symbol" aria-hidden="true">i</span><div><strong>Research software. Clear boundaries.</strong><p>All map and result screenshots on this page use synthetic verification data. They demonstrate software behavior, not real-world crop accuracy. Spatial holdouts do not prove exchangeability or operational coverage, and review flags are not legal findings.</p></div><a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/limitations.md">Read the limitations <span aria-hidden="true">↗</span></a></aside></section>
+      <div class="benchmark">
+        <div class="benchmark-copy">
+          <p class="eyebrow">Public benchmark · protocol v1</p>
+          <h3 id="bench-title">EuroCrops Slovenia 2021, Pomurje</h3>
+          <p>Seven crop classes, Sentinel-2 L2A, a frozen protocol file and one command to reproduce. Parcel-level scores on a spatial-block holdout with 95&nbsp;% block-bootstrap intervals.</p>
+          <p class="caveat"><svg class="icon"><use href="#i-info"/></svg><span>A public transfer task on farmers’ declarations, not field-verified labels, and <strong>not</strong> Republic of Srpska data. Valid for this protocol only; not evidence of accuracy elsewhere.</span></p>
+        </div>
+        <div class="table-wrap">
+          <table aria-labelledby="bench-title">
+            <thead><tr><th scope="col">Model</th><th scope="col">OA %</th><th scope="col">Macro&#8209;F1&nbsp;%</th><th scope="col">Coverage %<br><span>conformal, target 90</span></th></tr></thead>
+            <tbody>
+              <tr><th scope="row">rf</th><td>86.9 <span>[81.1, 92.2]</span></td><td>85.5 <span>[78.2, 91.7]</span></td><td>91.7</td></tr>
+              <tr><th scope="row">extra_trees</th><td>88.1 <span>[82.8, 93.1]</span></td><td>86.3 <span>[78.6, 92.6]</span></td><td>92.9</td></tr>
+              <tr><th scope="row">hist_gb</th><td>87.8 <span>[83.0, 92.5]</span></td><td>86.1 <span>[79.4, 91.6]</span></td><td>89.1</td></tr>
+              <tr><th scope="row">catboost</th><td>88.5 <span>[83.5, 93.2]</span></td><td>87.2 <span>[80.9, 92.7]</span></td><td>92.0</td></tr>
+            </tbody>
+          </table>
+          <p class="table-note">EuroCrops labels: Schneider et al. (2023), CC-BY-SA-4.0. Full report in <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/benchmarks/eurocrops-si-2021-pomurje.v1.md">docs/benchmarks</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <section class="start-section" id="start" aria-labelledby="start-title"><div class="section-shell start-grid"><div><span class="eyebrow">START SMALL. KEEP IT REPRODUCIBLE.</span><h2 id="start-title">Your next study<br>starts locally.</h2><p>Install GeoCrop, run a synthetic software check, then prepare your own data and independent evaluation.</p><a class="button light" href="https://github.com/ZeljkoDzafic/geocrop-engine/tree/main">Explore the repository <span aria-hidden="true">↗</span></a></div><div class="install-card"><div class="install-heading"><span>TERMINAL · QUICK START</span><button id="copy-install" class="copy-button" type="button">Copy commands</button></div><pre id="install-command"><code>git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
+  <section class="section" id="parcels" aria-labelledby="parcels-title">
+    <div class="container split">
+      <div>
+        <p class="eyebrow">Parcel decisions</p>
+        <h2 id="parcels-title">Every parcel says why.</h2>
+        <p class="section-lede">Pixel probabilities are aggregated inside an interior buffer, or parcels are classified directly from their signatures. Each parcel is accepted or sent to review with stable reason codes.</p>
+        <ul class="list">
+          <li><strong>Sentinel-2 and Sentinel-1 markers.</strong> Harvest, told apart from senescence when radar is available; tillage; dated mowing events; within-parcel homogeneity. Each with confidence and data-sufficiency fields.</li>
+          <li><strong>A traffic light for Checks by Monitoring.</strong> Optional rules can only escalate a colour, and absence rules fire only on confident, sufficient data.</li>
+          <li><strong>A review aid, not a verdict.</strong> A reason describes the configured rule, not a verified crop error or a legal finding.</li>
+        </ul>
+      </div>
+      <div class="codes">
+        <div class="codes-head"><span class="light light-green"></span><span class="light light-yellow"></span><span class="light light-red"></span><span>parcels.gpkg</span></div>
+        <dl>
+          <dt>decision_reasons</dt>
+          <dd><code>low_confidence</code> <code>low_margin</code> <code>strategies_disagree</code> <code>insufficient_valid_pixels</code> <code>aoa_below_threshold</code></dd>
+          <dt>traffic_light_reasons</dt>
+          <dd><code>conformal_discrepancy</code> <code>declaration_discrepancy</code> <code>ambiguous_prediction_set</code> <code>calendar_inconsistent</code></dd>
+          <dt>marker codes</dt>
+          <dd><code>no_harvest_evidence</code> <code>tillage_detected</code> <code>insufficient_mowing_events</code> <code>heterogeneous_parcel</code></dd>
+        </dl>
+        <p>A selection of the documented codes (<a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/parcels.md">parcels</a>, <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/markers.md">markers</a>). Semicolon-separated and not mutually exclusive.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="models" aria-labelledby="models-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Models and pretrained adapters</p>
+        <h2 id="models-title">Bring in the state of the art.<br><span class="soft">Keep the same yardstick.</span></h2>
+        <p class="section-lede">Every model and feature source runs behind the same spatial CV, ablation and prediction, so a new idea is compared on identical folds.</p>
+      </header>
+      <div class="cards cards-2">
+        <article class="card"><svg class="icon card-icon"><use href="#i-cube"/></svg><h3>Foundation-model embeddings</h3><p>An optional feature group <code>emb</code> from <strong>Presto</strong>, computed locally on the CPU from GeoCrop’s own composites, or from <strong>AlphaEarth</strong> and <strong>TESSERA</strong> annual embeddings. Ablation adds handcrafted, embeddings-only and combined rows.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-vector"/></svg><h3>Fields of The World boundaries</h3><p><code>ftw-boundaries</code> runs pretrained field-boundary models on two-window composites: CC-BY checkpoints by default, SHA-256-pinned download, watershed parcels, scored like OBIA and the U-Net.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-flow"/></svg><h3>Active learning for field campaigns</h3><p>Pick a diverse, well-spaced batch among the most uncertain parcels, grouped into trips. Ingest labels with per-round provenance, and simulate label budgets against random sampling.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-layers"/></svg><h3>Classifiers and temporal networks</h3><p>Random Forest, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN and L-TAE, plus parcel-level classification on signatures, on one benchmark harness.</p></article>
+      </div>
+      <p class="fineprint">Heavy dependencies and checkpoints are optional and fetched at runtime; nothing is bundled. Licences and attribution: <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/embeddings.md">embeddings</a>, <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/field-boundaries.md">field boundaries</a>, <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/active-learning.md">active learning</a>.</p>
+    </div>
+  </section>
+
+  <section class="section" id="reliability" aria-labelledby="reliability-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Built for real data</p>
+        <h2 id="reliability-title">Know before you run.<br><span class="soft">Prove it after.</span></h2>
+      </header>
+      <div class="stats">
+        <article class="stat"><p class="stat-label">Preflight</p><p class="stat-value">Ready, warn or blocked</p><p>Scenes per window and orbit, clear-sky coverage, class support under the spatial blocks, CRS overlap, and disk, RAM and runtime estimates before a long run starts.</p></article>
+        <article class="stat"><p class="stat-label">Acceptance · Semberija 2023</p><p class="stat-value">21 of 21 checks</p><p>One versioned run of the whole chain on real Sentinel-2 and Sentinel-1 data over about 4&nbsp;km²: radiometry, S1/S2 co-registration, reproducibility, COG, STAC and GeoParquet validity.</p></article>
+        <article class="stat"><p class="stat-label">Reliability gate</p><p class="stat-value">Killed, then recovered</p><p>A real run is killed inside features, train and predict and must recover to the uninterrupted result. Partial outputs are quarantined; a disk guard stops before writing.</p></article>
+      </div>
+      <p class="fineprint">Report: <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/acceptance/acceptance-0.10-dev-2026-10-26.md">acceptance-0.10-dev-2026-10-26</a>. The acceptance checks cover the technical integrity of the chain on that area, not crop-map accuracy.</p>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="platform" aria-labelledby="platform-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Open by architecture</p>
+        <h2 id="platform-title">One engine. Every way you work.</h2>
+        <p class="section-lede">A layered core — local logic, adapters for networks and external programs, application, interfaces — enforced by architecture tests. Extend it through plugin registries for classifiers, indices, segmenters, exporters and validators.</p>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="Interfaces">
+        <button id="tab-web" role="tab" type="button" aria-selected="true" aria-controls="panel-web" data-tab><svg class="icon"><use href="#i-map"/></svg>Web</button>
+        <button id="tab-qgis" role="tab" type="button" aria-selected="false" aria-controls="panel-qgis" tabindex="-1" data-tab><svg class="icon"><use href="#i-layers"/></svg>QGIS</button>
+        <button id="tab-jupyter" role="tab" type="button" aria-selected="false" aria-controls="panel-jupyter" tabindex="-1" data-tab><svg class="icon"><use href="#i-code"/></svg>Jupyter</button>
+        <button id="tab-rest" role="tab" type="button" aria-selected="false" aria-controls="panel-rest" tabindex="-1" data-tab><svg class="icon"><use href="#i-plug"/></svg>REST</button>
+      </div>
+
+      <article class="panel" id="panel-web" role="tabpanel" aria-labelledby="tab-web">
+        <div class="panel-copy">
+          <h3>The browser, on your machine</h3>
+          <p><code>geocrop serve</code> binds to loopback and requires a token on every API request. Jobs are queued, logged, cancellable and their outputs downloadable. Sentinel-2 cloudless and OpenStreetMap basemaps sit under the imagery.</p>
+          <a class="link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/web-interface.md">Web and API guide<svg class="icon"><use href="#i-right"/></svg></a>
+        </div>
+        <button class="shot zoom-map" type="button" data-image="assets/images/web-dark.webp" data-caption="Map view in dark appearance with a real Sentinel-2 composite. Contains modified Copernicus Sentinel data 2023.">
+          <img src="assets/images/web-dark.webp" alt="GeoCrop map view in dark appearance with Sentinel-2 imagery" width="1440" height="900" loading="lazy">
+          <span class="shot-zoom" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
+        </button>
+      </article>
+
+      <article class="panel" id="panel-qgis" role="tabpanel" aria-labelledby="tab-qgis" hidden>
+        <div class="panel-copy">
+          <h3>Inside QGIS Processing</h3>
+          <p>A standalone plugin adds run-command, demo and load-job algorithms to the Processing Toolbox. It talks to the engine API, streams logs, reconnects to jobs and loads results as layers. QGIS keeps its own Python.</p>
+          <div class="panel-actions">
+            <a class="btn btn-primary" href="assets/downloads/geocrop-qgis-0.1.0.zip" download><svg class="icon"><use href="#i-download"/></svg>QGIS plugin 0.1.0</a>
+            <a class="link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/qgis.md">Installation guide<svg class="icon"><use href="#i-right"/></svg></a>
+          </div>
+          <p class="fineprint">Apache-2.0 (<a href="LICENSE.txt">licence</a>, <a href="NOTICE.txt">notice</a>). Targets QGIS 3.28–3.x; tested in 3.40.6.</p>
+        </div>
+        <button class="shot" type="button" data-image="assets/images/qgis.png" data-caption="QGIS 3.40.6 with the GeoCrop Processing provider. Crop classes and parcel outlines are synthetic demonstration outputs.">
+          <img src="assets/images/qgis.png" alt="QGIS desktop with a synthetic crop-class raster, parcel outlines and GeoCrop tools in the Processing Toolbox" width="1660" height="1020" loading="lazy">
+          <span class="shot-zoom" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
+        </button>
+      </article>
+
+      <article class="panel" id="panel-jupyter" role="tabpanel" aria-labelledby="tab-jupyter" hidden>
+        <div class="panel-copy">
+          <h3>Notebooks and scripts</h3>
+          <p><code>EngineClient</code> submits the same commands, polls jobs, reads logs and downloads artifacts, without putting the token in the notebook. It uses <code>/api/v1</code> and falls back on older servers.</p>
+          <a class="link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/examples/web_notebook.ipynb">Example notebook<svg class="icon"><use href="#i-right"/></svg></a>
+        </div>
+        <div class="code-window">
+          <div class="code-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>notebook.py</span></div>
+<pre><code><span class="c"># GEOCROP_WEB_TOKEN comes from the environment.</span>
+<span class="k">from</span> geocrop.client <span class="k">import</span> EngineClient
+
+<span class="k">with</span> EngineClient() <span class="k">as</span> engine:
+    job = engine.submit([<span class="s">"indices"</span>, <span class="s">"--format"</span>, <span class="s">"json"</span>])
+    engine.wait(job[<span class="s">"id"</span>], timeout=<span class="n">60</span>)
+    print(engine.logs(job[<span class="s">"id"</span>])[<span class="s">"text"</span>])</code></pre>
+        </div>
+      </article>
+
+      <article class="panel" id="panel-rest" role="tabpanel" aria-labelledby="tab-rest" hidden>
+        <div class="panel-copy">
+          <h3>A versioned REST contract</h3>
+          <p>Every endpoint is served under <code>/api/v1</code>, the documented stable contract with an OpenAPI schema. Requests need a Bearer token; request bodies and job arguments are size-limited.</p>
+          <a class="link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/web-interface.md">Endpoint reference<svg class="icon"><use href="#i-right"/></svg></a>
+        </div>
+        <div class="code-window">
+          <div class="code-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>/api/v1</span></div>
+<pre><code><span class="k">GET </span> /api/v1/health
+<span class="k">GET </span> /api/v1/commands
+<span class="s">POST</span> /api/v1/jobs  <span class="c">{"argv": ["indices", "--format", "json"]}</span>
+<span class="k">GET </span> /api/v1/jobs/{id}/logs
+<span class="s">POST</span> /api/v1/jobs/{id}/cancel
+<span class="k">GET </span> /api/v1/jobs/{id}/artifacts</code></pre>
+        </div>
+      </article>
+
+      <ul class="pills" aria-label="Formats and integrations">
+        <li>COG</li><li>GeoPackage</li><li>GeoParquet</li><li>STAC</li><li>EuroCrops HCAT</li><li>openEO, optional</li><li>Docker</li><li>Run manifests</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="start" aria-labelledby="start-title">
+    <div class="container">
+      <header class="section-head">
+        <p class="eyebrow">Get started</p>
+        <h2 id="start-title">A first run in seconds.</h2>
+        <p class="section-lede">Install, run the synthetic demo, then open the workspace. Python 3.10–3.12.</p>
+      </header>
+
+      <div class="install">
+        <div class="tabs tabs-small" role="tablist" aria-label="Platform">
+          <button id="os-unix" role="tab" type="button" aria-selected="true" aria-controls="install-unix" data-tab>macOS and Linux</button>
+          <button id="os-windows" role="tab" type="button" aria-selected="false" aria-controls="install-windows" tabindex="-1" data-tab>Windows</button>
+        </div>
+        <div class="code-window" id="install-unix" role="tabpanel" aria-labelledby="os-unix">
+          <div class="code-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>Terminal</span><button class="copy" type="button" data-copy="code-unix"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre><code id="code-unix">git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
 cd geocrop-engine
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[all,web]'
-geocrop demo --root outputs/my-new-demo --quick</code></pre><p>For the browser and API, securely set a random <code>GEOCROP_WEB_TOKEN</code> of at least 32 characters, then run <code>geocrop serve --workspace . --port 8765</code>. See the <a href="#setup">full setup guide</a> for platform-specific activation and authentication.</p><span id="copy-status" role="status" aria-live="polite"></span></div></div></section>
-
-  <section class="setup section-shell" id="setup" aria-labelledby="setup-title">
-    <div class="section-heading"><div><span class="eyebrow">INSTALLATION & EVERYDAY USE</span><h2 id="setup-title">From a fresh install<br>to your first workflow.</h2></div><p>Start with the software demonstration. Connect your preferred interface, then prepare a study with your own inputs and evaluation design.</p></div>
-    <aside class="github-notice"><strong>Find the project on GitHub</strong><p>Browse the public source, read the documentation, report issues and install GeoCrop directly from the main branch.</p><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine">ZeljkoDzafic / geocrop-engine <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/tree/main">Browse the main branch <span aria-hidden="true">↗</span></a></aside>
-    <div class="setup-platforms" role="tablist" aria-label="Installation platform"><button role="tab" id="platform-unix" aria-selected="true" aria-controls="install-unix" data-platform="unix">Linux / macOS</button><button role="tab" id="platform-windows" aria-selected="false" aria-controls="install-windows" tabindex="-1" data-platform="windows">Windows PowerShell</button></div>
-    <div class="installation-panel" role="tabpanel" id="install-unix" aria-labelledby="platform-unix"><h3>1. Install the engine and web extra</h3><p>Use Git and Python 3.10–3.12, the versions covered by the engine’s CI. A virtual environment keeps the scientific dependencies separate.</p><pre><code>git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
-cd geocrop-engine
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
 python -m pip install -e '.[all,web]'
+geocrop demo --root outputs/my-first-demo --quick
 
-# Run a synthetic software check in a new output directory.
-geocrop demo --root outputs/my-new-demo --quick</code></pre><p class="setup-small">On a later terminal session, enter the repository and activate <code>.venv</code> again. The <code>all</code> extra adds the documented segmentation, STAC and Parquet dependencies; GPU/deep-learning and external cloud-mask tools remain optional.</p></div>
-    <div class="installation-panel" role="tabpanel" id="install-windows" aria-labelledby="platform-windows" hidden><h3>1. Install from PowerShell</h3><p>Install Git and Python 3.12 first. Calling the environment’s executables directly avoids changing PowerShell’s activation policy.</p><pre><code>git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
+# Workspace: first set GEOCROP_WEB_TOKEN (32+ random characters)
+geocrop serve --workspace . --port 8765</code></pre>
+        </div>
+        <div class="code-window" id="install-windows" role="tabpanel" aria-labelledby="os-windows" hidden>
+          <div class="code-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>PowerShell</span><button class="copy" type="button" data-copy="code-windows"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre><code id="code-windows">git clone https://github.com/ZeljkoDzafic/geocrop-engine.git
 cd geocrop-engine
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[all,web]"
-.\.venv\Scripts\geocrop.exe demo --root outputs\my-new-demo --quick</code></pre><p class="setup-small">Use <code>.\.venv\Scripts\geocrop.exe</code> instead of <code>geocrop</code> in the examples below, unless the environment is activated.</p></div>
-    <div class="setup-grid">
-      <article class="setup-card"><span class="setup-number">02 / BROWSER & API</span><h3>Start the local workspace</h3><p>Choose a random access token of at least 32 characters in your password/secret manager. Set it securely in the terminal session that starts the server.</p><details><summary>Linux / macOS token prompt</summary><pre><code>printf 'Paste your access token (32+ characters): '
-read -rs GEOCROP_WEB_TOKEN
-printf '\n'
-export GEOCROP_WEB_TOKEN</code></pre></details><details><summary>PowerShell token prompt</summary><pre><code>$tokenInput = Read-Host 'Access token (32+ characters)' -AsSecureString
-$env:GEOCROP_WEB_TOKEN = [System.Net.NetworkCredential]::new('', $tokenInput).Password</code></pre></details><pre><code>geocrop serve --workspace . --port 8765</code></pre><p>Open <code>http://127.0.0.1:8765</code> locally and enter the same token. The workspace provides forms, an engine command console, logs and output downloads. The token is not a command parameter or a value to commit.</p><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/web-interface.md">Full web and API guide <span aria-hidden="true">→</span></a></article>
-      <article class="setup-card"><span class="setup-number">03 / COMMAND LINE</span><h3>Run a stage or a study</h3><p>Inspect the available commands and resolve an example configuration without needing satellite data.</p><pre><code>geocrop --help
-geocrop train --help
-geocrop config-check --config configs/example.yaml</code></pre><p>For real processing, prepare imported scenes and your reference layers, then create and edit a study configuration. Fix paths, dates, classes and validation roles before running it.</p><pre><code>cp configs/example.yaml configs/my-study.yaml
-# Edit my-study.yaml for your actual study data.
-geocrop config-check --config configs/my-study.yaml
-geocrop run --config configs/my-study.yaml</code></pre><p class="setup-small">On PowerShell use <code>Copy-Item</code> instead of <code>cp</code> if needed. The pipeline reuses complete unchanged stages. Use fresh output locations when changing studies.</p><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/getting-started.md">Real-data walkthrough <span aria-hidden="true">→</span></a></article>
-      <article class="setup-card"><span class="setup-number">04 / JUPYTER</span><h3>Connect your notebook</h3><p>Install the engine in the notebook kernel environment. Set the same token securely in that environment; then use the Python client against the running server.</p><pre><code>from geocrop.client import EngineClient
+.\.venv\Scripts\geocrop.exe demo --root outputs\my-first-demo --quick
 
-with EngineClient() as engine:
-    job = engine.submit(["indices", "--format", "json"])
-    done = engine.wait(job["id"], timeout=60)
-    print(engine.logs(job["id"])["text"])</code></pre><p>JupyterLab is optional and installed separately if it is not already available. Command paths belong to the server workspace; downloaded files belong to the notebook machine.</p><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/examples/web_notebook.ipynb">Runnable notebook and downloads <span aria-hidden="true">→</span></a></article>
-      <article class="setup-card"><span class="setup-number">05 / QGIS</span><h3>Add the Processing provider</h3><ol><li>Keep the engine web server running.</li><li>Download the plugin ZIP below.</li><li>In QGIS choose <strong>Plugins → Manage and Install Plugins → Install from ZIP</strong>.</li><li>Enable <strong>GeoCrop Engine</strong> and QGIS’s built-in <strong>Processing</strong> plugin.</li><li>Open <strong>Processing Toolbox → GeoCrop Engine</strong>.</li></ol><p>Supply the token through QGIS’s process environment or an unlocked QGIS Basic authentication configuration, using its password field for the engine token. Run a command, try the synthetic demo or reconnect using a job ID.</p><a class="button secondary" href="assets/downloads/geocrop-qgis-0.1.0.zip" download>Download QGIS plugin v0.1.0 <span aria-hidden="true">↓</span></a><p class="setup-small">The plugin targets QGIS 3.28–3.x with Python 3.9+ and was tested in QGIS 3.40.6. It downloads GIS products into new local directories.</p><a class="text-link" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/qgis.md">QGIS setup and authentication <span aria-hidden="true">→</span></a></article>
+# Workspace: first set $env:GEOCROP_WEB_TOKEN (32+ random characters)
+.\.venv\Scripts\geocrop.exe serve --workspace . --port 8765</code></pre>
+        </div>
+        <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="next">
+        <a class="next-card" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/getting-started.md"><span><strong>Real-data walkthrough</strong><span>Catalogue, import, preflight and a resumable run</span></span><svg class="icon"><use href="#i-right"/></svg></a>
+        <a class="next-card" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/cli.md"><span><strong>CLI reference</strong><span>Every command and option</span></span><svg class="icon"><use href="#i-right"/></svg></a>
+        <a class="next-card" href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/limitations.md"><span><strong>Limitations</strong><span>What the results do and do not establish</span></span><svg class="icon"><use href="#i-right"/></svg></a>
+      </div>
+
+      <aside class="note">
+        <svg class="icon"><use href="#i-info"/></svg>
+        <p><strong>Research software, with clear boundaries.</strong> The demo checks software integration only; its metrics say nothing about real-world accuracy, which needs independent observations from your own study area. No satellite images, private parcel data or model weights are bundled. CDSE downloads need an account and Sentinel-1 GRD preprocessing needs ESA SNAP.</p>
+      </aside>
     </div>
-    <div class="setup-reference"><article><h3>What do I need for a real study?</h3><p>Sentinel observations or prepared scenes, a projected analysis grid, interpreted training polygons, parcel boundaries and independent validation observations. CDSE downloads need your account credentials; Sentinel-1 GRD preprocessing needs a separate ESA SNAP installation. No satellite images, private parcel data or pretrained weights are bundled.</p></article><article><h3>Where are the results?</h3><p>A demo writes beneath its <code>--root</code>. Config-driven studies use <code>paths.output</code>, plus the configured composite/feature paths. Typical products include <code>prediction/classes.tif</code>, <code>probabilities.tif</code>, <code>parcels/parcels.gpkg</code>, validation reports and run manifests. Temporal QA is stored beside the time-series stack.</p></article><article><h3>Can I use a remote server?</h3><p>Yes, through a local forwarded port. The engine UI/API binds to loopback and runs as one trusted owner. Keep tokens out of source/notebook outputs. This presentation is a separate static site and does not expose an engine server.</p></article><article><h3>What do the results establish?</h3><p>The demo checks software integration only. Real crop accuracy, calibration coverage and review workload need an independent observational evaluation. Use the input audit, retain manifests and report the study’s sampling and threshold choices.</p></article></div>
   </section>
+</main>
 
-  </main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <a class="brand" href="#top"><img src="assets/icon.svg" alt="" width="24" height="24"><span>GeoCrop <span class="brand-soft">Engine</span></span></a>
+    <nav aria-label="Footer">
+      <a href="https://github.com/ZeljkoDzafic/geocrop-engine">GitHub</a>
+      <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/index.md">Documentation</a>
+      <a href="https://github.com/ZeljkoDzafic/geocrop-engine/issues">Issues</a>
+      <a href="LICENSE.txt">Apache-2.0 licence</a>
+      <a href="NOTICE.txt">Notice</a>
+      <a href="assets/screenshots.json">Screenshot provenance</a>
+    </nav>
+    <p class="footer-note">© 2026 Željko Džafić and Dragutin Adžić. Imagery contains modified Copernicus Sentinel data 2023. Named third-party projects keep their own licences and trademarks; integration does not imply endorsement.</p>
+  </div>
+</footer>
 
-  <footer class="site-footer section-shell"><a class="brand" href="#"><img src="assets/icon.svg" alt="" width="30" height="30"><span>GeoCrop<small>ENGINE</small></span></a><p>Open satellite processing.<br>Inspectable parcel evidence.</p><div><a href="https://github.com/ZeljkoDzafic/geocrop-engine">GitHub repository</a><a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/LICENSE">Apache 2.0 license</a><a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/index.md">Documentation</a><a href="https://github.com/ZeljkoDzafic/geocrop-engine/issues">Issues & feedback</a></div><span class="footer-note">GeoCrop Engine · 2026<br><a href="assets/screenshots.json">Screenshot provenance</a></span></footer>
-
-  <dialog id="image-dialog" aria-label="Interface screenshot"><div class="dialog-top"><span>GEOCROP · ACTUAL INTERFACE CAPTURE</span><button id="close-dialog" aria-label="Close screenshot">Close <span aria-hidden="true">×</span></button></div><img id="dialog-image" src="assets/images/web.png" alt=""><p id="dialog-caption"></p></dialog>
+<dialog id="image-dialog" aria-labelledby="dialog-caption">
+  <div class="dialog-bar"><p id="dialog-caption"></p><button id="close-dialog" class="icon-button" type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button></div>
+  <img id="dialog-image" src="assets/images/web.webp" alt="">
+</dialog>
 </body>
 </html>

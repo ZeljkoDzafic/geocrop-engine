@@ -15,6 +15,27 @@
   evaluated rule with inputs/thresholds/outcome/reason code, observed vs rejected acquisitions and the interpolated
   grid, model sha256 and run-manifest reference; a self-contained strict-CSP HTML page with an inline SVG chart; a
   PNG chart; batch `index.csv`/`index.gpkg` and `evidence_manifest.json`. Byte-deterministic for identical inputs.
+- Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
+  fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
+  real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
+- External data-cube adapter (`geocrop.datacube`, docs/datacube.md): `geocrop cube load` reads Sentinel-2 L2A from
+  any STAC API through odc-stac directly onto the study grid with the same SCL screening and BOA-offset handling as
+  `stac-import` (identical scene folders on a real Semberija July 2023 run); `geocrop cube import` validates
+  xarray/Zarr/NetCDF or Open Data Cube cubes (band names, CRS, grid lattice, units/scale, nodata, UTC time) and
+  writes scene folders or window composites; `geocrop cube export` writes scenes, composites or a feature stack as
+  CF-1.8 Zarr/NetCDF. Optional `data:` config section (`source: local|odc-stac`). xarray, odc-stac, zarr and
+  netCDF4 are optional.
+- Local model and benchmark registry (`geocrop.registry`, docs/model-registry.md): `geocrop models
+  register|list|show|compare|promote|verify` stores trained models as immutable, hash-sealed entries (content
+  SHA-256, engine version and git commit, algorithm and parameters, feature manifest, input contract, classes and
+  HCAT mapping, training-data summary, CV/holdout/transfer/conformal metrics, licences of pretrained components)
+  with verified split fingerprints; `compare` refuses results scored on different folds or holdouts; stages
+  staging/production/archived in an append-only log; `geocrop predict --model registry:<name>@<version|stage>`
+  with an input-contract check against the feature stack. FTW and Presto checkpoints appear as `pretrained`
+  entries from their existing URL+SHA-256 pins. `benchmark`, `benchmark-models`, `benchmark-public`,
+  `benchmark-segmentation`, `ablation` and `transfer` runs are recorded automatically (`$GEOCROP_REGISTRY`,
+  `off` disables); `geocrop benchmarks list|show|leaderboard` ranks only runs with identical split fingerprints
+  (Markdown/CSV/JSON). `registry.overview()` gives the web layer a read-only JSON snapshot.
 - Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
   `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
   TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
