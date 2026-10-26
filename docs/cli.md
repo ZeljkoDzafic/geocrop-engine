@@ -1028,3 +1028,69 @@ Export the configured GeoCrop recipe as openEO process graphs (no credentials ne
 | `--products` |  |  | default: openeo.products of the config |
 | `--out` |  |  | output directory; default <openeo.work_dir>/graphs |
 | `--stdout` |  |  | print the openEO process objects as one JSON document |
+
+## `geocrop cube`
+
+External data cubes: load S2 via odc-stac, import xarray/Zarr/NetCDF cubes into scene or composite folders, export GeoCrop outputs as CF Zarr/NetCDF
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `cube_cmd` | yes |  |  |
+
+### `geocrop cube load`
+
+Sentinel-2 L2A from a STAC API via odc-stac onto the study grid -> scene folders (same masking/radiometry as stac-import; optional odc-stac extra)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` |  |  | defaults from data.*, grid.reference, paths.s2_scenes, compositing.scl_invalid |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference of --config) |
+| `--start` | yes |  |  |
+| `--end` | yes |  |  |
+| `--out` |  |  | scene root (default paths.s2_scenes of --config) |
+| `--endpoint` |  |  | STAC API (default data.endpoint, Earth Search) |
+| `--collection` |  |  | default data.collection, sentinel-2-l2a |
+| `--max-cloud` |  |  | tile cloud cover pre-filter (%%), default data.max_cloud |
+| `--min-clear` |  |  | minimum clear fraction inside the grid, default data.min_clear_fraction |
+| `--max-items` |  | `500` |  |
+| `--save-cube` |  |  | also write the loaded cube (.zarr or .nc) |
+| `--no-scenes` |  |  | only write --save-cube, no scene folders |
+
+### `geocrop cube import`
+
+Validate an external cube (dims time|window, y, x; bands as variables or a band dimension) and write GeoCrop scene folders or window composites
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--cube` | yes |  | .zarr store or .nc file |
+| `--reference` |  |  | study grid GeoTIFF (default grid.reference of --config) |
+| `--out` |  |  | scene root (--to scenes) or composite root (--to composites); default from config |
+| `--to` |  | `scenes` |  |
+| `--config` |  |  | windows and compositing parameters (needed for --to composites from time) |
+| `--units` |  | `auto` |  |
+| `--scale` |  |  | DN -> reflectance scale, e.g. 0.0001 |
+| `--offset` |  |  | additive offset after scaling, e.g. -0.1 (baseline >= 04.00) |
+| `--nodata` |  |  | no-data value of the band variables |
+| `--band-map` |  |  | JSON {"cube_variable": "B04", ...} for non-standard names |
+| `--crs` |  |  | CRS when the cube carries none, e.g. EPSG:32634 |
+| `--timezone` |  | `UTC` | time zone of naive timestamps (default UTC) |
+| `--assume-masked` |  |  | no SCL: NaN pixels are masked, others clear |
+| `--resample` |  |  | reproject a cube that is not on the grid lattice |
+| `--resampling` |  | `bilinear` |  |
+| `--min-clear` |  |  |  |
+| `--keep-scenes` |  |  | --to composites: keep the staged scene folders here |
+| `--overwrite` |  |  | re-write scene folders already imported |
+
+### `geocrop cube export`
+
+Write GeoCrop scene folders (time series), window composites or a feature stack as an xarray cube with CF-1.8 metadata (.zarr or .nc)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--kind` | yes |  |  |
+| `--src` |  |  | scene root, composite root or stack.tif (default from --config paths) |
+| `--out` | yes |  | .zarr or .nc |
+| `--config` |  |  | windows (composites) and default paths |
+| `--start` |  |  | scenes: first date |
+| `--end` |  |  | scenes: last date |
+| `--overwrite` |  |  |  |

@@ -2,6 +2,13 @@
 
 ## Unreleased
 ### Added
+- External data-cube adapter (`geocrop.datacube`, docs/datacube.md): `geocrop cube load` reads Sentinel-2 L2A from
+  any STAC API through odc-stac directly onto the study grid with the same SCL screening and BOA-offset handling as
+  `stac-import` (identical scene folders on a real Semberija July 2023 run); `geocrop cube import` validates
+  xarray/Zarr/NetCDF or Open Data Cube cubes (band names, CRS, grid lattice, units/scale, nodata, UTC time) and
+  writes scene folders or window composites; `geocrop cube export` writes scenes, composites or a feature stack as
+  CF-1.8 Zarr/NetCDF. Optional `data:` config section (`source: local|odc-stac`). xarray, odc-stac, zarr and
+  netCDF4 are optional.
 - Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
   `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
   TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
