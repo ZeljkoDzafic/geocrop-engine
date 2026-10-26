@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from . import indices
+from . import cbm_markers, indices
 
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
@@ -67,6 +67,10 @@ DEFAULTS: dict[str, Any] = {
         "index": "NDVI",
         "calendar": None,
         "min_coverage": 0.5,
+        # Event/homogeneity markers (geocrop.cbm_markers.EVENT_DEFAULTS) and traffic-light marker rules
+        # (RULE_DEFAULTS); rules are off by default so existing outputs are unchanged.
+        "events": copy.deepcopy(cbm_markers.EVENT_DEFAULTS),
+        "rules": copy.deepcopy(cbm_markers.RULE_DEFAULTS),
     },
     "classes": {"label_field": "class_name", "id_field": "polygon_id", "targets": []},
     "model": {
@@ -186,6 +190,11 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("compositing.statistic must be median, mean or pNN (percentile)")
     if cfg["parcels"]["strategy"] not in ("majority", "mean_probability", "combined"):
         raise ConfigError("parcels.strategy must be majority, mean_probability or combined")
+    try:
+        cbm_markers.resolve_event_params(cfg["cbm"]["events"])
+        cbm_markers.resolve_rules(cfg["cbm"]["rules"])
+    except ValueError as exc:
+        raise ConfigError(f"cbm: {exc}") from exc
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")

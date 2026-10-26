@@ -11,6 +11,14 @@
 - Tag-driven `release` workflow (version consistency check, tests, sdist + wheel, GitHub Release with CHANGELOG
   notes and checksums); `tools/check_versions.py`; pinned `constraints/py312.txt`;
   [release and rollback policy](docs/release.md).
+- Event and homogeneity markers for Checks by Monitoring (`geocrop.cbm_markers`, docs/markers.md):
+  harvest from Sentinel-2 + Sentinel-1 (separates harvest from senescence when S1 is available), tillage
+  after harvest, mowing events with dates, within-parcel homogeneity (std + Sarle's bimodality), explicit
+  confidence and data-sufficiency fields; S1 series analysed per orbit group. New `cbm.s1_signatures`,
+  `parcel_signatures(moments=True)`, `timeseries.drop_events`; CLI `s1-signatures`, `event-markers`,
+  `traffic-light`, `signatures --moments`.
+- Optional traffic-light marker rules (`cbm.rules`, off by default) with `traffic_light_reasons` reason codes
+  (`cbm.traffic_light_details`, `parcels.aggregate(marker_rules=...)`); `cbm.events` holds marker parameters.
 - Layered architecture (core / adapters / application / interface) declared in `geocrop._layers` and
   enforced by `tests/test_architecture.py` (AST import rules, no network libraries in core); ADRs in
   `docs/adr/`.
