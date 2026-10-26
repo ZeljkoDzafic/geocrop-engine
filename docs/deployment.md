@@ -11,7 +11,7 @@ The engine runs on one machine; the bottleneck is I/O and concurrent raster work
 | Fast scratch (NVMe) | 500 GB–1 TB | 2 TB |
 | Archive | 1–2 TB | 4 TB + independent copy of key results |
 | GPU | not needed | optional 12–16 GB VRAM for U-Net training only |
-| OS | Ubuntu 24.04 LTS (or macOS/Windows for development) | Ubuntu 24.04 LTS |
+| OS | Ubuntu 26.04 LTS or 24.04 LTS (or macOS/Windows for development) | Ubuntu 26.04 LTS |
 
 **Measured** ([performance](performance.md)): the full S2 + S1 chain on 1000 km² of Semberija (one season, 4
 windows, 97 features) needed 7.4 GiB peak RAM, 11.5 GiB of disk and 60 min on a 15-core laptop; extrapolated,

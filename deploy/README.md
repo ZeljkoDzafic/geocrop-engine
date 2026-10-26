@@ -1,4 +1,4 @@
-# VM runbook (Ubuntu 24.04, CPU only)
+# VM runbook (Ubuntu 26.04 or 24.04, CPU only)
 
 Recommended for the northern Republic of Srpska (~10,000 km², one season): 16 vCPU, 64 GB RAM, 2 TB local
 NVMe (`/scratch`), 2–3 TB archive (`/data`), outbound HTTPS. A pilot on one or two Sentinel-2 tiles works with

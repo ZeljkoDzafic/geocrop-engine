@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -35,7 +35,7 @@ jobs:
 
   github-release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
@@ -55,7 +55,7 @@ jobs:
   # workflow file release.yml on pypi.org, create a GitHub environment named "pypi", then uncomment.
   # pypi:
   #   needs: build
-  #   runs-on: ubuntu-latest
+  #   runs-on: ubuntu-26.04
   #   environment: pypi
   #   permissions:
   #     id-token: write
