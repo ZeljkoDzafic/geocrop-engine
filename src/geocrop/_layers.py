@@ -33,6 +33,8 @@ LAYERS: dict[str, frozenset[str]] = {
         "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
+        "calendars",     # data-driven crop calendars and phenological windows
+        "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
@@ -49,10 +51,12 @@ LAYERS: dict[str, frozenset[str]] = {
         "stac",          # STAC inventory (pystac-client)
         "stac_import",   # STAC COG import
         "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
+        "public_data",   # runtime download of public reference datasets (EuroCrops, WorldCereal calendars)
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
+        "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),

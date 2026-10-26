@@ -565,6 +565,37 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--reference", help="reference parcels: also write object-level segment metrics")
     x.add_argument("--iou", type=float, default=0.5)
 
+    # public benchmark and crop calendars (G1, G11)
+    x = cmd("benchmark-public", "Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC)")
+    x.add_argument("--protocol", required=True, help="versioned protocol YAML, e.g. configs/benchmarks/*.yaml")
+    x.add_argument("--work", required=True, help="working directory (scenes, composites, results.json/.md)")
+    x.add_argument("--cache", help="download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public")
+    x.add_argument("--models", nargs="*", help="subset of the protocol's models (default all)")
+    x.add_argument("--workers", type=int, default=4, help="parallel scene imports")
+    x.add_argument("--layer", help="local copy of the EuroCrops layer instead of the pinned download")
+    x.add_argument("--publish", help="directory to copy results.md/.json to (named after the protocol)")
+
+    x = cmd("calendar", "Derive a crop calendar and phenological windows from parcel markers, or read "
+                        "WorldCereal calendar priors")
+    x.add_argument("action", choices=["derive", "worldcereal"])
+    x.add_argument("--markers", help="derive: markers table from geocrop markers (CSV/Parquet)")
+    x.add_argument("--signatures", help="derive: parcel signatures (CSV/Parquet); markers computed with --start/--end")
+    x.add_argument("--start", help="derive with --signatures: season start (ISO date)")
+    x.add_argument("--end", help="derive with --signatures: season end (ISO date)")
+    x.add_argument("--labels", help="derive: parcels with labels (GPKG/GeoJSON/CSV)")
+    x.add_argument("--label-field", default="class_name")
+    x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--year", type=int, help="derive: year of the suggested windows")
+    x.add_argument("--percentiles", nargs=3, type=float, default=[10, 50, 90], metavar=("LOW", "MID", "HIGH"))
+    x.add_argument("--min-parcels", type=int, default=5)
+    x.add_argument("--min-days", type=int, default=30, help="derive: shortest suggested window")
+    x.add_argument("--max-windows", type=int, default=6)
+    x.add_argument("--out", help="derive: calendar YAML; worldcereal: JSON (default: print)")
+    x.add_argument("--windows-out", help="derive: suggested windows YAML snippet")
+    x.add_argument("--lon", type=float, help="worldcereal: longitude (WGS84)")
+    x.add_argument("--lat", type=float, help="worldcereal: latitude (WGS84)")
+    x.add_argument("--cache", help="worldcereal: download cache directory")
+
     x = cmd("manifest", "Write a reproducibility manifest (versions, git, hashes)")
     x.add_argument("--out", required=True)
     x.add_argument("--config")
@@ -695,6 +726,59 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--out", help="output directory; default <openeo.work_dir>/graphs")
     x.add_argument("--stdout", action="store_true", help="print the openEO process objects as one JSON document")
     return p
+
+
+def _calendar(a):
+    """`geocrop calendar derive|worldcereal` (kept out of `main` to keep the dispatch flat)."""
+    from . import calendars
+    if a.action == "worldcereal":
+        if a.lon is None or a.lat is None:
+            raise SystemExit("worldcereal needs --lon and --lat")
+        from .public_data import WORLDCEREAL_CITATION, worldcereal_calendar_files
+        priors = {"lon": a.lon, "lat": a.lat, "unit": "day of year (first season)",
+                  "priors": calendars.worldcereal_priors(worldcereal_calendar_files(cache=a.cache), a.lon, a.lat),
+                  "source": WORLDCEREAL_CITATION}
+        if a.out:
+            Path(a.out).write_text(json.dumps(priors, indent=2), encoding="utf8")
+        _print(priors)
+        return
+    import pandas as pd
+    if not a.labels or not (a.markers or a.signatures):
+        raise SystemExit("derive needs --labels and --markers (or --signatures with --start/--end)")
+    if a.markers:
+        markers = pd.read_parquet(a.markers) if a.markers.endswith(".parquet") else pd.read_csv(a.markers)
+        source = a.markers
+    else:
+        from datetime import date
+
+        from .cbm import markers as compute_markers
+        if not a.start or not a.end:
+            raise SystemExit("--signatures needs --start and --end")
+        sig = pd.read_parquet(a.signatures) if a.signatures.endswith(".parquet") else pd.read_csv(a.signatures)
+        markers = compute_markers(sig, date.fromisoformat(a.start), date.fromisoformat(a.end))
+        source = a.signatures
+    if a.labels.lower().endswith(".csv"):
+        labels = pd.read_csv(a.labels, dtype={a.id_field: str})
+    else:
+        import geopandas as gpd
+        labels = pd.DataFrame(gpd.read_file(a.labels).drop(columns="geometry"))
+    labels = labels.rename(columns={a.label_field: "class_name", a.id_field: "parcel_id"})
+    derived = calendars.derive(markers, labels[["parcel_id", "class_name"]], tuple(a.percentiles), a.min_parcels)
+    cal = calendars.to_calendar(derived)
+    text = calendars.calendar_yaml(cal, derived, source)
+    if a.out:
+        Path(a.out).write_text(text, encoding="utf8")
+    result = {"calendar": a.out or text, "classes": {k: v["n_parcels"] for k, v in derived["classes"].items()}}
+    if a.windows_out or a.year:
+        year = a.year or (int(a.start[:4]) if a.start else None)
+        if year is None:
+            raise SystemExit("Suggested windows need --year")
+        windows = calendars.suggest_windows(derived, year, a.min_days, a.max_windows)
+        snippet = calendars.windows_yaml(windows, derived, source)
+        if a.windows_out:
+            Path(a.windows_out).write_text(snippet, encoding="utf8")
+        result["windows"] = windows
+    _print(result)
 
 
 def _ftw_boundaries(a):
@@ -1170,6 +1254,21 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         t = benchmark.segmentation(a.raster, a.reference, a.out, a.bands, a.unet_model, a.unet_bands, a.tile_size,
                                    a.segments_per_km2, methods=a.methods)
         print(t.to_string(index=False))
+    elif c == "benchmark-public":
+        import shutil
+
+        from .public_benchmark import run as run_public
+        report = run_public(a.protocol, a.work, a.cache, a.models, a.workers, a.layer)
+        if a.publish:
+            dest = Path(a.publish)
+            dest.mkdir(parents=True, exist_ok=True)
+            stem = f"{report['protocol']['id']}.v{report['protocol']['version']}"
+            for suffix in ("md", "json"):
+                shutil.copyfile(Path(a.work) / f"results.{suffix}", dest / f"{stem}.{suffix}")
+        _print({"results": str(Path(a.work) / "results.json"), "protocol_sha256": report["protocol"]["sha256"],
+                "models": {k: v["status"] for k, v in report["models"].items()}})
+    elif c == "calendar":
+        _calendar(a)
     elif c == "ftw-boundaries":
         _ftw_boundaries(a)
     elif c == "manifest":

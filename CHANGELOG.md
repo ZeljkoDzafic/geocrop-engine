@@ -86,6 +86,16 @@
   cloud-screened composites), available from the CLI and the web workspace.
 - Map: true colour, false colour and NDVI for every composite and scene, compact imagery control, Sentinel-2
   cloudless (EOX) and OpenStreetMap basemaps.
+- `geocrop benchmark-public` (G1): frozen, versioned benchmark protocols (`configs/benchmarks/`) on public
+  EuroCrops parcels with Sentinel-2 from Earth Search; parcel-level OA / macro-F1 / per-class F1 with
+  block-bootstrap CIs, split-conformal coverage and set size, review burden at a target accuracy, wall time and
+  peak RSS; results JSON + Markdown (`docs/benchmarks/`). EuroCrops data are downloaded at run time (md5-pinned).
+- `geocrop.hcat` and `configs/hcat/` (G12): populated HCAT mapping and harmonisation table for the RS/BiH classes
+  (CC-BY-SA-4.0 data, attribution in `configs/hcat/LICENSE-HCAT.md`).
+- `geocrop calendar derive|worldcereal` (G11): data-driven crop calendars and suggested phenological windows from
+  parcel markers; WorldCereal crop-calendar priors (PANGAEA, runtime download, SHA-256-pinned). See
+  `docs/calendars.md`.
+- GitHub issue templates (bug report, feature request).
 - `geocrop parcel-classify` / `geocrop.parcel_classify` (gap G4): parcel-level classification on parcel
   signatures (Whittaker-smoothed mean/std series, temporal percentiles, window means, shape descriptors)
   through the same parcel-grouped spatial CV, locked holdout, calibration, conformal sets and AOA as
@@ -133,6 +143,7 @@
   subprocess-running code.
 
 ### Fixed
+- `docs/limitations.md` no longer states a fixed (stale) number of tests.
 - Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
   flattened through `estimators.predict_labels`.

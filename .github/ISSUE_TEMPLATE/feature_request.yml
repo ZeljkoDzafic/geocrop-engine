@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a new capability or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What do you want to achieve, and why is it hard with GeoCrop today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >-
+        Describe the behaviour, CLI/configuration interface or plugin (estimator, index, segmenter, exporter,
+        validator) you have in mind.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Method references and data
+      description: >-
+        Papers, standards or reference implementations (name their licences; GPL/AGPL code cannot be copied into
+        the Apache-2.0 code base), and openly licensed data that could test the feature.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this and open a pull request (see CONTRIBUTING.md).

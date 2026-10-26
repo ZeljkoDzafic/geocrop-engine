@@ -1,7 +1,8 @@
 # Scope, status and limitations
 
 ## Verified
-* Unit and integration tests (≈ 60) for every module, including SAFE radiometric import on a synthetic SAFE,
+* Automated unit and integration tests for every module (the suite under `tests/`; run `pytest` for the
+  current count, see [Testing](testing.md)), including SAFE radiometric import on a synthetic SAFE,
   shadow-projection geometry, multi-temporal cloud screening, Whittaker/phenology/harmonics, conformal coverage,
   AOA extrapolation flags, variogram range recovery, a full scene-to-traffic-light pipeline,
   same-day mosaicking, mask dilation, linear S1 compositing, feature manifest, leakage-free spatial folds,

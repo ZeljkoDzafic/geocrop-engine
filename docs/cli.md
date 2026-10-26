@@ -802,6 +802,45 @@ Pretrained Fields of The World field boundaries (CC-BY checkpoints) -> parcels
 | `--reference` |  |  | reference parcels: also write object-level segment metrics |
 | `--iou` |  | `0.5` |  |
 
+## `geocrop benchmark-public`
+
+Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--protocol` | yes |  | versioned protocol YAML, e.g. configs/benchmarks/*.yaml |
+| `--work` | yes |  | working directory (scenes, composites, results.json/.md) |
+| `--cache` |  |  | download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public |
+| `--models` |  |  | subset of the protocol's models (default all) |
+| `--workers` |  | `4` | parallel scene imports |
+| `--layer` |  |  | local copy of the EuroCrops layer instead of the pinned download |
+| `--publish` |  |  | directory to copy results.md/.json to (named after the protocol) |
+
+## `geocrop calendar`
+
+Derive a crop calendar and phenological windows from parcel markers, or read WorldCereal calendar priors
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `action` | yes |  |  |
+| `--markers` |  |  | derive: markers table from geocrop markers (CSV/Parquet) |
+| `--signatures` |  |  | derive: parcel signatures (CSV/Parquet); markers computed with --start/--end |
+| `--start` |  |  | derive with --signatures: season start (ISO date) |
+| `--end` |  |  | derive with --signatures: season end (ISO date) |
+| `--labels` |  |  | derive: parcels with labels (GPKG/GeoJSON/CSV) |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `parcel_id` |  |
+| `--year` |  |  | derive: year of the suggested windows |
+| `--percentiles` |  | `[10, 50, 90]` |  |
+| `--min-parcels` |  | `5` |  |
+| `--min-days` |  | `30` | derive: shortest suggested window |
+| `--max-windows` |  | `6` |  |
+| `--out` |  |  | derive: calendar YAML; worldcereal: JSON (default: print) |
+| `--windows-out` |  |  | derive: suggested windows YAML snippet |
+| `--lon` |  |  | worldcereal: longitude (WGS84) |
+| `--lat` |  |  | worldcereal: latitude (WGS84) |
+| `--cache` |  |  | worldcereal: download cache directory |
+
 ## `geocrop manifest`
 
 Write a reproducibility manifest (versions, git, hashes)

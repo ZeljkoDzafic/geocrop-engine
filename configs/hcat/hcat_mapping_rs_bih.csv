@@ -1,0 +1,11 @@
+class_name,hcat_code,hcat_name
+maize,3301010600,grain_maize_corn_popcorn
+soybean,3301160000,soy_soybeans
+sunflower,3301060500,sunflower
+winter_crops,3301010000,cereal
+grassland,3302000000,pasture_meadow_grassland_grass
+vegetables,3301070000,fresh_vegetables
+tobacco,3301060100,tobacco
+forest,3306000000,tree_wood_forest
+water,3399000000,not_known_and_other
+built_up,3399000000,not_known_and_other
