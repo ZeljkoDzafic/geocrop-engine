@@ -10,6 +10,7 @@ per-season sample files that share one feature manifest.
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -161,6 +162,10 @@ def polygon_window(geom, ds) -> Window | None:
     return Window(c0, r0, c1 - c0, r1 - r0)
 
 
+class SampleCoverageWarning(UserWarning):
+    """Reference polygons were skipped because none of their pixels is valid for every feature."""
+
+
 def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_field: str = "class_name",
             id_field: str = "polygon_id", max_per_polygon: int | None = 250, inner_buffer_m: float = 0.0,
             seed: int = 42, region_field: str | None = None, year_field: str | None = None,
@@ -199,6 +204,7 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             raise ValueError(f"{source}: {col!r} is empty for {int(gdf[col].isna().sum())} polygons")
     X, y, pid, xs, ys, regions, years = [], [], [], [], [], [], []
     intersecting = 0
+    emptied: dict[str, int] = {}          # class -> polygons inside the stack without any fully valid pixel
     with open_input(stack, "Feature stack") as ds:
         gdf = gdf.to_crs(ds.crs)
         if inner_buffer_m:
@@ -217,6 +223,8 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             inside = geometry_mask([geom], out_shape=cube.shape[1:], transform=transform, invert=True)
             rr, cc = np.nonzero(inside & valid_mask(cube, ds.nodata))
             if len(rr) == 0:
+                cls = str(getattr(row, label_field))
+                emptied[cls] = emptied.get(cls, 0) + 1
                 continue
             if max_per_polygon and len(rr) > max_per_polygon:
                 keep = rng.choice(len(rr), size=max_per_polygon, replace=False)
@@ -240,6 +248,14 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
                              "check the polygons' CRS and location")
         raise ValueError(f"{intersecting} {source} intersect feature stack {stack_name}, but none contains a pixel "
                          "with valid values for every feature (nodata/NaN); check the composites")
+    if emptied:
+        lost = sorted(set(emptied) - set(y))
+        warnings.warn(
+            f"{sum(emptied.values())} of {intersecting} {source} have no pixel with valid values for every feature "
+            f"(nodata/NaN) and were skipped; per class: {dict(sorted(emptied.items()))}"
+            + (f". Classes left WITHOUT any sample: {lost}" if lost else "")
+            + ". Check the composites or restrict the stack to feature groups that are valid there.",
+            SampleCoverageWarning, stacklevel=2)
     if year is not None:
         years = [str(year)] * len(y)
     return Samples(np.concatenate(X).astype("float32"), np.array(y), np.array(pid),

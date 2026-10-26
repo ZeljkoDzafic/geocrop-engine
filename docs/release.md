@@ -37,7 +37,8 @@ PATCH releases contain only bug and security fixes. Security fixes may tighten t
 
 ## Release checklist
 
-1. Start from an up-to-date `main` with a green `tests` workflow (matrix, pinned, audit, docker).
+1. Start from an up-to-date `main` with a green `tests` workflow (matrix, pinned, audit, docker) and a passing
+   [release gate](release-gate.md) report for the release commit (`tools/release_gate.py`).
 2. Run `pip-audit -r constraints/py312.txt`; resolve findings or document them in [security](security.md).
 3. Refresh the pinned set if dependencies changed (see *Reproducible installs*), and run the full suite against it.
 4. Decide the version from the CHANGELOG entries according to the policy above.

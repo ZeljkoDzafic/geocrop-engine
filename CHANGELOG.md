@@ -10,6 +10,9 @@
   EuroCrops SI 2021 and MKGP KMRS 2025 (`public_data.url_layer`, checksum-pinned runtime download).
 - `tools/scale_benchmark.py` and docs/performance.md: the real chain on 25–1000 km² of Semberija with measured
   wall/CPU time, RSS, disk and network per stage, scaling plots, regional extrapolation and VM sizing.
+- `plugin-contracts/2`: adds the `feature_providers` registry (entry-point group `geocrop.feature_providers`) and the
+  `evidence`/feature-manifest file-contract versions; existing plugin groups are unchanged (no migration needed).
+- `tools/deploy_website.sh`: manual deployment of the presentation site to Cloudflare static assets, with security headers in `website/_headers`.
 - Analyst parcel review in the web workspace (gap G7, docs/web-interface.md#review-analyst-parcel-decisions): a
   Review view with a filterable, sortable queue (traffic light, declared class, model decision, reason code,
   uncertainty, review state; J/K to move), a parcel card with declared vs predicted class, probabilities, conformal
@@ -185,6 +188,16 @@
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+- Release gate `tools/release_gate.py` (docs/release-gate.md): verifies a commit from a pristine clone in a
+  fresh venv (all extras, pinned constraints) - ruff, default/slow/network test tiers, real and offline
+  acceptance, crash recovery, Docker clean-machine proxy, combined integration study
+  (`tools/gate_integration.py`), public benchmark rerun, licence/weights audit (`tools/check_weights.py`,
+  docs/licences-and-weights.md) and plugin contracts - and writes `release_gate_report.{json,md}`;
+  `deploy/vm_acceptance.sh` runs the same gate on a fresh Ubuntu VM. Reports under docs/release-gates/.
+- Frozen plugin contract snapshot `plugin-contracts/1` (`tests/golden/plugin_contracts.json`,
+  `tests/test_plugin_contracts.py`): entry-point groups, built-in names, `Registry` API, `Segmenter` protocol,
+  `Index` record, exporter/validator signatures and file-contract versions. Changing any of them requires a new
+  snapshot version and a CHANGELOG line.
 - `geocrop run` wires in the standalone capabilities, all off by default (docs/configuration.md#optional-parts-of-geocrop-run):
   `cv.strategy` with sample region/year ids and `model/transfer_report.json`; `predict.smoothing`; an
   `embeddings` stage (`features.embeddings`, attached to the stack; network adapters imported only when
@@ -225,6 +238,13 @@
 - `geocrop preflight`: the prediction runtime now includes the single-core area-of-applicability map (~150 s
   per megapixel with ~100 features; it was under-estimated about 2x at 500 km²) and peak RAM includes ~1 GB of
   interpreter/GDAL overhead (it was under-estimated about 3x at 25 km²); see docs/performance.md.
+- LightGBM/CatBoost installed but with an unloadable native library (e.g. LightGBM without `libomp` on macOS)
+  raised `OSError` and aborted `geocrop benchmark-models`; the model is now reported as skipped with the reason.
+- `samples` silently skipped reference polygons without a pixel valid in every feature, so a whole class could
+  vanish (e.g. NaN phenology features of low-amplitude classes from `ts-features`); it now emits a
+  `SampleCoverageWarning` with the skipped polygons per class and the classes left without samples.
+- `hcat.harmonise` returned NaN instead of None for unmapped codes under pandas 3 (the version pinned in
+  `constraints/py312.txt`), failing `tests/test_public_benchmark.py` in a clean pinned install.
 - `docs/limitations.md` no longer states a fixed (stale) number of tests.
 - Cross-validation accepts estimators whose `predict` returns an `(n, 1)` array (CatBoost).
 - CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
