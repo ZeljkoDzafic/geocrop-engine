@@ -65,6 +65,10 @@ inside active windows, preserving unknown user files instead of mixing old featu
 * Stage fingerprints use SHA-256 **content** digests of inputs (large files cached by path/size/mtime in
   `<output>/.hashcache.json`; small files such as sidecars and configs are always re-hashed), the engine source
   code and the fingerprints of upstream stages (`composite → features → samples → train → predict → parcels`).
+  Optional stages and options (`embeddings`, `parcel_classify`, `cv.strategy`, `predict.smoothing`,
+  `cbm.event_markers`, `cbm.rules`, `cbm.temporal_support`, `timeseries.temporal_support`, `model.params`) enter a fingerprint only while they are enabled, so a
+  configuration that uses none of them keeps its fingerprints; the engine-code part still changes with
+  every GeoCrop version, so an upgrade recomputes the stages once.
   Touching or copying a file does not trigger reprocessing; any content, code or upstream change does.
 * `cache.hash: metadata` switches to size + mtime for raw archives too large to hash.
 * A lock file prevents two runs from writing the same output directory; `run.log` records every stage with

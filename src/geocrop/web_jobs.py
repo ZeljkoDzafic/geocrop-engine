@@ -12,6 +12,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -86,6 +87,75 @@ def validated_command(argv=None, command=None) -> list[str]:
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+#: Runs ``geocrop.cli`` in the workspace: ``python -c BOOTSTRAP <workspace> <args...>``. `os.posix_spawn` has no
+#: working-directory action before Python 3.13, so the child changes directory itself; like Popen(close_fds=True)
+#: it first closes descriptors above stderr that a native library may have left inheritable.
+_BOOTSTRAP = ("import os, sys; os.closerange(3, min(os.sysconf('SC_OPEN_MAX'), 65536)); os.chdir(sys.argv[1]); "
+              "from geocrop.cli import main; main(sys.argv[2:])")
+
+
+class SpawnedProcess:
+    """The part of `subprocess.Popen` the job worker uses, for a child started with `os.posix_spawn`.
+
+    Both the worker (waiting) and `cancel` (terminating, then waiting) may reap the child, so waiting
+    polls under a lock instead of blocking in `waitpid`.
+    """
+
+    def __init__(self, pid: int):
+        self.pid, self.returncode = pid, None
+        self._lock = threading.Lock()
+
+    def poll(self):
+        with self._lock:
+            if self.returncode is None:
+                try:
+                    pid, status = os.waitpid(self.pid, os.WNOHANG)
+                except ChildProcessError:      # reaped elsewhere; the exit status is lost
+                    self.returncode = -1
+                else:
+                    if pid:
+                        self.returncode = os.waitstatus_to_exitcode(status)
+            return self.returncode
+
+    def wait(self, timeout=None):
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self.poll() is None:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired([str(self.pid)], timeout)
+            time.sleep(0.05)
+        return self.returncode
+
+    def terminate(self):
+        os.kill(self.pid, signal.SIGTERM)
+
+    def kill(self):
+        os.kill(self.pid, signal.SIGKILL)
+
+
+def spawn(args: list[str], cwd: Path, env: dict, stdout):
+    """Start an engine job child in its own session, with stdout and stderr appended to `stdout`.
+
+    On POSIX the child is started with `os.posix_spawn`, never with fork(): this server process may hold
+    libraries with fork handlers that are unsafe in a forked child. In particular PROJ (loaded by map
+    previews through rasterio/pyproj) registers a `pthread_atfork` child handler that closes its cached
+    SQLite handle of proj.db; when proj.db was replaced on disk (for example a reinstalled pyproj), SQLite logs
+    from inside that handler and the forked child crashes with SIGSEGV before exec (every later job then
+    exited with -11). posix_spawn runs no atfork handlers. `args` is ``[python, "-m", "geocrop.cli", ...]``.
+    """
+    if os.name != "posix" or not hasattr(os, "posix_spawn"):
+        return subprocess.Popen(args, cwd=cwd, stdout=stdout, stderr=subprocess.STDOUT, env=env)
+    if args[1:3] != ["-m", "geocrop.cli"]:
+        raise ValueError("Only geocrop.cli jobs are spawned")
+    fd = stdout.fileno()
+    actions = [(os.POSIX_SPAWN_OPEN, 0, os.devnull, os.O_RDONLY, 0),
+               (os.POSIX_SPAWN_DUP2, fd, 1), (os.POSIX_SPAWN_DUP2, fd, 2)]
+    pid = os.posix_spawn(args[0], [args[0], "-c", _BOOTSTRAP, str(cwd), *args[3:]], env,
+                         file_actions=actions, setsid=True,
+                         # like Popen(restore_signals=True): signals Python ignores are not inherited as ignored
+                         setsigdef=[getattr(signal, n) for n in ("SIGPIPE", "SIGXFSZ") if hasattr(signal, n)])
+    return SpawnedProcess(pid)
 
 
 class JobManager:
@@ -214,9 +284,8 @@ class JobManager:
                     child_env["OPENBLAS_NUM_THREADS"] = child_env["OMP_NUM_THREADS"]
                     log = self.state_dir / f"{job_id}.log"
                     with log.open("ab") as output:
-                        self._process = subprocess.Popen([sys.executable, "-m", "geocrop.cli", *job["argv"]],
-                                                         cwd=self.workspace, stdout=output, stderr=subprocess.STDOUT,
-                                                         env=child_env, start_new_session=os.name == "posix")
+                        self._process = spawn([sys.executable, "-m", "geocrop.cli", *job["argv"]],
+                                              self.workspace, child_env, output)
                     self._active = job_id
                     process = self._process
                 code = process.wait()

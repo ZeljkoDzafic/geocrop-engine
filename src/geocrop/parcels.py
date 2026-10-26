@@ -139,7 +139,8 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
               min_margin: float | None = None, crop_mapping: dict | None = None,
               conformal: str | Path | dict | None = None, alpha: float = 0.1, aoa: str | Path | None = None,
               min_aoa_fraction: float = 0.5, markers: pd.DataFrame | None = None, calendar: dict | None = None,
-              marker_rules: dict | None = None) -> dict:
+              marker_rules: dict | None = None, temporal_support: pd.DataFrame | None = None,
+              temporal_rules: dict | None = None) -> dict:
     """Summarise the probability raster per parcel and write GeoPackage + CSV + summary JSON.
 
     crop_mapping   maps declaration codes to model class names (e.g. {"1101": "soybean"}).
@@ -153,6 +154,10 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
     marker_rules   enabled `cbm.rules` (see `geocrop.cbm_markers.RULE_DEFAULTS`): copies the event-marker
                    columns of `markers` (from `cbm.event_markers`), lets them escalate the traffic light and
                    adds `traffic_light_reasons`. Without it the output is unchanged.
+    temporal_support  per-parcel table from `temporal_quality.parcel_support`: its ``tq_*`` columns are
+                   copied into the output.
+    temporal_rules enabled `cbm.temporal_support` (`geocrop.temporal_quality.RULE_DEFAULTS`): weakly
+                   supported parcels are routed to review with reason codes (needs `temporal_support`).
     """
     from . import cbm
 
@@ -265,12 +270,17 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         if calendar:
             table["calendar_consistent"] = cbm.calendar_consistency(m, table["declared_class"], calendar).to_numpy()
     rules_on = marker_rules is not None and cbm.cbm_markers.resolve_rules(marker_rules)["enabled"]
-    if rules_on:
-        if markers is not None:
+    tq_on = temporal_rules is not None and cbm.temporal_quality.resolve(temporal_rules)["enabled"]
+    if temporal_support is not None:
+        ids = gdf[id_field].astype(str).reset_index(drop=True)
+        table = cbm.temporal_quality.attach(table.assign(_pid=ids.to_numpy()), temporal_support, "_pid")
+        table = table.drop(columns="_pid")
+    if rules_on or tq_on:
+        if rules_on and markers is not None:
             for col in cbm.cbm_markers.EVENT_COLUMNS:
                 if col in m:
                     table[col] = m[col].to_numpy()
-        details = cbm.traffic_light_details(table, marker_rules)
+        details = cbm.traffic_light_details(table, marker_rules, temporal_rules)
         table["traffic_light"] = details["traffic_light"].to_numpy()
         table["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
     else:
@@ -301,7 +311,7 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                                      if result["declared_class"].notna().any() else {}),
         "note": "Review flags support inspection prioritisation; they are not findings of non-compliance.",
     }
-    if rules_on:
+    if rules_on or tq_on:
         summary["traffic_light_reason_counts"] = dict(sorted(Counter(
             code for codes in table["traffic_light_reasons"] for code in codes.split(";") if code).items()))
     out.with_suffix(".summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")

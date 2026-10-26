@@ -36,6 +36,11 @@ LAYERS: dict[str, frozenset[str]] = {
         "calendars",     # data-driven crop calendars and phenological windows
         "hcat",          # EuroCrops HCAT class harmonisation
         "parcel_classify", "temporal_models",
+        "review",        # analyst parcel review: queue, evidence, append-only decisions, label export
+        "feature_providers",  # foundation-model feature-provider protocol + built-in providers (no network)
+        "galileo_encoder",    # Galileo encoder port (torch, optional)
+        "anysat_encoder",     # AnySat encoder port (torch, optional)
+        "temporal_quality",  # observed vs interpolated support, temporal-support routing rules
     }),
     # The outside world: data providers, external tools, exchange formats, remote clients.
     ADAPTERS: frozenset({
@@ -52,19 +57,22 @@ LAYERS: dict[str, frozenset[str]] = {
         "stac_import",   # STAC COG import
         "openeo_adapter",  # optional openEO back-end (CDSE): process graphs, batch jobs, contract conversion
         "public_data",   # runtime download of public reference datasets (EuroCrops, WorldCereal calendars)
+        "datacube",      # external xarray/Zarr/NetCDF cubes and optional odc-stac loading <-> file contracts
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
         "public_transfer",   # frozen-protocol public region/year transfer benchmark
+        "evidence",      # per-parcel evidence packages (JSON + HTML + PNG) and batch index
+        "registry",      # local file-based model and benchmark registry
     }),
     # Entry points. Nothing below this layer may import it.
-    INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),
+    INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map", "web_review"}),
 }
 
 #: Web modules may only be imported by the CLI (``geocrop serve``) and by each other.
-WEB_MODULES = frozenset({"web", "web_jobs", "web_map"})
+WEB_MODULES = frozenset({"web", "web_jobs", "web_map", "web_review"})
 WEB_IMPORTERS = frozenset({"cli"}) | WEB_MODULES
 
 #: Third-party libraries core modules may use: the scientific/geospatial stack and optional ML backends.
@@ -72,6 +80,7 @@ CORE_THIRD_PARTY = frozenset({
     "numpy", "scipy", "pandas", "sklearn", "joblib", "rasterio", "geopandas", "shapely", "pyproj", "affine",
     "skimage", "torch", "lightgbm", "catboost", "omnicloudmask", "segmentation_models_pytorch",
     "matplotlib",   # optional, imported lazily for figures (active_learning.plot_curves)
+    "pyarrow",      # Parquet schema reads without loading rows (review.discover)
 })
 
 #: Standard-library modules core must not use: network access and process execution belong in adapters.

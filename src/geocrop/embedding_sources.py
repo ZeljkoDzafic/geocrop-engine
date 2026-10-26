@@ -10,6 +10,11 @@ Presto inference are in the core module `geocrop.embeddings`.
   Source Cooperative (``tessera/tessera``); the georeference of each tile comes from its landmask GeoTIFF. Only
   the needed rows of each ``.npy`` file are fetched (HTTP range requests on the uncompressed array).
 * Presto - official ``default_model.pt`` from nasaharvest/presto pinned by commit URL and SHA-256.
+* Weights of every monthly feature provider (Presto, Galileo, AnySat, plugins) - `fetch_weights` downloads the
+  provider's pinned files (URL + SHA-256) into ``$GEOCROP_CACHE/<provider>/``.
+
+The pre-computed sources are also exposed as feature providers (`ALPHAEARTH`, `TESSERA`), registered by name
+in `geocrop.feature_providers`.
 """
 from __future__ import annotations
 
@@ -145,14 +150,15 @@ def alphaearth_tiles(year: int, bbox: tuple[float, float, float, float], index: 
 
 def fetch_alphaearth(reference: str | Path, output: str | Path, year: int, mirror: str = "source.coop",
                      index: str | Path | None = None, block_size: int = 1024,
-                     resampling: Resampling = Resampling.nearest) -> Path:
+                     resampling: Resampling = Resampling.nearest, names: list[str] | None = None) -> Path:
     """AlphaEarth annual embeddings (64 bands, dequantised) on the study grid, reading only COG windows."""
     with rasterio.open(reference) as ref:
         tiles = alphaearth_tiles(year, _wgs84_bounds(ref), index, mirror)
         if not tiles:
             raise ValueError(f"No AlphaEarth tiles for {year} cover the grid")
         extra = {"tiles": ";".join(t["url"] for t in tiles), "mirror": mirror, "resampling": resampling.name}
-        with rasterio.Env(**GDAL_ENV), emb.EmbeddingWriter(output, reference, "alphaearth", year, 64, extra) as sink:
+        with rasterio.Env(**GDAL_ENV), emb.EmbeddingWriter(output, reference, "alphaearth", year, 64, extra,
+                                                                 names) as sink:
             handles = [rasterio.open("/vsicurl/" + t["url"]) for t in tiles]
             handles.sort(key=lambda ds: ds.crs != ref.crs)      # same-zone tiles first (no reprojection)
             try:
@@ -235,7 +241,7 @@ def _tessera_tile(lon: float, lat: float, year: int, session: requests.Session) 
 
 
 def fetch_tessera(reference: str | Path, output: str | Path, year: int, block_size: int = 1024,
-                  resampling: Resampling = Resampling.nearest) -> Path:
+                  resampling: Resampling = Resampling.nearest, names: list[str] | None = None) -> Path:
     """TESSERA annual embeddings (128 bands, dequantised) on the study grid, fetching only needed tile rows."""
     session = _session()
     with rasterio.open(reference) as ref:
@@ -249,7 +255,7 @@ def fetch_tessera(reference: str | Path, output: str | Path, year: int, block_si
             warnings.warn(f"TESSERA tiles without coverage for {year}: {', '.join(missing)}", stacklevel=2)
         extra = {"tiles": ";".join(t["url"] for t in tiles), "missing_tiles": ";".join(missing),
                  "dataset": TESSERA_DATASET, "resampling": resampling.name}
-        with emb.EmbeddingWriter(output, reference, "tessera", year, 128, extra) as sink:
+        with emb.EmbeddingWriter(output, reference, "tessera", year, 128, extra, names) as sink:
             for w in blocks(ref.width, ref.height, block_size):
                 shape = (int(w.height), int(w.width))
                 dst_t = ref.window_transform(w)
@@ -288,35 +294,122 @@ def _pixel_lonlat(ref, window) -> tuple[np.ndarray, np.ndarray]:
     return np.asarray(lat).reshape(rows.shape), np.asarray(lon).reshape(rows.shape)
 
 
+# --------------------------------------------------------------------------- feature providers
+
+
+def fetch_weights(provider, directory: str | Path | None = None) -> Path | list[Path]:
+    """Download a provider's pinned weight files once (verified by SHA-256); one path, or a list for several."""
+    if not provider.weights:
+        raise ValueError(f"Feature provider {provider.name!r} has no weights to download")
+    root = Path(directory or cache_dir() / provider.name)
+    paths = [download(w.url, root / w.name, w.sha256) for w in provider.weights]
+    return paths[0] if len(paths) == 1 else paths
+
+
+class _Precomputed:
+    """Feature provider for published annual embeddings read on the study grid (no model, no weights)."""
+    weights: tuple = ()
+    requires_licence_ack = False
+    legacy_names = True
+
+    def __init__(self, name: str, fetch, contract):
+        info = emb.SOURCE_INFO[name]
+        self.name, self._fetch, self.contract = name, fetch, contract
+        self.dims, self.sensor, self.product = info["dims"], info["sensor"], info["product"]
+        self.licence, self.attribution, self.dequantisation = info["licence"].split(" ")[0], info["attribution"], \
+            info["dequantisation"]
+        self.code_licence = "n/a (published data)"
+
+    def load_model(self, weights=None, **_):
+        return None
+
+    def model_dims(self, model) -> int:
+        return self.dims
+
+    def embed_pixels(self, reference, output, *, year: int, block_size: int | None = None, resampling: str = "nearest",
+                     names: list[str] | None = None, **options) -> Path:
+        kw = {k: options[k] for k in ("mirror", "index") if k in options and options[k] is not None}
+        return self._fetch(reference, output, year, block_size=block_size or 1024, resampling=Resampling[resampling],
+                           names=names, **kw)
+
+    def embed_parcels(self, reference, parcels, output, *, year: int, raster: str | Path | None = None,
+                      id_field: str = "parcel_id", min_pixels: int = 1, **options):
+        """Parcel means of the pixel embeddings (``raster``, or a fresh `embed_pixels` next to ``output``)."""
+        if raster is None:
+            raster = Path(output).with_suffix(".tif")
+            self.embed_pixels(reference, raster, year=year, **options)
+        return emb.raster_parcel_means(raster, parcels, output, id_field, min_pixels=min_pixels)
+
+    def __repr__(self) -> str:
+        return f"<FeatureProvider {self.name}>"
+
+
+def _contract(sensors, bands, temporal, normalisation):
+    from .feature_providers import InputContract
+    return InputContract(kind="precomputed", sensors=sensors, bands=bands, temporal=temporal,
+                         normalisation=normalisation)
+
+
+ALPHAEARTH = _Precomputed("alphaearth", fetch_alphaearth, _contract(
+    ("AlphaEarth Foundations (Sentinel-1/2, Landsat and other inputs, producer side)",),
+    tuple(f"A{i:02d}" for i in range(64)), "annual (2017-2025)",
+    "int8 dequantised ((q / 127.5) ** 2) * sign(q); unit-length vectors"))
+TESSERA = _Precomputed("tessera", fetch_tessera, _contract(
+    ("TESSERA (Sentinel-1/2, producer side)",), tuple(f"D{i:03d}" for i in range(128)),
+    "annual (coverage varies by year and tile)", "int8 * float32 per-pixel scales"))
+
+
 # --------------------------------------------------------------------------- one entry point
 
 
 def extract(source: str, reference: str | Path, out_dir: str | Path, year: int, monthly: str | Path | None = None,
             start: str | None = None, months: int = 12, parcels: str | Path | None = None,
             id_field: str = "parcel_id", checkpoint: str | Path | None = None, mirror: str = "source.coop",
-            index: str | Path | None = None, resampling: str = "nearest", block_size: int | None = None) -> dict:
-    """Produce ``out_dir/<source>_<year>.tif`` (and, for Presto with parcels, ``<...>_parcels.csv``)."""
-    rs = Resampling[resampling]
+            index: str | Path | None = None, resampling: str = "nearest", block_size: int | None = None,
+            namespace: bool | None = None, allow_license: list[str] | tuple[str, ...] | None = None) -> dict:
+    """Produce ``out_dir/<source>_<year>.tif`` with any registered feature provider (and, with parcels,
+    ``<source>_<year>_parcels.csv``). `namespace` forces ``emb_<source>_NN`` (True) or legacy ``emb_NN`` (False)
+    feature names; by default only new providers are namespaced. `allow_license` acknowledges licence ids of
+    providers that are not permissive."""
+    from . import feature_providers as fp
+
+    provider = fp.get(source)
+    fp.check_licence(provider, allow_license)
     target = emb.output_path(out_dir, source, year)
+    names = fp.feature_names(provider, namespace=namespace)
     result: dict = {"source": source, "year": int(year)}
-    if source == "alphaearth":
-        fetch_alphaearth(reference, target, year, mirror, index, block_size or 1024, rs)
-    elif source == "tessera":
-        fetch_tessera(reference, target, year, block_size or 1024, rs)
-    else:
-        if monthly is None:
-            raise ValueError("Presto needs monthly composites (embeddings.monthly / --monthly)")
-        start = start or f"{int(year)}-01"
-        ckpt = Path(checkpoint) if checkpoint else presto_checkpoint()
-        model = emb.load_presto(ckpt)
-        extra = {"checkpoint_url": PRESTO_CHECKPOINT["url"], "checkpoint_sha256": PRESTO_CHECKPOINT["sha256"]} \
-            if not checkpoint else {"checkpoint": str(checkpoint)}
-        emb.presto_pixels(monthly, reference, target, start, months, model=model, block_size=block_size or 256,
-                          extra=extra)
+    if provider.contract.kind == "precomputed":
+        rs = Resampling[resampling].name
+        provider.embed_pixels(reference, target, year=year, block_size=block_size, resampling=rs, mirror=mirror,
+                              index=index, names=names)
         if parcels:
             table = target.with_name(target.stem + "_parcels.csv")
-            emb.presto_parcels(monthly, reference, parcels, table, start, months, id_field, model=model)
+            provider.embed_parcels(reference, parcels, table, year=year, raster=target, id_field=id_field)
+            result["parcels"] = str(table)
+    else:
+        if monthly is None:
+            raise ValueError(f"{source} needs monthly composites (embeddings.monthly / --monthly)")
+        start = start or f"{int(year)}-01"
+        if checkpoint:
+            weights = [Path(p) for p in checkpoint] if isinstance(checkpoint, (list, tuple)) else Path(checkpoint)
+            extra = {"checkpoint": str(checkpoint)}
+        else:
+            weights = presto_checkpoint() if source == "presto" else fetch_weights(provider)
+            extra = {"checkpoint_url": PRESTO_CHECKPOINT["url"], "checkpoint_sha256": PRESTO_CHECKPOINT["sha256"]} \
+                if source == "presto" else {"checkpoint_url": ";".join(w.url for w in provider.weights),
+                                            "checkpoint_sha256": ";".join(w.sha256 for w in provider.weights)}
+        model = provider.load_model(weights)
+        names = fp.feature_names(provider, provider.model_dims(model), namespace)
+        common = {"monthly": monthly, "start": start, "months": months, "model": model, "names": names}
+        if block_size:
+            common["block_size"] = block_size
+        provider.embed_pixels(reference, target, extra=extra, **common)
+        if parcels:
+            table = target.with_name(target.stem + "_parcels.csv")
+            common.pop("block_size", None)
+            provider.embed_parcels(reference, parcels, table, id_field=id_field, **common)
             result["parcels"] = str(table)
     result["raster"] = str(target)
+    result["feature_names"] = f"{names[0]} ... {names[-1]}"
     result["summary"] = emb.summary(target)
     return result

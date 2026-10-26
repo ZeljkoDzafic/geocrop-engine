@@ -13,6 +13,7 @@
   <script defer src="/static/vendor/leaflet/leaflet.js"></script>
   <script defer src="/static/map.js"></script>
   <script defer src="/static/app.js"></script>
+  <script defer src="/static/review.js"></script>
   <script defer src="/static/terminal.js"></script>
 </head>
 <body>
@@ -51,6 +52,12 @@
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.4 2.6 6.9 7.5 8.5-4.9 1.6-6.9 4.1-7.5 8.5-.6-4.4-2.6-6.9-7.5-8.5 4.9-1.6 6.9-4.1 7.5-8.5Z"/></symbol>
   <symbol id="i-satellite" viewBox="0 0 24 24"><path d="m9.5 9.5 5 5m-8-8 3 3-3 3-3-3Zm11 11-3-3 3-3 3 3ZM12 12l2-2"/><path d="M15.5 4.5a4 4 0 0 1 4 4m-4-1.5a1.5 1.5 0 0 1 1.5 1.5"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M7.5 10.5v9h-3v-9Zm0 0 4-6.5c1.6 0 2.4 1 2 2.6l-.8 3.4h5.1a2 2 0 0 1 2 2.4l-1.3 6a2 2 0 0 1-2 1.6H7.5"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M5 8.5h13m-3.5-3.5L18 8.5 14.5 12M19 15.5H6m3.5 3.5L6 15.5 9.5 12"/></symbol>
+  <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .9-1 1.6v.5m0 2.8v.2"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10m-7 6h4"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4m-4.5 4.5L12 4l4.5 4.5M5 13v5.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V13"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5"/></symbol>
 </svg>
 
@@ -71,7 +78,8 @@
       <button class="nav-item" type="button" data-view="commands"><svg class="icon"><use href="#i-command"/></svg><span>Commands</span><kbd>2</kbd></button>
       <button class="nav-item" type="button" data-view="jobs"><svg class="icon"><use href="#i-jobs"/></svg><span>Jobs</span><span id="jobs-badge" class="nav-badge" hidden></span><kbd>3</kbd></button>
       <button class="nav-item" type="button" data-view="terminal"><svg class="icon"><use href="#i-terminal"/></svg><span>Terminal</span><kbd>4</kbd></button>
-      <button class="nav-item" type="button" data-view="api"><svg class="icon"><use href="#i-code"/></svg><span>Python &amp; API</span><kbd>5</kbd></button>
+      <button class="nav-item" type="button" data-view="review"><svg class="icon"><use href="#i-review"/></svg><span>Review</span><kbd>5</kbd></button>
+      <button class="nav-item" type="button" data-view="api"><svg class="icon"><use href="#i-code"/></svg><span>Python &amp; API</span><kbd>6</kbd></button>
     </nav>
     <section class="recent" aria-labelledby="recent-title">
       <header class="section-header"><h2 id="recent-title">Recent jobs</h2>
@@ -175,6 +183,7 @@
             </section>
           </aside>
         </div>
+        <div id="map-home" hidden></div>
         <p id="map-status" class="caption" role="status">Select a finished job to see its outputs on the map.</p>
 
         <div id="detail-slot-map" class="detail-slot">
@@ -252,6 +261,140 @@
         <div id="terminal-root"></div>
       </section>
 
+
+      <!-- Review -->
+      <section id="view-review" class="view" hidden>
+        <div id="review-empty" class="card review-empty">
+          <div class="empty-icon"><svg class="icon"><use href="#i-review"/></svg></div>
+          <h2 id="review-empty-title">Review parcels of a finished job</h2>
+          <p id="review-empty-text" class="muted">Select a finished parcel job — the synthetic demo, a run with parcels, <code>parcels</code> or <code>traffic-light</code> — to walk its parcels one by one, see the evidence and record agree, disagree or can't tell.</p>
+          <div class="empty-actions"><button id="review-demo" class="btn btn-secondary" type="button"><svg class="icon"><use href="#i-sparkle"/></svg>Run the synthetic demo</button></div>
+        </div>
+
+        <div id="review-main" class="review" hidden>
+          <header class="card review-bar">
+            <div class="review-progress">
+              <div class="review-progress-text"><strong id="review-count">0</strong><span id="review-total">of 0 reviewed</span></div>
+              <div id="review-meter" class="review-meter" role="img" aria-label="Review progress"><i data-k="agree"></i><i data-k="disagree"></i><i data-k="unsure"></i></div>
+              <div id="review-tally" class="review-tally"></div>
+            </div>
+            <div class="review-filters" role="group" aria-label="Filters">
+              <div id="filter-light" class="segmented segmented-small" role="radiogroup" aria-label="Traffic light"></div>
+              <label class="sr-only" for="filter-state">Review state</label>
+              <select id="filter-state" class="compact-select"><option value="pending">To review</option><option value="done">Reviewed</option><option value="all">All parcels</option></select>
+              <label class="sr-only" for="filter-class">Declared class</label>
+              <select id="filter-class" class="compact-select"><option value="">Any declared class</option></select>
+              <label class="sr-only" for="filter-reason">Reason code</label>
+              <select id="filter-reason" class="compact-select"><option value="">Any reason</option></select>
+              <label class="sr-only" for="filter-uncertainty">Uncertainty</label>
+              <select id="filter-uncertainty" class="compact-select"><option value="">Any certainty</option><option value="set">Ambiguous conformal set</option><option value="0.6">Confidence below 0.6</option><option value="0.8">Confidence below 0.8</option></select>
+              <label class="sr-only" for="filter-decision">Model decision</label>
+              <select id="filter-decision" class="compact-select" hidden><option value="">Any model decision</option></select>
+            </div>
+            <div class="review-bar-actions">
+              <button id="review-export" class="btn btn-secondary btn-small" type="button"><svg class="icon"><use href="#i-export"/></svg>Export labels</button>
+            </div>
+          </header>
+
+          <div class="review-grid">
+            <aside class="card review-queue" aria-label="Parcel queue">
+              <div class="queue-head">
+                <div class="search-field queue-search"><svg class="icon"><use href="#i-search"/></svg><label class="sr-only" for="queue-search">Find a parcel</label><input id="queue-search" type="search" placeholder="Parcel id" autocomplete="off" spellcheck="false"></div>
+                <label class="sr-only" for="queue-sort">Sort</label>
+                <select id="queue-sort" class="compact-select" title="Sort">
+                  <option value="priority">Priority</option><option value="confidence">Confidence</option><option value="entropy:desc">Entropy</option>
+                  <option value="margin">Margin</option><option value="area_m2:desc">Area</option><option value="parcel_id">Parcel id</option>
+                </select>
+              </div>
+              <p id="queue-summary" class="queue-summary" role="status"></p>
+              <ul id="queue" class="queue" role="listbox" aria-label="Parcels" tabindex="0"></ul>
+              <footer class="queue-foot"><button id="queue-more" class="btn btn-plain btn-small" type="button" hidden>Load more</button><span class="queue-keys"><kbd>J</kbd><kbd>K</kbd> move</span></footer>
+            </aside>
+
+            <article id="parcel-card" class="card parcel-card" aria-labelledby="parcel-title">
+              <header class="parcel-head">
+                <div class="parcel-heading">
+                  <span class="eyebrow" id="parcel-eyebrow">Parcel</span>
+                  <div class="parcel-title-row"><h2 id="parcel-title">—</h2><span id="parcel-light" class="light-pill" hidden></span><span id="parcel-reviewed" class="pill" hidden></span></div>
+                </div>
+                <div class="parcel-nav">
+                  <button id="parcel-prev" class="icon-button" type="button" aria-label="Previous parcel" title="Previous parcel (K)"><svg class="icon"><use href="#i-left"/></svg></button>
+                  <span id="parcel-position" class="parcel-position"></span>
+                  <button id="parcel-next" class="icon-button" type="button" aria-label="Next parcel" title="Next parcel (J)"><svg class="icon"><use href="#i-right"/></svg></button>
+                </div>
+              </header>
+
+              <div class="verdict">
+                <div class="verdict-cell"><span>Declared</span><strong id="parcel-declared">—</strong></div>
+                <div class="verdict-arrow" id="verdict-arrow" aria-hidden="true"><svg class="icon"><use href="#i-right"/></svg></div>
+                <div class="verdict-cell"><span>Predicted</span><strong id="parcel-predicted">—</strong></div>
+                <div class="verdict-cell verdict-meta"><span>Confidence</span><strong id="parcel-confidence">—</strong></div>
+                <div class="verdict-cell verdict-meta"><span>Conformal set</span><strong id="parcel-set">—</strong></div>
+              </div>
+              <div class="reason-row">
+                <ul id="parcel-reasons" class="reason-pills" aria-label="Reason codes"></ul>
+                <button id="parcel-evidence" class="btn btn-plain btn-small" type="button" hidden title="Download the parcel's evidence package (geocrop evidence)"><svg class="icon"><use href="#i-doc"/></svg>Evidence package</button>
+              </div>
+
+              <div class="parcel-body">
+                <section class="parcel-map-wrap" aria-label="Parcel on the map"><div id="review-map-slot" class="review-map-slot"></div></section>
+                <section class="evidence-block probs-block" aria-labelledby="probs-title">
+                  <h3 id="probs-title">Class probabilities</h3>
+                  <ul id="parcel-probs" class="prob-list"></ul>
+                  <p class="muted small" id="probs-note"></p>
+                </section>
+              </div>
+
+              <section class="evidence-block" aria-labelledby="ts-title">
+                <div class="block-head"><h3 id="ts-title">Time series</h3><span id="ts-source" class="muted small"></span></div>
+                <div id="ts-chart" class="ts-chart"></div>
+              </section>
+
+              <section class="evidence-block" aria-labelledby="chips-title">
+                <div class="block-head"><h3 id="chips-title">Imagery</h3>
+                  <div id="chips-kind" class="segmented segmented-small" role="radiogroup" aria-label="Chip product">
+                    <button type="button" role="radio" data-value="true" aria-checked="true">True colour</button><button type="button" role="radio" data-value="ndvi" aria-checked="false" tabindex="-1">NDVI</button>
+                  </div>
+                </div>
+                <div id="chips" class="filmstrip" aria-live="polite"></div>
+              </section>
+
+              <div class="parcel-more">
+                <details class="evidence-block disclosure" id="markers-block"><summary><svg class="icon chevron"><use href="#i-right"/></svg>Markers <span id="markers-count" class="count"></span></summary><dl id="parcel-markers" class="kv-grid"></dl></details>
+                <details class="evidence-block disclosure"><summary><svg class="icon chevron"><use href="#i-right"/></svg>All attributes <span id="attrs-count" class="count"></span></summary><dl id="parcel-attrs" class="kv-grid"></dl></details>
+                <details class="evidence-block disclosure" id="history-block" hidden><summary><svg class="icon chevron"><use href="#i-right"/></svg>Decision history <span id="history-count" class="count"></span></summary><ol id="parcel-history" class="history"></ol></details>
+              </div>
+
+              <form id="decide" class="decide" novalidate>
+                <div class="decide-row decide-actions" role="group" aria-label="Decision">
+                  <button type="button" class="decide-btn" data-decision="agree" id="decide-agree"><svg class="icon"><use href="#i-thumbup"/></svg><span>Agree</span><kbd>A</kbd></button>
+                  <button type="button" class="decide-btn" data-decision="disagree" id="decide-disagree"><svg class="icon"><use href="#i-swap"/></svg><span>Disagree</span><kbd>D</kbd></button>
+                  <button type="button" class="decide-btn" data-decision="unsure" id="decide-unsure"><svg class="icon"><use href="#i-question"/></svg><span>Can't tell</span><kbd>U</kbd></button>
+                </div>
+                <div id="decide-correct" class="decide-row decide-correct" hidden>
+                  <label for="decide-class">Correct class</label>
+                  <select id="decide-class"></select>
+                  <input id="decide-new-class" placeholder="Other class name" autocomplete="off" spellcheck="false" hidden maxlength="64">
+                  <button id="decide-save" class="btn btn-primary btn-small" type="submit">Save disagreement <kbd class="kbd-on-accent">↵</kbd></button>
+                </div>
+                <button id="decide-summary" class="decide-summary" type="button" aria-controls="decide-meta"></button>
+                <div class="decide-row decide-meta" id="decide-meta">
+                  <label class="sr-only" for="decide-comment">Comment</label>
+                  <input id="decide-comment" placeholder="Comment (optional)" autocomplete="off" maxlength="2000">
+                  <label class="sr-only" for="decide-analyst">Analyst</label>
+                  <input id="decide-analyst" class="analyst-input" placeholder="Analyst" autocomplete="off" maxlength="80">
+                  <div id="decide-purpose" class="segmented segmented-small" role="radiogroup" aria-label="Purpose of the label">
+                    <button type="button" role="radio" data-value="training" aria-checked="false">Training</button><button type="button" role="radio" data-value="validation" aria-checked="false" tabindex="-1">Validation</button>
+                  </div>
+                </div>
+                <p id="decide-error" class="form-error" role="alert"></p>
+              </form>
+            </article>
+          </div>
+          <p class="fineprint">Decisions are appended to <code id="review-path">review/decisions.csv</code> in the job's output folder with analyst, UTC time and model SHA-256. Analyst labels feed <code>geocrop active-learning ingest</code>; they are not a probability sample and must not be used to estimate map accuracy or area. Chips are downsampled crops; one stretch is shared by all dates.</p>
+        </div>
+      </section>
+
       <!-- Python & API -->
       <section id="view-api" class="view" hidden>
         <div class="api-grid">
@@ -289,6 +432,7 @@ Content-Type: application/json
     <button class="tab-item" type="button" data-view="commands"><svg class="icon"><use href="#i-command"/></svg><span>Commands</span></button>
     <button class="tab-item" type="button" data-view="jobs"><svg class="icon"><use href="#i-jobs"/></svg><span>Jobs</span></button>
     <button class="tab-item" type="button" data-view="terminal"><svg class="icon"><use href="#i-terminal"/></svg><span>Terminal</span></button>
+    <button class="tab-item" type="button" data-view="review"><svg class="icon"><use href="#i-review"/></svg><span>Review</span></button>
     <button class="tab-item" type="button" data-view="api"><svg class="icon"><use href="#i-code"/></svg><span>API</span></button>
   </nav>
 </div>
@@ -375,14 +519,44 @@ Content-Type: application/json
     <dl class="shortcut-list">
       <div><dt><kbd data-mod-key>⌘K</kbd></dt><dd>Search commands and actions</dd></div>
       <div><dt><kbd>N</kbd></dt><dd>New analysis</dd></div>
-      <div><dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Map, Commands, Jobs, Terminal, Python &amp; API</dd></div>
+      <div><dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Map, Commands, Jobs, Terminal, Review, Python &amp; API</dd></div>
       <div><dt><kbd>F</kbd></dt><dd>Expand or restore the map</dd></div>
       <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next imagery date</dd></div>
-      <div><dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next / previous job</dd></div>
+      <div><dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next / previous job (in Review: parcel)</dd></div>
+      <div><dt><kbd>A</kbd> <kbd>D</kbd> <kbd>U</kbd></dt><dd>Review: agree, disagree, can't tell</dd></div>
       <div><dt><kbd>?</kbd></dt><dd>Show this overview</dd></div>
       <div><dt><kbd>esc</kbd></dt><dd>Close a sheet or leave the expanded map</dd></div>
     </dl>
   </div>
+</dialog>
+
+
+<!-- Export review labels -->
+<dialog id="export-sheet" class="sheet-dialog" aria-labelledby="export-title">
+  <form id="export-form" class="sheet analysis" novalidate>
+    <header class="sheet-header">
+      <div><h2 id="export-title">Export labels</h2><p class="muted small">A label table for <code>geocrop active-learning ingest</code>, written next to the decisions</p></div>
+      <button id="export-close" class="icon-button" type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="step">
+      <p class="step-lead">Which decisions? Training labels go into the next round; validation labels are kept apart by ingest and never enter training.</p>
+      <div id="export-purpose" class="segmented" role="radiogroup" aria-label="Purpose">
+        <button type="button" role="radio" data-value="training" aria-checked="true">Training</button><button type="button" role="radio" data-value="validation" aria-checked="false" tabindex="-1">Validation</button>
+      </div>
+      <label class="field-label" for="export-round">Active-learning round</label>
+      <input id="export-round" type="number" min="0" max="100000" step="1" inputmode="numeric" value="1">
+      <div id="export-result" class="export-result" hidden>
+        <dl class="summary"><div><dt>File</dt><dd id="export-path">—</dd></div><div><dt>Rows</dt><dd id="export-rows">—</dd></div></dl>
+        <div class="preview" id="export-command-wrap"><span class="preview-label">Next step</span><code id="export-command"></code><button id="export-copy" class="icon-button" type="button" aria-label="Copy command" title="Copy"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+      </div>
+    </div>
+    <p id="export-error" class="form-error" role="alert"></p>
+    <footer class="sheet-footer">
+      <button id="export-download" class="btn btn-plain" type="button" hidden><svg class="icon"><use href="#i-download"/></svg>Download CSV</button>
+      <span class="spacer"></span>
+      <button id="export-run" class="btn btn-primary" type="submit">Write label table</button>
+    </footer>
+  </form>
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>

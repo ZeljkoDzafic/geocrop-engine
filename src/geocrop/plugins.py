@@ -1,4 +1,5 @@
-"""Plugin registries: extend GeoCrop with classifiers, indices, segmenters, exporters and validators.
+"""Plugin registries: extend GeoCrop with classifiers, indices, segmenters, exporters, validators and
+foundation-model feature providers.
 
 Third-party packages declare entry points in their ``pyproject.toml``; GeoCrop finds them with
 ``importlib.metadata`` the first time a name is looked up that is not built in (lazy discovery). Built-ins
@@ -24,6 +25,12 @@ segmenters    ``geocrop.segmenters`` an object (or a zero-argument class) satisf
 exporters     ``geocrop.exporters``  ``export(source, destination, **options) -> Path | dict``.
 validators    ``geocrop.validators`` ``validate(path, **options) -> dict`` with a ``problems`` list
                                      (empty when the input passes).
+feature_      ``geocrop.feature_     an object (or a zero-argument class) satisfying
+providers     providers``            ``geocrop.feature_providers.FeatureProvider``: ``name`` (equal to
+                                     the entry-point name), ``dims``, ``licence``, ``weights`` (pinned
+                                     URL + sha256), ``contract`` (input contract), ``load_model``,
+                                     ``embed_pixels`` and ``embed_parcels``. Selected with
+                                     ``features.embeddings.source`` / ``geocrop embeddings --source``.
 ============  =====================  ==============================================================
 
 A plugin that fails to import or violates its contract is skipped with a ``PluginWarning``; it never
@@ -155,6 +162,11 @@ class Registry:
         self.discover()
         return list(dict.fromkeys([*self._items, *self._lazy]))
 
+    def declared_names(self) -> list[str]:
+        """Names registered so far plus entry-point names, without importing any plugin or the built-in provider
+        (cheap enough for command-line choices; `names` loads everything)."""
+        return list(dict.fromkeys([*self._items, *self._lazy, *(ep.name for ep in _entry_points(self.group))]))
+
     def source(self, name: str) -> str:
         self.get(name)
         return self._sources[name]
@@ -198,11 +210,26 @@ def _segmenter(name: str, obj: Any) -> Any:
     return obj
 
 
+def _feature_provider(name: str, obj: Any) -> Any:
+    if isinstance(obj, type):
+        obj = obj()
+    required = ("name", "dims", "licence", "weights", "contract", "load_model", "embed_pixels", "embed_parcels")
+    missing = [a for a in required if not hasattr(obj, a)]
+    if missing:
+        raise TypeError(f"feature provider {name!r} must satisfy geocrop.feature_providers.FeatureProvider; "
+                        f"missing {missing}")
+    if obj.name != name:
+        raise ValueError(f"feature provider registered as {name!r} is named {obj.name!r}; the names must match")
+    return obj
+
+
 estimators = Registry("estimator", "geocrop.estimators", _callable("estimator factory"), provider="geocrop.estimators")
 indices = Registry("index", "geocrop.indices", _index, provider="geocrop.indices")
 segmenters = Registry("segmenter", "geocrop.segmenters", _segmenter, provider="geocrop.segmenters")
 exporters = Registry("exporter", "geocrop.exporters", _callable("exporter"))
 validators = Registry("validator", "geocrop.validators", _callable("validator"))
+feature_providers = Registry("feature provider", "geocrop.feature_providers", _feature_provider,
+                             provider="geocrop.feature_providers")
 
 # Built-ins implemented outside the core are named, not imported: they load on first use.
 exporters.register_lazy("cog", "geocrop.export:to_cog")
@@ -211,7 +238,8 @@ validators.register_lazy("raster", "geocrop.provenance:check_raster")
 validators.register_lazy("vector", "geocrop.provenance:check_vector")
 
 REGISTRIES: dict[str, Registry] = {"estimators": estimators, "indices": indices, "segmenters": segmenters,
-                                   "exporters": exporters, "validators": validators}
+                                   "exporters": exporters, "validators": validators,
+                                   "feature_providers": feature_providers}
 
 
 def describe() -> dict[str, dict[str, str]]:

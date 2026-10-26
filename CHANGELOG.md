@@ -10,6 +10,59 @@
   EuroCrops SI 2021 and MKGP KMRS 2025 (`public_data.url_layer`, checksum-pinned runtime download).
 - `tools/scale_benchmark.py` and docs/performance.md: the real chain on 25–1000 km² of Semberija with measured
   wall/CPU time, RSS, disk and network per stage, scaling plots, regional extrapolation and VM sizing.
+- Analyst parcel review in the web workspace (gap G7, docs/web-interface.md#review-analyst-parcel-decisions): a
+  Review view with a filterable, sortable queue (traffic light, declared class, model decision, reason code,
+  uncertainty, review state; J/K to move), a parcel card with declared vs predicted class, probabilities, conformal
+  set, reason pills, markers, the parcel outlined on the map, an inline-SVG time series (S2 indices, S1 dB from
+  signature tables, or parcel means from the job's imagery) and true-colour/NDVI chips per date; A/D/U record
+  agree / disagree with corrected class / can't tell with an explicit training or validation purpose into an
+  append-only `review/decisions.csv` (analyst, UTC time, model SHA-256), exported as an `active-learning ingest`
+  label table. Core logic in `geocrop.review`, routes in `geocrop.web_review` (authenticated, `/api/v1` aliases,
+  workspace-confined, no client-supplied paths). Parcels with a `geocrop evidence` package get its triggered rules
+  as reason pills, a download of the package page and, without signatures, its observed/interpolated series.
+- Feature-provider adapter interface for foundation-model embeddings (`geocrop.feature_providers`, plugin
+  registry `geocrop.plugins.feature_providers`, entry-point group `geocrop.feature_providers`): name, licence,
+  pinned weights (URL + SHA-256), input contract, `embed_pixels` / `embed_parcels`. AlphaEarth, TESSERA and
+  Presto now implement it (unchanged output); new providers `galileo` (Galileo-nano, MIT, encoder port verified
+  against the official code, max abs diff 1.2e-7) and `anysat` (AnySat base, MIT, s2 inference port, max abs
+  diff 0.0 per tile). Features are namespaced `emb_<provider>_NN` so several providers fit in one stack
+  (`features.embeddings.source` accepts a list; `namespace`, `allow_license` keys; `geocrop embeddings
+  --source a b`, `--namespace`, `--allow-license`, `--list`); legacy `emb_NN` stacks stay readable and a second
+  legacy source is attached under namespaced names. Parcel tables for pre-computed sources (parcel means).
+- Temporal quality (`geocrop.temporal_quality`, docs/temporal-quality.md): observed vs interpolated support per
+  pixel (`ts-features --temporal-support` writes `<stack>_temporal_support.tif` + versioned manifest: clear
+  observations, longest gap, season coverage, distance of SOS/peak/EOS to the nearest clear acquisition, gap at the
+  peak, interpolation-dependent feature share) and per parcel (`geocrop temporal-support`, `tq_*` columns). Optional
+  `cbm.temporal_support` rules route weakly supported parcels to review with reason codes `LOW_OBS`, `LONG_GAP`,
+  `LONG_GAP_AT_PEAK`, `INTERPOLATED_PHENOLOGY`, `INTERPOLATED_FEATURES`, `NO_TEMPORAL_SUPPORT`
+  (`cbm.traffic_light_details(..., temporal_rules=...)`, `parcels.aggregate(..., temporal_support=, temporal_rules=)`);
+  disabled by default, existing traffic lights unchanged.
+- Parcel evidence packages (`geocrop evidence`, `geocrop.evidence`, docs/evidence.md): per parcel a versioned
+  `evidence.json` (contract `evidence`) with classification, conformal set, AOA, markers, temporal support, every
+  evaluated rule with inputs/thresholds/outcome/reason code, observed vs rejected acquisitions and the interpolated
+  grid, model sha256 and run-manifest reference; a self-contained strict-CSP HTML page with an inline SVG chart; a
+  PNG chart; batch `index.csv`/`index.gpkg` and `evidence_manifest.json`. Byte-deterministic for identical inputs.
+- Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
+  fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
+  real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
+- External data-cube adapter (`geocrop.datacube`, docs/datacube.md): `geocrop cube load` reads Sentinel-2 L2A from
+  any STAC API through odc-stac directly onto the study grid with the same SCL screening and BOA-offset handling as
+  `stac-import` (identical scene folders on a real Semberija July 2023 run); `geocrop cube import` validates
+  xarray/Zarr/NetCDF or Open Data Cube cubes (band names, CRS, grid lattice, units/scale, nodata, UTC time) and
+  writes scene folders or window composites; `geocrop cube export` writes scenes, composites or a feature stack as
+  CF-1.8 Zarr/NetCDF. Optional `data:` config section (`source: local|odc-stac`). xarray, odc-stac, zarr and
+  netCDF4 are optional.
+- Local model and benchmark registry (`geocrop.registry`, docs/model-registry.md): `geocrop models
+  register|list|show|compare|promote|verify` stores trained models as immutable, hash-sealed entries (content
+  SHA-256, engine version and git commit, algorithm and parameters, feature manifest, input contract, classes and
+  HCAT mapping, training-data summary, CV/holdout/transfer/conformal metrics, licences of pretrained components)
+  with verified split fingerprints; `compare` refuses results scored on different folds or holdouts; stages
+  staging/production/archived in an append-only log; `geocrop predict --model registry:<name>@<version|stage>`
+  with an input-contract check against the feature stack. FTW and Presto checkpoints appear as `pretrained`
+  entries from their existing URL+SHA-256 pins. `benchmark`, `benchmark-models`, `benchmark-public`,
+  `benchmark-segmentation`, `ablation` and `transfer` runs are recorded automatically (`$GEOCROP_REGISTRY`,
+  `off` disables); `geocrop benchmarks list|show|leaderboard` ranks only runs with identical split fingerprints
+  (Markdown/CSV/JSON). `registry.overview()` gives the web layer a read-only JSON snapshot.
 - Optional foundation-model embeddings as feature group `emb` (gaps G2/G3, docs/embeddings.md):
   `geocrop embeddings` reads AlphaEarth Satellite Embedding V1 (64-d, CC-BY-4.0, bottom-up COG windows) and
   TESSERA v1 (128-d, `.npy` row-range reads) onto the study grid, or computes Presto embeddings on the CPU from
@@ -132,6 +185,21 @@
 - `geocrop.faultinject`: test-only pause points, inert unless `GEOCROP_FAULT_PAUSE` is set.
 - `raster.RasterInputError` with checked raster access (`open_input`, `read_block`, `check_grid`,
   `feature_names`) at the features, samples and predict boundaries. Errors name the file and the problem.
+- `geocrop run` wires in the standalone capabilities, all off by default (docs/configuration.md#optional-parts-of-geocrop-run):
+  `cv.strategy` with sample region/year ids and `model/transfer_report.json`; `predict.smoothing`; an
+  `embeddings` stage (`features.embeddings`, attached to the stack; network adapters imported only when
+  configured); `cbm.event_markers` (Sentinel-1 signatures and event markers) and `cbm.rules` in the cbm and
+  parcels stages; an optional `parcel_classify` stage (`decision: additional | replace`). Optional stages and
+  options enter fingerprints only when enabled (`pipeline.OPTIONAL_DEPENDS`, `config.FINGERPRINT_NEUTRAL`), so
+  existing configurations keep their configuration and stage fingerprints. Temporal support is wired in too:
+  `timeseries.temporal_support` (per-pixel raster in the features stage) and `cbm.temporal_support`
+  (`cbm/temporal_support.csv` in the cbm stage, routing in the parcels/parcel_classify stages).
+- `model.params`: estimator-specific hyperparameters (e.g. of plugin estimators) passed through unchanged and
+  validated against the selected estimator's constructor (`model.config_params`, `model.check_params`); used by
+  `geocrop run`, `ablation`, `reduce-features` and `transfer`. `--algorithm`/`--algorithms` accept registered
+  plugin estimators (`plugins.Registry.declared_names`).
+- Feature manifests (`<stack>.features.json`) carry `schema_version` (`features.write_manifest`) and are checked on
+  read (`features.read_manifest`); unversioned manifests still load (ADR 0003).
 
 ### Security
 - Web API: `manifest --snap-gpt` could be passed in an abbreviated spelling (`--snap-gp=...`), letting a token
@@ -164,6 +232,9 @@
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
   (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
   now stop and ask for the upstream stage to be rerun.
+- Web workspace: after a map preview had used PROJ, later jobs could crash with exit code -11 before starting
+  (PROJ's fork handler closed its cached proj.db handle in the forked child; reproduced on macOS when proj.db
+  had been replaced on disk). Jobs are now started with `posix_spawn`, which runs no fork handlers.
 - Truncated or corrupt GeoTIFFs failed with GDAL's anonymous "Read failed"; the error now names the file and window.
 - A composite band that is entirely nodata/NaN/inf, or a stack without one valid pixel, used to produce an
   empty classification without an error. Both are now rejected and the empty products removed. Tests confirm
