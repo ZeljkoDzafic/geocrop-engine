@@ -5,11 +5,16 @@ into square spatial blocks (default 5 km), so no block contributes to both train
 testing in any fold. Folds are stratified by class where the data allow
 (StratifiedGroupKFold). Cross-validated scores are *internal* diagnostics; external accuracy
 must come from independent field observations (see `geocrop.validation`).
+
+Transfer validation (``cv_strategy`` = ``region``, ``year`` or ``region_year``) holds out one whole region,
+season or region-season cell per fold (see `geocrop.splits.leave_one_group_out`) and reports per-group
+metrics and the gap to in-domain spatial CV; see docs/validation-protocols.md.
 """
 from __future__ import annotations
 
 import itertools
 import json
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -18,13 +23,23 @@ import rasterio
 import sklearn
 from joblib import dump, load
 from pyproj import CRS
+from rasterio.windows import Window
 from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
-from . import applicability, contracts, metrics, uncertainty
-from .estimators import channels_from_names, importances, make_estimator
+from . import applicability, contracts, faultinject, metrics, splits, uncertainty
+from .estimators import importances, make_estimator, predict_labels, sequence_params
 from .hashing import sha256
-from .raster import NODATA, blocks, gtiff_profile, valid_mask
+from .raster import (
+    NODATA,
+    RasterInputError,
+    blocks,
+    feature_names,
+    gtiff_profile,
+    open_input,
+    read_block,
+    valid_mask,
+)
 from .samples import Samples
 
 RF_KEYS = ("algorithm", "n_estimators", "max_features", "min_samples_leaf", "max_depth", "class_weight", "n_jobs",
@@ -45,18 +60,29 @@ def spatial_blocks(samples: Samples, block_m: float | None) -> np.ndarray:
     return block.reindex(samples.polygon).to_numpy()
 
 
+def cv_groups(samples: Samples, strategy: str = "spatial_blocks", block_m: float | None = 5000) -> np.ndarray:
+    """Group id per sample for a cross-validation strategy (spatial blocks, region, year or region-year)."""
+    splits.check_strategy(strategy)
+    if strategy == "spatial_blocks":
+        return spatial_blocks(samples, block_m)
+    return splits.strategy_groups(strategy, region=samples.region, year=samples.year, polygon=samples.polygon)
+
+
 def make_rf(params: dict, seed: int):
     """Estimator for `params["algorithm"]` (default Random Forest); see `geocrop.estimators`."""
     return make_estimator(params, seed)
 
 
 def _fold_plan(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates=None, crs=None,
-               spatial_buffer_m: float = 0):
+               spatial_buffer_m: float = 0, strategy: str = "spatial_blocks"):
     """Build deterministic folds, optionally purging whole training polygons near test samples.
 
     Distances refer to sampled pixel centres, not unsampled polygon boundaries. Test sets stay
     unchanged. A buffer therefore cannot establish separation of complete polygon geometries.
+    With a group strategy (region/year/region_year) each fold holds out exactly one group and
+    `n_splits` is ignored; diagnostics then name the ``held_out_group``.
     """
+    splits.check_strategy(strategy)
     if not np.isfinite(spatial_buffer_m) or spatial_buffer_m < 0:
         raise ValueError("spatial_buffer_m must be finite and non-negative")
     y, groups = np.asarray(y), np.asarray(groups)
@@ -81,9 +107,13 @@ def _fold_plan(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates
     n_groups = len(np.unique(groups))
     if n_groups < 2:
         raise ValueError("Cross-validation needs at least two spatial groups")
-    splitter = StratifiedGroupKFold(n_splits=min(n_splits, n_groups), shuffle=True, random_state=seed)
+    if strategy == "spatial_blocks":
+        splitter = StratifiedGroupKFold(n_splits=min(n_splits, n_groups), shuffle=True, random_state=seed)
+        plan = [(None, tr, te) for tr, te in splitter.split(np.zeros(len(y)), y, groups)]
+    else:
+        plan = list(splits.leave_one_group_out(groups, strategy))
     out = []
-    for k, (tr, te) in enumerate(splitter.split(np.zeros(len(y)), y, groups)):
+    for k, (held_out, tr, te) in enumerate(plan):
         if set(groups[tr]) & set(groups[te]):
             raise AssertionError("Spatial group leakage between folds")
         original = tr.copy()
@@ -103,33 +133,42 @@ def _fold_plan(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates
             "min_train_test_distance_m": (float(tree.query(points[tr], k=1)[0].min())
                                           if tree is not None else None),
         }
+        if held_out is not None:
+            diagnostics["held_out_group"] = str(held_out)
         out.append((tr, te, diagnostics))
     return out
 
 
 def folds(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates=None, crs=None,
-          spatial_buffer_m: float = 0):
+          spatial_buffer_m: float = 0, strategy: str = "spatial_blocks"):
     """Spatial-group folds; an optional metric buffer purges whole nearby training polygons.
 
     The buffer applies to sampled pixel centres only. Held-out samples are never dropped.
     """
     return [(tr, te) for tr, te, _ in _fold_plan(
         y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
-        spatial_buffer_m=spatial_buffer_m)]
+        spatial_buffer_m=spatial_buffer_m, strategy=strategy)]
 
 
 def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed: int = 42,
-                   bootstrap: int = 0, *, coordinates=None, crs=None, spatial_buffer_m: float = 0) -> dict:
-    """Out-of-fold predictions across spatial folds; metrics pooled over all folds plus per-fold spread."""
-    oof = np.empty(len(y), dtype=object)
+                   bootstrap: int = 0, *, coordinates=None, crs=None, spatial_buffer_m: float = 0,
+                   strategy: str = "spatial_blocks") -> dict:
+    """Out-of-fold predictions across spatial folds; metrics pooled over all folds plus per-fold spread.
+
+    With a group `strategy` (region, year, region_year) `groups` must hold those group ids (see `cv_groups`);
+    every fold holds out one group and the per-fold rows are the per-held-out-group metrics. Samples that
+    no fold can evaluate (region_year cells without data from another region *and* year) are excluded
+    from pooled metrics and counted in ``unevaluated_samples``.
+    """
+    oof = np.full(len(y), None, dtype=object)
     oof_proba = None
     per_fold = []
     classes = np.unique(y)
     for k, (tr, te, diagnostics) in enumerate(_fold_plan(
             y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
-            spatial_buffer_m=spatial_buffer_m)):
+            spatial_buffer_m=spatial_buffer_m, strategy=strategy)):
         rf = make_rf(params, seed + k).fit(X[tr], y[tr])
-        oof[te] = rf.predict(X[te])
+        oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
         proba[:, np.searchsorted(classes, rf.classes_)] = rf.predict_proba(X[te])
         if oof_proba is None:
@@ -139,19 +178,28 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
         per_fold.append({"fold": k, **diagnostics, "n_test": int(len(te)), "test_groups": int(len(np.unique(groups[te]))),
                          "missing_train_classes": sorted(set(classes) - set(rf.classes_)),
                          "overall_accuracy": s["overall_accuracy"], "macro_f1": s["macro_f1"], "kappa": s["kappa"]})
-    pooled = metrics.summary(y, oof.astype(str), labels=classes)
+    done = np.array([v is not None for v in oof])
+    pooled = metrics.summary(y[done], oof[done].astype(str), labels=classes)
     pooled["_oof"] = oof.astype(str)   # out-of-fold predictions and probabilities; removed before JSON export
     pooled["_oof_proba"] = oof_proba
     pooled["_classes"] = [str(c) for c in classes]
+    if strategy != "spatial_blocks":
+        pooled["_evaluated"] = done   # removed before JSON export
+    pooled["strategy"] = strategy
+    pooled["unevaluated_samples"] = int((~done).sum())
     pooled["folds"] = per_fold
     pooled["spatial_buffer_m"] = spatial_buffer_m
     pooled["distance_support"] = "sampled pixel centres; not full polygon geometries"
     pooled["fold_macro_f1_mean"] = float(np.mean([f["macro_f1"] for f in per_fold]))
     pooled["fold_macro_f1_std"] = float(np.std([f["macro_f1"] for f in per_fold]))
-    pooled["calibration"] = metrics.calibration(oof_proba, y, classes)
+    pooled["calibration"] = metrics.calibration(oof_proba[done], y[done], classes)
     if bootstrap:
-        pooled["bootstrap"] = metrics.bootstrap(y, oof.astype(str), groups=polygon, n_boot=bootstrap, seed=seed)
+        pooled["bootstrap"] = metrics.bootstrap(y[done], oof[done].astype(str), groups=np.asarray(polygon)[done],
+                                                n_boot=bootstrap, seed=seed)
     pooled["note"] = "Internal spatial cross-validation on interpreted reference polygons; not independent field validation."
+    if strategy != "spatial_blocks":
+        pooled["note"] = (f"Leave-one-{strategy.replace('_', '-')}-out validation on interpreted reference polygons "
+                          "(out-of-domain transfer); not independent field validation.")
     return pooled
 
 
@@ -183,25 +231,98 @@ def holdout_mask(y, groups, fraction: float, seed: int = 42) -> np.ndarray:
 
 
 def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer: int = 5, n_inner: int = 3,
-                          seed: int = 42, *, coordinates=None, crs=None, spatial_buffer_m: float = 0) -> dict:
+                          seed: int = 42, *, coordinates=None, crs=None, spatial_buffer_m: float = 0,
+                          strategy: str = "spatial_blocks", inner_groups=None) -> dict:
     """Unbiased estimate of the *tuned* procedure: hyperparameters are selected by an inner spatial CV that
     sees only the outer training blocks; the outer test blocks are predicted once (Varma & Simon, 2006).
-    The same optional spatial buffer is applied in the outer and inner folds."""
+    The same optional spatial buffer is applied in the outer and inner folds.
+
+    With a group `strategy` the outer loop holds out one region/year (`groups` are those ids) and the inner
+    tuning runs k-fold over `inner_groups` (normally spatial blocks) of the outer training data only, so the
+    held-out region/year never influences the selected hyperparameters."""
     classes = np.unique(y)
-    oof = np.empty(len(y), dtype=object)
+    oof = np.full(len(y), None, dtype=object)
     chosen = []
     xy = None if coordinates is None else np.asarray(coordinates)
-    for k, (tr, te) in enumerate(folds(y, groups, n_outer, seed, polygon=polygon, coordinates=xy, crs=crs,
-                                       spatial_buffer_m=spatial_buffer_m)):
-        inner = tune(X[tr], y[tr], polygon[tr], groups[tr], base, grid, n_inner, seed + k,
+    inner_groups = np.asarray(groups if inner_groups is None else inner_groups)
+    for k, (tr, te, diag) in enumerate(_fold_plan(y, groups, n_outer, seed, polygon=polygon, coordinates=xy,
+                                                  crs=crs, spatial_buffer_m=spatial_buffer_m, strategy=strategy)):
+        inner = tune(X[tr], y[tr], polygon[tr], inner_groups[tr], base, grid, n_inner, seed + k,
                      coordinates=None if xy is None else xy[tr], crs=crs, spatial_buffer_m=spatial_buffer_m)
         params = {**base, **inner["best_params"]}
-        oof[te] = make_estimator(params, seed + k).fit(X[tr], y[tr]).predict(X[te])
-        chosen.append({"fold": k, **inner["best_params"]})
-    s = metrics.summary(y, oof.astype(str), labels=classes)
+        oof[te] = predict_labels(make_estimator(params, seed + k).fit(X[tr], y[tr]), X[te])
+        row = {"fold": k, **inner["best_params"]}
+        if "held_out_group" in diag:
+            row["held_out_group"] = diag["held_out_group"]
+        chosen.append(row)
+    done = np.array([v is not None for v in oof])
+    s = metrics.summary(y[done], oof[done].astype(str), labels=classes)
     s["selected_params_per_fold"] = chosen
     s["note"] = "Nested spatial CV: outer-fold scores of the full tuning procedure (not optimistic)."
+    if strategy != "spatial_blocks":
+        s["strategy"] = strategy
+        s["unevaluated_samples"] = int((~done).sum())
+        s["note"] = (f"Nested leave-one-{strategy.replace('_', '-')}-out CV; hyperparameters tuned by spatial-block "
+                     "CV inside each outer training set (not optimistic).")
     return s
+
+
+def transfer_validation(X, y, polygon, groups, in_domain_groups, params: dict, strategy: str,
+                        n_splits: int = 5, seed: int = 42, *, coordinates=None, crs=None,
+                        spatial_buffer_m: float = 0, in_domain: dict | None = None) -> dict:
+    """Out-of-domain (leave-one-region/year-out) vs in-domain (spatial-block CV) accuracy on the same samples.
+
+    `groups` are the strategy's group ids, `in_domain_groups` the spatial blocks. `in_domain` may be a
+    `cross_validate` result computed earlier on the same arrays (it must still contain ``_oof``).
+    Returns pooled metrics for both regimes (scored on the samples evaluated out-of-domain), one row per
+    held-out group with its in-domain and out-of-domain scores, and the transfer gap
+    (in-domain minus out-of-domain; positive values mean accuracy lost when moving to an unseen domain).
+    """
+    if strategy == "spatial_blocks":
+        raise ValueError("transfer_validation needs a group strategy: region, year or region_year")
+    y, polygon, groups = np.asarray(y), np.asarray(polygon), np.asarray(groups).astype(str)
+    spatial = {"coordinates": coordinates, "crs": crs, "spatial_buffer_m": spatial_buffer_m}
+    if in_domain is None:
+        in_domain = cross_validate(X, y, polygon, in_domain_groups, params, n_splits, seed, **spatial)
+    out = cross_validate(X, y, polygon, groups, params, n_splits, seed, strategy=strategy, **spatial)
+    classes = out["_classes"]
+    done = out["_evaluated"]
+    keys = ("overall_accuracy", "kappa", "macro_f1")
+    ind = metrics.summary(y[done], np.asarray(in_domain["_oof"])[done], labels=classes)
+    ood = {k: out[k] for k in keys}
+    rows = []
+    for fold in out["folds"]:
+        g = fold["held_out_group"]
+        m = groups == g
+        a = metrics.summary(y[m], np.asarray(in_domain["_oof"])[m], labels=classes)
+        b = metrics.summary(y[m], out["_oof"][m], labels=classes)
+        row = {"held_out_group": g, "n_test": int(m.sum()), "n_train": fold["n_train"],
+               "test_polygons": int(len(np.unique(polygon[m]))),
+               "missing_train_classes": fold["missing_train_classes"],
+               "classes_in_test": sorted(set(y[m].astype(str)))}
+        for k in keys:
+            row[f"in_domain_{k}"], row[f"out_of_domain_{k}"] = a[k], b[k]
+            row[f"gap_{k}"] = a[k] - b[k]
+        row["out_of_domain_per_class_f1"] = {c: v["f1"] for c, v in b["per_class"].items() if v["reference_count"]}
+        rows.append(row)
+    skipped = sorted(set(groups) - {r["held_out_group"] for r in rows})
+    group_f1 = np.array([r["out_of_domain_macro_f1"] for r in rows], dtype=float)
+    return {
+        "strategy": strategy, "n_groups": int(len(np.unique(groups))), "groups_not_evaluable": skipped,
+        "evaluated_samples": int(done.sum()), "unevaluated_samples": int((~done).sum()),
+        "in_domain": {k: ind[k] for k in keys} | {"protocol": "spatial-block k-fold CV on all groups"},
+        "out_of_domain": ood | {"protocol": f"leave-one-{strategy.replace('_', '-')}-out",
+                                "per_class": out["per_class"], "labels": out["labels"],
+                                "confusion_matrix": out["confusion_matrix"]},
+        "transfer_gap": {k: ind[k] - ood[k] for k in keys},
+        "group_macro_f1_mean": float(np.nanmean(group_f1)) if len(group_f1) else None,
+        "group_macro_f1_std": float(np.nanstd(group_f1)) if len(group_f1) else None,
+        "worst_group": min(rows, key=lambda r: r["out_of_domain_macro_f1"])["held_out_group"] if rows else None,
+        "per_group": rows,
+        "note": "Both regimes are scored on the same samples. Interpreted reference polygons; the gap is an "
+                "internal estimate of domain shift, not independent field accuracy.",
+        "_oof": out["_oof"],
+    }
 
 
 def split_final_holdout(samples: Samples, spatial_block_m: float | None, fraction: float, seed: int):
@@ -214,8 +335,7 @@ def split_final_holdout(samples: Samples, spatial_block_m: float | None, fractio
 
 
 def _subset(samples: Samples, mask) -> Samples:
-    return Samples(samples.X[mask], samples.y[mask], samples.polygon[mask], samples.x[mask], samples.yy[mask],
-                   samples.features, samples.crs)
+    return samples.take(mask)
 
 
 def _calibration_split(samples: Samples, groups, fraction: float, seed: int, spatial_buffer_m: float):
@@ -284,9 +404,7 @@ def selection_samples(samples: Samples, spatial_block_m: float | None = 5000, se
         return samples, None
     groups = spatial_blocks(samples, spatial_block_m)
     fit, _, split = _calibration_split(samples, groups, calibration_fraction, seed, spatial_buffer_m)
-    proper = Samples(samples.X[fit], samples.y[fit], samples.polygon[fit], samples.x[fit], samples.yy[fit],
-                     samples.features, samples.crs)
-    return proper, split
+    return samples.take(fit), split
 
 
 def train(samples: Samples, output_dir: str | Path, features: list[str] | None = None, params: dict | None = None,
@@ -294,7 +412,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
           bootstrap: int = 1000, provenance: dict | None = None, calibrate: bool = True,
           conformal_alphas=(0.05, 0.1, 0.2), spatial_buffer_m: float = 0,
           calibration_mode: str = "oof", calibration_fraction: float = 0.2, holdout_fraction: float = 0.0,
-          refit_all: bool = True, inner_splits: int = 3) -> dict:
+          refit_all: bool = True, inner_splits: int = 3, cv_strategy: str = "spatial_blocks") -> dict:
     """Spatial CV (optionally after tuning), then fit the mapping model on its proper-training samples.
 
     From the out-of-fold probabilities it also fits a temperature (calibration), empirical
@@ -311,7 +429,12 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
       mode the predictor stays frozen so that the conformal thresholds remain bound to it.
     * With a tuning grid, `report["nested_cv"]` is the unbiased score of the tuning procedure; the
       re-run `cross_validation` with the selected parameters serves calibration and diagnostics only.
+    * cv_strategy ``region``/``year``/``region_year`` adds `report["transfer_validation"]`: leave-one-group-out
+      metrics per held-out region/year, the in-domain spatial CV on the same samples and the transfer gap.
+      `cross_validation`, calibration, conformal thresholds and AOA keep using spatial blocks, so the default
+      outputs are unchanged.
     """
+    splits.check_strategy(cv_strategy)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
@@ -323,14 +446,11 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     calibration = None
     if split is not None:
         held_out = np.isin(input_samples.polygon.astype(str), split["calibration_polygon_ids"])
-        calibration = Samples(input_samples.X[held_out], input_samples.y[held_out], input_samples.polygon[held_out],
-                              input_samples.x[held_out], input_samples.yy[held_out], input_samples.features,
-                              input_samples.crs)
+        calibration = input_samples.take(held_out)
     X = samples.subset(features)
     y = samples.y
     params = dict(params or {"n_estimators": 500, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1})
-    if params.get("algorithm") == "tempcnn" and "n_channels" not in params:
-        params["n_channels"] = channels_from_names(features)
+    params = sequence_params(params, features)
     report: dict = {"features": len(features), "samples": int(len(y)), "polygons": int(len(np.unique(samples.polygon))),
                     "spatial_groups": int(len(np.unique(groups))), "spatial_block_m": spatial_block_m,
                     "class_counts": pd.Series(y).value_counts().to_dict(),
@@ -356,6 +476,19 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     if tune_grid:
         cv["note"] += " Parameters were tuned on these folds: use nested_cv for performance."
     report["cross_validation"] = cv
+    if cv_strategy != "spatial_blocks":
+        tgroups = cv_groups(samples, cv_strategy, spatial_block_m)
+        tv = transfer_validation(X, y, samples.polygon, tgroups, groups, params, cv_strategy, n_splits, seed,
+                                 in_domain=cv, **spatial)
+        tv.pop("_oof")
+        if tune_grid:
+            tv["nested"] = nested_cross_validate(X, y, samples.polygon, tgroups, params, tune_grid, n_splits,
+                                                 inner_splits, seed, strategy=cv_strategy, inner_groups=groups,
+                                                 **spatial)
+        report["transfer_validation"] = tv
+        pd.DataFrame([{k: v for k, v in r.items() if not isinstance(v, (list, dict))} for r in tv["per_group"]]
+                     ).to_csv(out / "transfer_per_group.csv", index=False)
+    report["cv_strategy"] = cv_strategy
     cv.pop("_oof")
     oof_proba, classes = cv.pop("_oof_proba"), cv.pop("_classes")
     temperature = 1.0
@@ -414,9 +547,11 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
         pd.DataFrame({"polygon": test.polygon, "label": test.y, "predicted": pred}).to_csv(
             out / "holdout_predictions.csv", index=False)
         if refit_all and calibration_mode == "oof":
+            meta = {k: (np.concatenate([getattr(samples, k), getattr(test, k)])
+                        if getattr(samples, k) is not None else None) for k in ("region", "year")}
             samples = Samples(np.concatenate([samples.X, test.X]), np.concatenate([samples.y, test.y]),
                               np.concatenate([samples.polygon, test.polygon]), np.concatenate([samples.x, test.x]),
-                              np.concatenate([samples.yy, test.yy]), samples.features, samples.crs)
+                              np.concatenate([samples.yy, test.yy]), samples.features, samples.crs, **meta)
             X, y = samples.subset(features), samples.y
             groups = spatial_blocks(samples, spatial_block_m)
             spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
@@ -440,6 +575,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
                "provenance": provenance or {}, "calibration_mode": calibration_mode,
                "calibration_split": split}
     dump(payload, out / "model.joblib", compress=3)
+    faultinject.point("train")
     model_sha256 = sha256(out / "model.joblib")
     conformal["model_sha256"] = model_sha256
     report["model_sha256"] = model_sha256
@@ -448,9 +584,83 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     return report
 
 
-def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512) -> dict:
+SMOOTHING_DEFAULTS = {"enabled": False, "window": 7, "smoothness": 10.0}
+
+
+def smoothing_settings(smoothing: dict | bool | None) -> dict | None:
+    """Validated smoothing settings (None when disabled); accepts the `predict.smoothing` config section."""
+    if not smoothing:
+        return None
+    cfg = {**SMOOTHING_DEFAULTS, **({"enabled": True} if smoothing is True else smoothing)}
+    if not cfg["enabled"]:
+        return None
+    window, smoothness = cfg["window"], cfg["smoothness"]
+    if isinstance(window, bool) or not isinstance(window, int) or window < 3 or window % 2 == 0:
+        raise ValueError("smoothing window must be an odd integer >= 3")
+    if isinstance(smoothness, bool) or not isinstance(smoothness, (int, float)) or not np.isfinite(smoothness) \
+            or smoothness <= 0:
+        raise ValueError("smoothing smoothness must be a positive finite number")
+    return {"enabled": True, "window": int(window), "smoothness": float(smoothness)}
+
+
+def smooth_probabilities(proba: np.ndarray, valid: np.ndarray, window: int = 7, smoothness: float = 10.0,
+                         eps: float = 1e-4) -> np.ndarray:
+    """Edge-aware Bayesian-style smoothing of a class-probability cube ``(classes, rows, cols)``.
+
+    Each class probability is mapped to log-odds. For every pixel the local mean ``m`` and variance ``v`` of the
+    log-odds over the valid pixels of a ``window`` x ``window`` neighbourhood act as a prior; the pixel's own
+    value is the observation with variance `smoothness`. The posterior mean is
+    ``(v * x + smoothness * m) / (v + smoothness)``: in homogeneous areas (small ``v``) pixels are pulled
+    towards their neighbourhood, across field edges (large ``v``) they keep their own value. Probabilities are
+    renormalised to sum to one. Invalid pixels neither contribute nor change (returned unchanged).
+    Independent implementation of the idea behind the Bayesian smoothing of the sits R package.
+    """
+    from scipy.ndimage import uniform_filter
+
+    proba = np.asarray(proba, dtype="float64")
+    valid = np.asarray(valid, dtype=bool)
+    out = proba.copy()
+    if not valid.any():
+        return out.astype("float32")
+    w = valid.astype("float64")
+    count = uniform_filter(w, size=window, mode="constant", cval=0.0)
+    count = np.where(count > 0, count, np.nan)
+    smoothed = np.empty_like(proba)
+    for c in range(proba.shape[0]):
+        p = np.clip(np.where(valid, proba[c], 0.5), eps, 1 - eps)
+        x = np.log(p / (1 - p)) * w
+        mean = uniform_filter(x, size=window, mode="constant", cval=0.0) / count
+        var = np.maximum(uniform_filter(x * x, size=window, mode="constant", cval=0.0) / count - mean ** 2, 0.0)
+        post = (var * x + smoothness * mean) / (var + smoothness)
+        smoothed[c] = 1 / (1 + np.exp(-post))
+    total = smoothed.sum(axis=0)
+    smoothed /= np.where(total > 0, total, 1)
+    out[:, valid] = smoothed[:, valid]
+    return out.astype("float32")
+
+
+def _uncertainty_bands(proba: np.ndarray, n_classes: int) -> np.ndarray:
+    """(3, n): max probability, top-2 margin, normalised entropy for an ``(n, classes)`` probability matrix."""
+    order = np.sort(proba, axis=1)
+    u = np.empty((3, len(proba)), dtype="float32")
+    u[0] = order[:, -1]
+    u[1] = order[:, -1] - (order[:, -2] if proba.shape[1] > 1 else 0)
+    ent = -np.sum(np.where(proba > 0, proba * np.log(np.maximum(proba, 1e-12)), 0), axis=1)
+    u[2] = ent / np.log(n_classes) if n_classes > 1 else 0
+    return u
+
+
+def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512,
+            smoothing: dict | bool | None = None) -> dict:
     """Blockwise inference -> classes.tif (uint8 index, see class_legend.json), probabilities.tif
-    (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy)."""
+    (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy).
+
+    `smoothing` (the `predict.smoothing` config section, e.g. ``{"enabled": True, "window": 7,
+    "smoothness": 10}``) applies `smooth_probabilities` before the argmax, so classes, uncertainty and any
+    later parcel aggregation use smoothed probabilities; the raw probabilities are kept in
+    ``probabilities_unsmoothed.tif``. Blocks are read with a halo, so results do not depend on block size.
+    """
+    smooth = smoothing_settings(smoothing)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     model_sha256 = sha256(model_path)
@@ -460,57 +670,111 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     classes = [str(c) for c in model.classes_]
     if len(classes) > 254:
         raise ValueError("At most 254 classes fit the uint8 class raster")
-    with rasterio.open(stack) as src:
-        names = list(src.descriptions)
+    raw_path = out / "probabilities_unsmoothed.tif"
+    with open_input(stack, "Feature stack") as src:
+        names = feature_names(src)
         missing = [f for f in wanted if f not in names]
         if missing:
-            raise ValueError(f"Stack lacks model features: {missing[:5]}")
+            raise RasterInputError(f"Feature stack {stack} lacks {len(missing)} model features: {missing[:5]}")
+        any_valid = False
         bands = [names.index(f) + 1 for f in wanted]
         base = gtiff_profile(src)
         cls_prof = {**base, "count": 1, "dtype": "uint8", "nodata": 255}
         prob_prof = {**base, "count": len(classes), "dtype": "float32", "nodata": NODATA, "predictor": 3}
         unc_prof = {**base, "count": 3, "dtype": "float32", "nodata": NODATA, "predictor": 3}
-        with rasterio.open(out / "classes.tif", "w", **cls_prof) as c_dst, \
-                rasterio.open(out / "probabilities.tif", "w", **prob_prof) as p_dst, \
-                rasterio.open(out / "uncertainty.tif", "w", **unc_prof) as u_dst:
-            for destination in (c_dst, p_dst, u_dst):
-                destination.update_tags(model_sha256=model_sha256)
+        width, height = src.width, src.height
+
+        def describe(p_dst):
+            p_dst.update_tags(model_sha256=model_sha256)
             for i, c in enumerate(classes, 1):
                 p_dst.set_band_description(i, c)
+
+        def model_proba(w):
+            cube = read_block(src, bands, window=w)
+            ok = valid_mask(cube, src.nodata)
+            proba = None
+            if ok.any():
+                proba = model.predict_proba(cube[:, ok].T)
+                proba = uncertainty.apply_temperature(proba, temperature).astype("float32")
+            return ok, proba
+
+        if smooth is not None:
+            with rasterio.open(raw_path, "w", **prob_prof) as r_dst:
+                describe(r_dst)
+                r_dst.update_tags(smoothing="none (input to smoothing)")
+                for w in blocks(width, height, block_size):
+                    ok, proba = model_proba(w)
+                    p = np.full((len(classes), *ok.shape), NODATA, dtype="float32")
+                    if proba is not None:
+                        p[:, ok] = proba.T
+                    r_dst.write(p, window=w)
+        with rasterio.open(out / "classes.tif", "w", **cls_prof) as c_dst, \
+                rasterio.open(out / "probabilities.tif", "w", **prob_prof) as p_dst, \
+                rasterio.open(out / "uncertainty.tif", "w", **unc_prof) as u_dst, \
+                (rasterio.open(raw_path) if smooth is not None else nullcontext()) as raw:
+            for destination in (c_dst, u_dst):
+                destination.update_tags(model_sha256=model_sha256)
+            describe(p_dst)
+            if smooth is not None:
+                for destination in (c_dst, p_dst, u_dst):
+                    destination.update_tags(smoothing=json.dumps(smooth))
             for i, n in enumerate(("max_probability", "margin", "entropy"), 1):
                 u_dst.set_band_description(i, n)
-            for w in blocks(src.width, src.height, block_size):
-                cube = src.read(bands, window=w)
-                ok = valid_mask(cube, src.nodata)
+            halo = smooth["window"] // 2 if smooth is not None else 0
+            for w in blocks(width, height, block_size):
+                if smooth is None:
+                    ok, proba = model_proba(w)
+                else:
+                    c0, r0 = max(0, w.col_off - halo), max(0, w.row_off - halo)
+                    c1 = min(width, w.col_off + w.width + halo)
+                    r1 = min(height, w.row_off + w.height + halo)
+                    cube = raw.read(window=Window(c0, r0, c1 - c0, r1 - r0))
+                    big_ok = np.all(cube != NODATA, axis=0)
+                    cube = smooth_probabilities(cube, big_ok, smooth["window"], smooth["smoothness"])
+                    inner = (slice(w.row_off - r0, w.row_off - r0 + w.height),
+                             slice(w.col_off - c0, w.col_off - c0 + w.width))
+                    ok = big_ok[inner]
+                    proba = cube[:, inner[0], inner[1]][:, ok].T if ok.any() else None
+                any_valid = any_valid or bool(ok.any())
                 shape = ok.shape
                 c = np.full(shape, 255, dtype="uint8")
                 p = np.full((len(classes), *shape), NODATA, dtype="float32")
                 u = np.full((3, *shape), NODATA, dtype="float32")
-                if ok.any():
-                    proba = model.predict_proba(cube[:, ok].T)
-                    proba = uncertainty.apply_temperature(proba, temperature).astype("float32")
-                    order = np.sort(proba, axis=1)
+                if proba is not None:
                     c[ok] = proba.argmax(axis=1).astype("uint8")
                     p[:, ok] = proba.T
-                    u[0, ok] = order[:, -1]
-                    u[1, ok] = order[:, -1] - (order[:, -2] if proba.shape[1] > 1 else 0)
-                    ent = -np.sum(np.where(proba > 0, proba * np.log(np.maximum(proba, 1e-12)), 0), axis=1)
-                    u[2, ok] = ent / np.log(len(classes)) if len(classes) > 1 else 0
+                    u[:, ok] = _uncertainty_bands(proba, len(classes))
                 c_dst.write(c, 1, window=w)
                 p_dst.write(p, window=w)
                 u_dst.write(u, window=w)
+                faultinject.point("predict")
+    if not any_valid:
+        for name in ("classes.tif", "probabilities.tif", "uncertainty.tif"):
+            (out / name).unlink(missing_ok=True)
+        raise RasterInputError(f"Feature stack {stack}: no pixel has valid values for all {len(wanted)} model "
+                               "features (all nodata/NaN); the classification would be empty")
     legend = {str(i): c for i, c in enumerate(classes)}
     aoa_json = Path(model_path).with_name("aoa.json")
     if aoa_json.exists():
         applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size)
     (out / "class_legend.json").write_text(json.dumps(legend, indent=2), encoding="utf8")
     manifest = out / "prediction_manifest.json"
-    manifest.write_text(json.dumps({
+    body = {
         "schema": "geocrop-prediction/1", "model_sha256": model_sha256,
         "features": wanted, "classes": classes, "temperature": temperature,
         "calibration_mode": payload.get("calibration_mode", "oof"),
         "scope": "Artifact identity and inference settings only; not a scientific validity assessment.",
-    }, indent=2), encoding="utf8")
-    return {"classes": str(out / "classes.tif"), "probabilities": str(out / "probabilities.tif"),
-            "uncertainty": str(out / "uncertainty.tif"), "legend": legend,
-            "aoa": str(out / "aoa.tif") if aoa_json.exists() else None, "manifest": str(manifest)}
+    }
+    if smooth is not None:
+        body["smoothing"] = {**smooth, "method": "edge-aware Bayesian-style log-odds smoothing",
+                             "unsmoothed_probabilities": raw_path.name,
+                             "note": "Conformal thresholds in conformal.json were fitted on unsmoothed "
+                                     "out-of-fold probabilities; their coverage on smoothed maps is not established."}
+    manifest.write_text(json.dumps(body, indent=2), encoding="utf8")
+    result = {"classes": str(out / "classes.tif"), "probabilities": str(out / "probabilities.tif"),
+              "uncertainty": str(out / "uncertainty.tif"), "legend": legend,
+              "aoa": str(out / "aoa.tif") if aoa_json.exists() else None, "manifest": str(manifest)}
+    if smooth is not None:
+        result["probabilities_unsmoothed"] = str(raw_path)
+    return result
+

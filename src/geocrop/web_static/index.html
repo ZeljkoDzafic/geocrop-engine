@@ -1,65 +1,390 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GeoCrop · Engine workspace</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>GeoCrop Workspace</title>
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/terminal.css">
+  <script src="/static/theme.js"></script>
   <script defer src="/static/vendor/leaflet/leaflet.js"></script>
   <script defer src="/static/map.js"></script>
   <script defer src="/static/app.js"></script>
+  <script defer src="/static/terminal.js"></script>
 </head>
 <body>
-  <aside class="sidebar">
-    <a class="brand" href="/" aria-label="GeoCrop home"><span class="mark">G</span><span>GeoCrop<small>ENGINE WORKSPACE</small></span></a>
-    <div class="nav-label">WORKSPACE</div>
-    <nav aria-label="Main navigation">
-      <button class="nav active" data-tab="commands"><span>▦</span> Commands</button>
-      <button class="nav" data-tab="console"><span>›_</span> CLI console</button>
-      <button class="nav" data-tab="notebook"><span>⌘</span> Jupyter &amp; API</button>
-    </nav>
-    <div class="sidebar-note"><span class="leaf">↗</span><strong>From observation to decision.</strong><p>An open processing workflow for Sentinel data and agricultural parcel verification.</p></div>
-    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-label">Not connected</span><button id="disconnect" class="text-button" hidden>Sign out</button></div>
-  </aside>
-  <main>
-    <header><div class="breadcrumb">GeoCrop Engine <span>/</span> Workspace</div><span id="version" class="pill">LOCAL ENGINE</span></header>
-    <section class="intro"><div><div class="eyebrow">REPRODUCIBLE GEOANALYTICS</div><h1>Run. Monitor. Verify.</h1><p>The engine's commands, one transparent workspace.</p></div><div class="terrain" aria-hidden="true"><span></span><span></span><span></span><span></span></div></section>
-    <div id="message" role="status" hidden></div>
-    <section class="card auth" id="auth-panel"><div><h2>Connect to the engine</h2><p>Enter the access token configured when the server was started.</p></div><form id="connect-form"><label class="sr-only" for="token">Access token</label><input id="token" type="password" autocomplete="off" placeholder="Access token" required><button class="primary">Connect <span>→</span></button></form></section>
-    <section class="stats" aria-label="Job overview"><article><span>JOBS SHOWN</span><strong id="total">—</strong></article><article><span>ACTIVE</span><strong id="running">—</strong></article><article><span>SUCCEEDED</span><strong id="succeeded">—</strong></article><article><span>NEED ATTENTION</span><strong id="failed">—</strong></article></section>
-    <div class="workspace-grid">
-      <section class="card command-card">
-        <div class="card-top"><div><span class="eyebrow">NEW RUN</span><h2 id="panel-title">Engine commands</h2></div><span class="step">01</span></div>
-        <div id="commands-tab" class="tab-panel"><label for="command-select">Command</label><select id="command-select" disabled><option>Connect the engine to list commands</option></select><p class="help" id="command-help">Choose a command and enter paths and parameters.</p><form id="command-form"><div id="required-fields"></div><details id="advanced" hidden><summary>Advanced options</summary><div id="optional-fields"></div></details><button class="primary wide" id="run-command" disabled>Start run <span>→</span></button></form></div>
-        <div id="console-tab" class="tab-panel" hidden><p class="help">Enter one GeoCrop command. Quotes are supported for paths containing spaces.</p><form id="console-form"><label for="console-input">CLI command</label><textarea id="console-input" class="code-input" rows="5" spellcheck="false">geocrop indices --format markdown</textarea><p class="help">The console runs engine commands only. Shell operators and arbitrary programs are not supported.</p><button class="primary wide" id="run-console" disabled>Run command <span>→</span></button></form></div>
-        <div id="notebook-tab" class="tab-panel" hidden><p>Call the same engine from a Jupyter notebook, JupyterLab or a Python script.</p><pre class="snippet"><code>import os
-from geocrop.client import EngineClient
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Zm0 0v14m6-12v14"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-jobs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="m7.5 9.5 3 2.5-3 2.5M12.5 15h4"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8.5 7-5 5 5 5m7-10 5 5-5 5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2m0 15v2M2.5 12h2m15 0h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h1m3 0h1m3 0h1m3 0h1M8 14.5h8"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11m0-11-11 11"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+  <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l6.5-6.5M10 14l-6.5 6.5"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+  <symbol id="i-raster" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 9.3h16M4 14.7h16M9.3 4v16M14.7 4v16"/></symbol>
+  <symbol id="i-vector" viewBox="0 0 24 24"><path d="m6 7 10-2.5L19.5 15 9 19.5 4.5 13Z"/><circle cx="6" cy="7" r="1.2"/><circle cx="16" cy="4.5" r="1.2"/><circle cx="19.5" cy="15" r="1.2"/><circle cx="9" cy="19.5" r="1.2"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.5 3.5h7l4 4v13h-11Z"/><path d="M13.5 3.5v4h4M9 12h6m-6 3.5h6"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3.5 7.5 4.25v8.5L12 20.5l-7.5-4.25v-8.5Z"/><path d="M4.5 7.75 12 12l7.5-4.25M12 12v8.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4 4 9-9"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4.5m0 2.5v.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5m0-8.5v.2"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 4 8.5 4.5L12 13 3.5 8.5Z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
+  <symbol id="i-crosshair" viewBox="0 0 24 24"><rect x="4.5" y="6.5" width="15" height="11" rx="1.5" stroke-dasharray="3 2.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5Z"/></symbol>
+  <symbol id="i-signout" viewBox="0 0 24 24"><path d="M14 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14M10 12h10m-3.5-3.5L20 12l-3.5 3.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.5H15"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.4 2.6 6.9 7.5 8.5-4.9 1.6-6.9 4.1-7.5 8.5-.6-4.4-2.6-6.9-7.5-8.5 4.9-1.6 6.9-4.1 7.5-8.5Z"/></symbol>
+  <symbol id="i-satellite" viewBox="0 0 24 24"><path d="m9.5 9.5 5 5m-8-8 3 3-3 3-3-3Zm11 11-3-3 3-3 3 3ZM12 12l2-2"/><path d="M15.5 4.5a4 4 0 0 1 4 4m-4-1.5a1.5 1.5 0 0 1 1.5 1.5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5"/></symbol>
+</svg>
 
-# GEOCROP_WEB_TOKEN in the notebook environment
-engine = EngineClient()
-job = engine.submit(["indices", "--format", "json"])
-result = engine.wait(job["id"], timeout=60)
-print(engine.logs(job["id"])["text"])</code></pre><p class="help">If the notebook runs on another machine, use a locally forwarded port. Pass the token through an environment variable.</p><h3>HTTP API</h3><pre class="snippet"><code>POST /api/jobs
+<div class="app" id="app">
+  <aside class="sidebar" aria-label="Workspace">
+    <a class="brand" href="/" aria-label="GeoCrop workspace home">
+      <img src="/static/icon.svg" alt="" width="28" height="28">
+      <span><strong>GeoCrop</strong><small>Engine workspace</small></span>
+    </a>
+    <button id="new-analysis" class="btn btn-primary btn-block" type="button" disabled>
+      <svg class="icon"><use href="#i-plus"/></svg><span>New analysis</span><kbd class="kbd-on-accent">N</kbd>
+    </button>
+    <button id="open-palette" class="search-trigger" type="button" disabled>
+      <svg class="icon"><use href="#i-search"/></svg><span>Search commands</span><kbd data-mod-key>⌘K</kbd>
+    </button>
+    <nav class="nav" aria-label="Views">
+      <button class="nav-item" type="button" data-view="map" aria-current="page"><svg class="icon"><use href="#i-map"/></svg><span>Map</span><kbd>1</kbd></button>
+      <button class="nav-item" type="button" data-view="commands"><svg class="icon"><use href="#i-command"/></svg><span>Commands</span><kbd>2</kbd></button>
+      <button class="nav-item" type="button" data-view="jobs"><svg class="icon"><use href="#i-jobs"/></svg><span>Jobs</span><span id="jobs-badge" class="nav-badge" hidden></span><kbd>3</kbd></button>
+      <button class="nav-item" type="button" data-view="terminal"><svg class="icon"><use href="#i-terminal"/></svg><span>Terminal</span><kbd>4</kbd></button>
+      <button class="nav-item" type="button" data-view="api"><svg class="icon"><use href="#i-code"/></svg><span>Python &amp; API</span><kbd>5</kbd></button>
+    </nav>
+    <section class="recent" aria-labelledby="recent-title">
+      <header class="section-header"><h2 id="recent-title">Recent jobs</h2>
+        <button id="refresh" class="icon-button" type="button" aria-label="Refresh jobs" title="Refresh" disabled><svg class="icon"><use href="#i-refresh"/></svg></button></header>
+      <ul id="jobs" class="job-list" aria-label="Recent jobs"><li class="job-empty">Connect to see your jobs.</li></ul>
+    </section>
+    <footer class="sidebar-footer">
+      <div class="connection" title="Engine connection"><span id="connection-dot" class="dot"></span><span id="connection-label">Not connected</span></div>
+      <div class="footer-actions">
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle dark appearance" title="Appearance"><svg class="icon theme-light"><use href="#i-moon"/></svg><svg class="icon theme-dark"><use href="#i-sun"/></svg></button>
+        <button id="shortcuts-open" class="icon-button" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><svg class="icon"><use href="#i-keyboard"/></svg></button>
+        <button id="disconnect" class="icon-button" type="button" aria-label="Sign out" title="Sign out" hidden><svg class="icon"><use href="#i-signout"/></svg></button>
+      </div>
+    </footer>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <a class="brand brand-compact" href="/" aria-label="GeoCrop workspace home"><img src="/static/icon.svg" alt="" width="26" height="26"><strong>GeoCrop</strong></a>
+      <div class="topbar-title"><h1 id="view-title">Map</h1><p id="view-subtitle">Imagery and results of the selected job</p></div>
+      <div class="topbar-actions">
+        <span id="version" class="chip" title="Engine version">Local engine</span>
+        <button id="palette-compact" class="icon-button compact-only" type="button" aria-label="Search commands"><svg class="icon"><use href="#i-search"/></svg></button>
+        <button id="theme-compact" class="icon-button compact-only" type="button" aria-label="Toggle dark appearance"><svg class="icon theme-light"><use href="#i-moon"/></svg><svg class="icon theme-dark"><use href="#i-sun"/></svg></button>
+        <button id="new-compact" class="btn btn-primary btn-small compact-only" type="button" disabled><svg class="icon"><use href="#i-plus"/></svg><span>New</span></button>
+      </div>
+    </header>
+
+    <main id="content" class="content">
+      <!-- Map -->
+      <section id="view-map" class="view" aria-labelledby="view-title">
+        <div id="map-shell" class="map-shell">
+          <div class="map-stage">
+            <div id="map" role="region" aria-label="Results map"></div>
+            <div class="map-toolbar glass">
+              <svg class="icon icon-muted"><use href="#i-layers"/></svg>
+              <label class="sr-only" for="basemap-select">Basemap</label>
+              <select id="basemap-select" class="bare-select" title="Basemap">
+                <option value="none">No basemap</option>
+                <option value="s2-2023">Sentinel-2 cloudless 2023</option>
+                <option value="s2-2024">Sentinel-2 cloudless 2024</option>
+                <option value="osm">OpenStreetMap</option>
+              </select>
+              <span class="toolbar-sep" aria-hidden="true"></span>
+              <button id="map-expand" class="icon-button" type="button" aria-label="Expand map" title="Expand map (F)" aria-pressed="false"><svg class="icon when-collapsed"><use href="#i-expand"/></svg><svg class="icon when-expanded"><use href="#i-collapse"/></svg></button>
+            </div>
+            <div id="map-busy" class="map-busy glass" hidden><span class="spinner" aria-hidden="true"></span><span>Preparing map previews…</span></div>
+            <div id="pick-hint" class="pick-hint glass" hidden>
+              <svg class="icon"><use href="#i-crosshair"/></svg>
+              <span><strong>Drag on the map</strong> to draw your area</span>
+              <button id="pick-basemap" class="btn btn-small btn-tinted" type="button">Show satellite basemap</button>
+              <button id="pick-cancel" class="btn btn-small btn-plain" type="button">Cancel</button>
+            </div>
+            <div id="map-empty" class="map-empty">
+              <div class="empty-card glass">
+                <div class="empty-icon" id="empty-icon"><svg class="icon"><use href="#i-satellite"/></svg></div>
+                <h2 id="empty-title">From an area and dates to imagery</h2>
+                <p id="empty-text">Draw an area, choose a period, and GeoCrop fetches cloud-screened Sentinel-2 composites — true colour, false colour and NDVI — right here on the map.</p>
+                <ol class="empty-steps" id="empty-steps">
+                  <li><span>1</span>Area</li><li><span>2</span>Period</li><li><span>3</span>Quicklook</li>
+                </ol>
+                <div class="empty-actions" id="empty-actions">
+                  <button id="empty-new" class="btn btn-primary" type="button" disabled><svg class="icon"><use href="#i-plus"/></svg>New analysis</button>
+                  <button id="example-quicklook" class="btn btn-secondary" type="button" disabled><svg class="icon"><use href="#i-sparkle"/></svg>Try Semberija, Jun–Aug 2023</button>
+                </div>
+                <p class="empty-foot" id="empty-foot">Want a crop map? <button id="example-demo" class="link-button" type="button" disabled>Run the synthetic demo</button> — a software check with crop classes, uncertainty and parcels.</p>
+              </div>
+            </div>
+            <div id="imagery-control" class="scrubber glass" hidden>
+              <div class="scrubber-row">
+                <div id="imagery-kind" class="segmented segmented-small" role="radiogroup" aria-label="Image type"></div>
+                <div id="imagery-product" class="segmented segmented-small" role="radiogroup" aria-label="Product"></div>
+              </div>
+              <div class="scrubber-row scrubber-dates">
+                <button id="imagery-prev" class="icon-button" type="button" aria-label="Previous date" title="Previous date ([)"><svg class="icon"><use href="#i-left"/></svg></button>
+                <div class="scrubber-track">
+                  <div id="imagery-dates" class="segmented segmented-small scrubber-seg" role="radiogroup" aria-label="Date" hidden></div>
+                  <div id="imagery-slider" class="scrubber-slider">
+                    <output id="imagery-label" class="scrubber-label" for="imagery-time">—</output>
+                    <input id="imagery-time" type="range" min="0" max="0" value="0" step="1" aria-label="Acquisition date">
+                    <div id="imagery-ticks" class="scrubber-ticks" aria-hidden="true"></div>
+                  </div>
+                </div>
+                <button id="imagery-next" class="icon-button" type="button" aria-label="Next date" title="Next date (])"><svg class="icon"><use href="#i-right"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <aside id="map-side" class="inspector" aria-label="Map layers">
+            <section id="imagery-settings" class="inspector-group" hidden>
+              <h3>Imagery</h3>
+              <label class="switch-row" for="imagery-on"><span>Show imagery</span><input type="checkbox" id="imagery-on" class="switch" role="switch" checked></label>
+              <label class="slider-row" for="imagery-opacity"><span>Opacity</span><input id="imagery-opacity" type="range" min="0" max="100" value="90"><output id="imagery-opacity-value" for="imagery-opacity">90%</output></label>
+            </section>
+            <section class="inspector-group">
+              <h3>Layers</h3>
+              <ul id="map-layers" class="layer-list"><li class="inspector-empty">Layers of the selected job appear here.</li></ul>
+            </section>
+            <section class="inspector-group">
+              <h3>Legend</h3>
+              <div id="map-legend" class="legend"><p class="inspector-empty">Nothing to explain yet.</p></div>
+            </section>
+          </aside>
+        </div>
+        <p id="map-status" class="caption" role="status">Select a finished job to see its outputs on the map.</p>
+
+        <div id="detail-slot-map" class="detail-slot">
+        <section id="job-detail" class="card job-detail" aria-labelledby="selected-job" hidden>
+          <header class="job-header">
+            <div class="job-heading">
+              <div class="job-title-row"><h2 id="selected-job">No job selected</h2><span id="selected-status" class="pill">Ready</span></div>
+              <p id="selected-meta" class="job-meta"></p>
+            </div>
+            <div class="job-actions">
+              <button id="map-load" class="btn btn-secondary btn-small" type="button" disabled><svg class="icon"><use href="#i-map"/></svg>Show on map</button>
+              <button id="cancel" class="btn btn-danger btn-small" type="button" hidden><svg class="icon"><use href="#i-stop"/></svg>Stop</button>
+            </div>
+          </header>
+          <div class="cmdline"><code id="selected-command"></code><button id="copy-command" class="icon-button" type="button" aria-label="Copy command" title="Copy command"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+          <div class="job-body">
+            <section class="log-pane" aria-labelledby="log-title">
+              <h3 id="log-title">Output</h3>
+              <pre id="logs" class="log" tabindex="0" aria-live="polite">Run a command or choose a job to see its output.</pre>
+            </section>
+            <section class="files-pane" aria-labelledby="files-title">
+              <h3 id="files-title">Files <span id="file-count" class="count"></span></h3>
+              <p id="artifact-empty" class="muted small">Files appear here as the job writes them.</p>
+              <ul id="artifact-list" class="file-list"></ul>
+            </section>
+          </div>
+        </section>
+        </div>
+        <p class="fineprint">Previews are downsampled for display; download the files for analysis. Basemaps are off by default; when enabled, tile requests reveal the viewed area and this page's origin to the provider. OpenStreetMap tiles are for light interactive use under the OSMF tile usage policy. Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data), CC BY-NC-SA 4.0 — non-commercial use.</p>
+      </section>
+
+      <!-- Commands -->
+      <section id="view-commands" class="view" hidden>
+        <div class="commands-layout">
+          <aside class="card command-index" aria-label="All commands">
+            <div class="search-field"><svg class="icon"><use href="#i-search"/></svg><label class="sr-only" for="command-filter">Filter commands</label><input id="command-filter" type="search" placeholder="Filter commands" autocomplete="off" spellcheck="false"></div>
+            <div id="command-list" class="command-list" role="listbox" aria-label="Commands"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          </aside>
+          <section class="card command-form-card" aria-labelledby="panel-title">
+            <header class="form-header">
+              <span id="command-group" class="eyebrow">Command</span>
+              <h2 id="panel-title">Choose a command</h2>
+              <p id="command-help" class="muted">Pick a command from the list or press <kbd data-mod-key>⌘K</kbd>. Forms are generated from the engine's own command-line parser.</p>
+            </header>
+            <form id="command-form" novalidate>
+              <div id="required-fields" class="field-grid"></div>
+              <details id="advanced" class="advanced" hidden><summary><svg class="icon chevron"><use href="#i-right"/></svg>Advanced options <span id="advanced-count" class="count"></span></summary><div id="optional-fields" class="field-grid"></div></details>
+              <div class="preview" id="command-preview-wrap" hidden><span class="preview-label">Command line</span><code id="command-preview"></code><button id="copy-preview" class="icon-button" type="button" aria-label="Copy command line" title="Copy"><svg class="icon"><use href="#i-copy"/></svg></button></div>
+              <div class="form-actions"><p id="form-error" class="form-error" role="alert"></p><button class="btn btn-primary" id="run-command" disabled><svg class="icon"><use href="#i-play"/></svg>Run command</button></div>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <!-- Jobs -->
+      <section id="view-jobs" class="view" hidden>
+        <div class="stats" aria-label="Job overview">
+          <div><span>Total</span><strong id="total">—</strong></div>
+          <div><span>Active</span><strong id="running">—</strong></div>
+          <div><span>Succeeded</span><strong id="succeeded">—</strong></div>
+          <div><span>Failed</span><strong id="failed">—</strong></div>
+        </div>
+        <div id="detail-slot-jobs" class="detail-slot"></div>
+        <div class="card table-card">
+          <div class="jobs-table" role="table" aria-label="Job history">
+            <div class="jobs-row jobs-head" role="row"><span role="columnheader">Command</span><span role="columnheader">Status</span><span role="columnheader">Started</span><span role="columnheader">Duration</span><span role="columnheader">Exit</span></div>
+            <div id="jobs-page" role="rowgroup"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Terminal -->
+      <section id="view-terminal" class="view view-terminal" hidden>
+        <p class="muted view-lead">CLI console — type <code>geocrop</code> commands exactly as in your shell. They run as jobs in the workspace; shell operators and other programs are not available.</p>
+        <div id="terminal-root"></div>
+      </section>
+
+      <!-- Python & API -->
+      <section id="view-api" class="view" hidden>
+        <div class="api-grid">
+          <article class="card prose">
+            <h2>Jupyter and Python</h2>
+            <p class="muted">Call the same engine from a notebook, JupyterLab or a script. Set <code>GEOCROP_WEB_TOKEN</code> in the kernel's environment — never paste it into a cell.</p>
+            <pre class="snippet"><code>from geocrop.client import EngineClient
+
+with EngineClient() as engine:
+    job = engine.submit(["quicklook", "--bbox", "19.10", "44.72", "19.16", "44.76",
+                         "--start", "2023-06-01", "--end", "2023-08-31",
+                         "--out", "outputs/semberija-2023"])
+    engine.wait(job["id"], timeout=900)
+    print(engine.logs(job["id"])["text"])</code></pre>
+            <p class="muted small">On another machine, forward the port over SSH and pass <code>EngineClient(base_url=...)</code>. Paths belong to the server workspace.</p>
+          </article>
+          <article class="card prose">
+            <h2>HTTP API</h2>
+            <p class="muted">Every endpoint needs the Bearer token. Submitting returns a job ID right away; poll it for status, logs and files.</p>
+            <pre class="snippet"><code>POST /api/jobs
 Authorization: Bearer &lt;token&gt;
 Content-Type: application/json
 
-{"argv": ["indices", "--format", "json"]}</code></pre><button id="api-schema" class="secondary" disabled>Download OpenAPI schema ↓</button></div>
+{"argv": ["indices", "--format", "json"]}</code></pre>
+            <button id="api-schema" class="btn btn-secondary" type="button" disabled><svg class="icon"><use href="#i-download"/></svg>Download OpenAPI schema</button>
+          </article>
+        </div>
       </section>
-      <section class="card log-card"><div class="card-top"><div><span class="eyebrow">EXECUTION</span><h2>Command output</h2></div><button id="cancel" class="danger" hidden>Stop</button></div><div class="log-meta"><span id="selected-job">No job selected</span><span id="selected-status" class="badge">READY</span></div><pre id="logs" class="terminal" aria-live="polite">GeoCrop is ready.
+    </main>
+    <footer class="statusbar"><svg class="icon"><use href="#i-folder"/></svg><span id="workspace-path">Local research workspace</span><span class="statusbar-sep" aria-hidden="true">·</span><span>1 worker · same CLI and Python API</span></footer>
+  </div>
 
-Run a command or choose a job from the history.
-Output, warnings and errors appear here.</pre><div class="artifacts"><h3>Output files <span id="file-count"></span></h3><p id="artifact-empty" class="help">Files appear when the selected job creates them.</p><ul id="artifact-list"></ul></div></section>
-    </div>
-    <section class="card map-card" aria-labelledby="map-title">
-      <div class="card-top"><div><span class="eyebrow">RESULTS ON THE MAP</span><h2 id="map-title">Map</h2></div>
-        <div class="map-actions"><label class="map-toggle" for="basemap-select">Basemap</label><select id="basemap-select" class="basemap-select"><option value="none">None</option><option value="s2-2023">Sentinel-2 cloudless 2023 (EOX)</option><option value="s2-2024">Sentinel-2 cloudless 2024 (EOX)</option><option value="osm">OpenStreetMap</option></select><button id="map-load" class="secondary" disabled>Show selected job ↻</button></div></div>
-      <p id="map-status" class="help">Select a finished job with spatial outputs. <code>geocrop quicklook</code> shows real Sentinel-2 imagery (true colour, false colour and NDVI per month and per acquisition date); <code>geocrop demo</code> shows crop classes, uncertainty and parcels coloured by the traffic light (synthetic data with arbitrary coordinates).</p>
-      <div class="map-layout"><div id="map" role="region" aria-label="Results map"></div><aside id="map-side"><div id="imagery-control" class="imagery-control" hidden><h3>Satellite imagery</h3><label for="imagery-time">Date / window</label><select id="imagery-time"></select><label for="imagery-product">Product</label><select id="imagery-product"></select><label for="imagery-opacity">Opacity</label><input id="imagery-opacity" type="range" min="0" max="100" value="90"><label class="map-toggle"><input type="checkbox" id="imagery-on" checked> Show imagery</label></div><h3>Layers</h3><ul id="map-layers" class="map-layers"></ul><h3>Legend</h3><div id="map-legend" class="map-legend"></div></aside></div>
-      <p class="help map-note">Previews are downsampled for display; download the files for analysis. Basemaps are off by default; when enabled, tile requests reveal the viewed area and this page's origin to the provider. OpenStreetMap tiles are for light interactive use under the OSMF tile usage policy. Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data), CC BY-NC-SA 4.0 — non-commercial use.</p>
+  <nav class="tabbar glass" aria-label="Views">
+    <button class="tab-item" type="button" data-view="map" aria-current="page"><svg class="icon"><use href="#i-map"/></svg><span>Map</span></button>
+    <button class="tab-item" type="button" data-view="commands"><svg class="icon"><use href="#i-command"/></svg><span>Commands</span></button>
+    <button class="tab-item" type="button" data-view="jobs"><svg class="icon"><use href="#i-jobs"/></svg><span>Jobs</span></button>
+    <button class="tab-item" type="button" data-view="terminal"><svg class="icon"><use href="#i-terminal"/></svg><span>Terminal</span></button>
+    <button class="tab-item" type="button" data-view="api"><svg class="icon"><use href="#i-code"/></svg><span>API</span></button>
+  </nav>
+</div>
+
+<!-- Connect -->
+<div id="auth-panel" class="overlay" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+  <form id="connect-form" class="sheet auth-sheet">
+    <img src="/static/icon.svg" alt="" width="56" height="56" class="auth-logo">
+    <h2 id="auth-title">Connect to GeoCrop Engine</h2>
+    <p class="muted">Enter the access token you set in <code>GEOCROP_WEB_TOKEN</code> before running <code>geocrop serve</code>. It stays in this tab's memory only.</p>
+    <div class="input-icon"><svg class="icon"><use href="#i-key"/></svg><label class="sr-only" for="token">Access token</label><input id="token" type="password" autocomplete="off" placeholder="Access token" required></div>
+    <p id="auth-error" class="form-error" role="alert"></p>
+    <button class="btn btn-primary btn-block btn-large" type="submit">Connect</button>
+  </form>
+</div>
+
+<!-- Command palette -->
+<dialog id="palette" class="palette" aria-label="Command palette">
+  <div class="palette-search"><svg class="icon"><use href="#i-search"/></svg>
+    <input id="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" placeholder="Search commands and actions" autocomplete="off" spellcheck="false">
+    <kbd>esc</kbd></div>
+  <ul id="palette-list" class="palette-list" role="listbox" aria-label="Results"></ul>
+  <footer class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+</dialog>
+
+<!-- New analysis -->
+<dialog id="analysis-sheet" class="sheet-dialog" aria-labelledby="analysis-title">
+  <form id="analysis-form" class="sheet analysis" novalidate>
+    <header class="sheet-header">
+      <div><h2 id="analysis-title">New analysis</h2><p class="muted small">Sentinel-2 quicklook — cloud-screened monthly composites and single scenes</p></div>
+      <button id="analysis-close" class="icon-button" type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button>
+    </header>
+    <ol class="stepper" aria-label="Steps">
+      <li data-step-dot="1" aria-current="step"><span>1</span>Area</li>
+      <li data-step-dot="2"><span>2</span>Period</li>
+      <li data-step-dot="3"><span>3</span>Run</li>
+    </ol>
+    <section class="step" data-step="1" aria-label="Area">
+      <p class="step-lead">Which fields do you want to look at? Enter a bounding box in degrees (WGS 84) or draw it on the map.</p>
+      <div class="bbox-grid">
+        <label>West<input id="bbox-west" inputmode="decimal" autocomplete="off" placeholder="19.10"></label>
+        <label>South<input id="bbox-south" inputmode="decimal" autocomplete="off" placeholder="44.72"></label>
+        <label>East<input id="bbox-east" inputmode="decimal" autocomplete="off" placeholder="19.16"></label>
+        <label>North<input id="bbox-north" inputmode="decimal" autocomplete="off" placeholder="44.76"></label>
+      </div>
+      <div class="step-tools">
+        <button id="pick-area" class="btn btn-secondary btn-small" type="button"><svg class="icon"><use href="#i-crosshair"/></svg>Draw on map</button>
+        <button id="preset-semberija" class="chip chip-button" type="button">Semberija example</button>
+        <span id="bbox-info" class="muted small"></span>
+      </div>
     </section>
-    <section class="card history"><div class="card-top"><div><span class="eyebrow">HISTORY</span><h2>Jobs</h2></div><button id="refresh" class="secondary" disabled>Refresh ↻</button></div><div class="table-wrap"><table><thead><tr><th>Command</th><th>Status</th><th>Started</th><th>Exit</th></tr></thead><tbody id="jobs"><tr><td colspan="4" class="empty">Connect the engine to list jobs.</td></tr></tbody></table></div></section>
-    <footer><span id="workspace-path">Local research workspace</span><span>1 worker · same CLI and Python API</span></footer>
-  </main>
+    <section class="step" data-step="2" aria-label="Period" hidden>
+      <p class="step-lead">When? One composite is built per month with enough clear sky; cloud-free single scenes are kept too.</p>
+      <div class="date-grid">
+        <label>Start<input id="period-start" type="date" required></label>
+        <label>End<input id="period-end" type="date" required></label>
+      </div>
+      <div class="step-tools chips" id="period-presets"></div>
+      <p id="period-info" class="muted small"></p>
+    </section>
+    <section class="step" data-step="3" aria-label="Run" hidden>
+      <dl class="summary">
+        <div><dt>Area</dt><dd id="summary-area">—</dd></div>
+        <div><dt>Period</dt><dd id="summary-period">—</dd></div>
+      </dl>
+      <label class="field-label" for="analysis-out">Output folder</label>
+      <input id="analysis-out" autocomplete="off" spellcheck="false">
+      <p class="muted small">Relative to the workspace. A fresh folder keeps earlier results intact.</p>
+      <div class="preview"><span class="preview-label">Same as running</span><code id="analysis-preview"></code></div>
+    </section>
+    <p id="analysis-error" class="form-error" role="alert"></p>
+    <footer class="sheet-footer">
+      <button id="analysis-back" class="btn btn-plain" type="button" hidden>Back</button>
+      <span class="spacer"></span>
+      <button id="analysis-next" class="btn btn-primary" type="submit">Continue</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Shortcuts -->
+<dialog id="shortcuts" class="sheet-dialog" aria-labelledby="shortcuts-title">
+  <div class="sheet shortcuts" tabindex="-1" autofocus>
+    <header class="sheet-header"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button id="shortcuts-close" class="icon-button" type="button" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button></header>
+    <dl class="shortcut-list">
+      <div><dt><kbd data-mod-key>⌘K</kbd></dt><dd>Search commands and actions</dd></div>
+      <div><dt><kbd>N</kbd></dt><dd>New analysis</dd></div>
+      <div><dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Map, Commands, Jobs, Terminal, Python &amp; API</dd></div>
+      <div><dt><kbd>F</kbd></dt><dd>Expand or restore the map</dd></div>
+      <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous / next imagery date</dd></div>
+      <div><dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next / previous job</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Show this overview</dd></div>
+      <div><dt><kbd>esc</kbd></dt><dd>Close a sheet or leave the expanded map</dd></div>
+    </dl>
+  </div>
+</dialog>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
 </body>
 </html>

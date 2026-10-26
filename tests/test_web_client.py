@@ -94,3 +94,54 @@ def test_example_notebook_is_clean_and_has_executable_python():
         if cell["cell_type"] == "code":
             assert cell["execution_count"] is None and cell["outputs"] == []
             compile("".join(cell["source"]), str(path), "exec")
+
+
+class Routed(Response):
+    def __init__(self, status, value):
+        super().__init__(value)
+        self.status_code = status
+
+
+def test_client_prefers_v1_and_pins_the_detected_prefix(monkeypatch):
+    client = EngineClient(token="test-token")
+    urls = []
+
+    def request(method, url, **kwargs):
+        urls.append(url)
+        return Routed(200, {"status": "ok", "jobs": []})
+
+    monkeypatch.setattr(client.session, "request", request)
+    client.health()
+    client.jobs()
+    assert urls == ["http://127.0.0.1:8765/api/v1/health", "http://127.0.0.1:8765/api/v1/jobs"]
+    assert client.api_prefix == "/api/v1"
+    client.close()
+
+
+def test_client_falls_back_only_for_missing_routes(monkeypatch):
+    client = EngineClient(token="test-token")
+    urls = []
+
+    def legacy_server(method, url, **kwargs):
+        urls.append(url)
+        if "/api/v1/" in url:
+            return Routed(404, {"detail": "Not Found"})
+        return Routed(200, {"id": "a/b", "status": "running"})
+
+    monkeypatch.setattr(client.session, "request", legacy_server)
+    assert client.job("a/b")["status"] == "running"
+    assert urls == ["http://127.0.0.1:8765/api/v1/jobs/a%2Fb", "http://127.0.0.1:8765/api/jobs/a%2Fb"]
+    client.job("a/b")
+    assert urls[-1] == "http://127.0.0.1:8765/api/jobs/a%2Fb" and client.api_prefix == "/api"
+
+    fresh = EngineClient(token="test-token")
+    monkeypatch.setattr(fresh.session, "request", lambda method, url, **kw: urls.append(url) or Routed(
+        404, {"detail": "Job or artifact not found"}))
+    fresh.job("missing")  # Response stub does not raise; a real 404 would raise HTTPError
+    assert urls[-1].endswith("/api/v1/jobs/missing") and fresh.api_prefix == "/api/v1"
+    pinned = EngineClient(token="test-token", api_prefix="/api")
+    monkeypatch.setattr(pinned.session, "request", lambda method, url, **kw: urls.append(url) or Routed(200, {}))
+    pinned.health()
+    assert urls[-1].endswith("/api/health")
+    for c in (client, fresh, pinned):
+        c.close()

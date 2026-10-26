@@ -7,6 +7,11 @@
     lightgbm      LGBMClassifier            (pip install lightgbm)
     catboost      CatBoostClassifier        (pip install catboost; as in ESA WorldCereal)
     tempcnn       Temporal CNN (Pelletier et al., 2019) on `ts` features (pip install torch)
+    ltae          Lightweight Temporal Attention Encoder (Garnot & Landrieu, 2020) on `ts` features
+                  (pip install torch; `geocrop.temporal_models`)
+
+Sequence models (`SEQUENCE_ALGORITHMS`) reshape the channel-major `ts_<series>_d<doy>` layout to
+(n, T, C); `sequence_params` fills their `n_channels` (and L-TAE `positions`) from the feature names.
 
 Unknown keys for the chosen algorithm are ignored, so one YAML `model:` section can hold settings for
 several algorithms. Further algorithms come from plugins (entry-point group `geocrop.estimators`, see
@@ -17,11 +22,14 @@ from __future__ import annotations
 import inspect
 
 import numpy as np
+from sklearn.base import BaseEstimator, ClassifierMixin
 
 from . import plugins
 
 #: Built-in algorithm names. Plugins add more through `geocrop.plugins.estimators`; see `available_algorithms`.
-ALGORITHMS = ("rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn")
+ALGORITHMS = ("rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn", "ltae")
+#: Algorithms that consume (n, T, C) series reshaped from `ts_<series>_d<doy>` features.
+SEQUENCE_ALGORITHMS = ("tempcnn", "ltae")
 
 
 def _filtered(cls, params: dict, drop=("algorithm",)) -> dict:
@@ -78,7 +86,8 @@ def _catboost(p: dict, seed: int):
         raise RuntimeError("pip install catboost") from exc
     kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
           "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
-          "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed}
+          "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed,
+          "allow_writing_files": False}
     return CatBoostClassifier(**{k: v for k, v in kw.items() if v is not None})
 
 
@@ -86,7 +95,12 @@ def _tempcnn(p: dict, seed: int):
     return TempCNNClassifier(seed=seed, **_filtered(TempCNNClassifier, p))
 
 
-for _name, _factory in zip(ALGORITHMS, (_rf, _extra_trees, _hist_gb, _lightgbm, _catboost, _tempcnn)):
+def _ltae(p: dict, seed: int):
+    from .temporal_models import LightTAEClassifier
+    return LightTAEClassifier(seed=seed, **_filtered(LightTAEClassifier, p))
+
+
+for _name, _factory in zip(ALGORITHMS, (_rf, _extra_trees, _hist_gb, _lightgbm, _catboost, _tempcnn, _ltae)):
     plugins.estimators.register(_name, _factory, source=plugins.BUILTIN)
 
 
@@ -111,6 +125,11 @@ def make_estimator(params: dict, seed: int):
     return estimator
 
 
+def predict_labels(estimator, X) -> np.ndarray:
+    """Class labels as a 1-D array (CatBoost returns a column vector)."""
+    return np.asarray(estimator.predict(X)).ravel()
+
+
 def importances(model, n_features: int) -> np.ndarray:
     imp = getattr(model, "feature_importances_", None)
     if imp is None:
@@ -121,24 +140,43 @@ def importances(model, n_features: int) -> np.ndarray:
 
 def channels_from_names(names: list[str]) -> int:
     """Number of time series in an ordered list of `ts_<INDEX>_d<doy>` features."""
-    series = [n.split("_d")[0] for n in names if n.startswith("ts_")]
+    series = [n.rsplit("_d", 1)[0] for n in names if n.startswith("ts_")]
     if len(series) != len(names):
         raise ValueError("tempcnn uses only `ts` features; select groups: [ts]")
     return len(dict.fromkeys(series))
 
 
-class TempCNNClassifier:
+def sequence_params(params: dict | None, names: list[str]) -> dict:
+    """Copy of `params` with `n_channels` (and L-TAE `positions`) derived from `ts_<series>_d<doy>` names.
+
+    Non-sequence algorithms are returned unchanged; explicit values are never overwritten.
+    """
+    p = dict(params or {})
+    algo = p.get("algorithm")
+    if algo in SEQUENCE_ALGORITHMS:
+        if "n_channels" not in p:
+            p["n_channels"] = channels_from_names(names)
+        if algo == "ltae" and p.get("positions") is None:
+            from .temporal_models import series_names
+            p["positions"] = series_names(names)[1]
+    return p
+
+
+class TempCNNClassifier(ClassifierMixin, BaseEstimator):
     """Temporal CNN (Pelletier et al., 2019): 3 x [Conv1d(64, k=5) + BN + ReLU + Dropout] -> dense -> softmax.
 
     Expects features ordered channel-major (all dates of series 1, then series 2, ...), as produced by
     `geocrop.tsfeatures` and `features.select(groups=["ts"])`. Per-channel standardisation is learned in fit.
+    `patience` (default off, as before) enables early stopping on a stratified `validation_fraction`
+    of the training rows; see `geocrop.temporal_models.fit_network`.
     """
 
     def __init__(self, n_channels: int = 1, epochs: int = 60, lr: float = 1e-3, batch_size: int = 256,
                  dropout: float = 0.3, width: int = 64, class_weight: str | None = "balanced", seed: int = 42,
-                 device: str | None = None):
+                 device: str | None = None, patience: int | None = None, validation_fraction: float = 0.1):
         self.n_channels, self.epochs, self.lr, self.batch_size = n_channels, epochs, lr, batch_size
         self.dropout, self.width, self.class_weight, self.seed, self.device = dropout, width, class_weight, seed, device
+        self.patience, self.validation_fraction = patience, validation_fraction
 
     def _reshape(self, X):
         X = np.asarray(X, dtype="float32")
@@ -157,36 +195,13 @@ class TempCNNClassifier:
                              nn.Linear(256, n_classes))
 
     def fit(self, X, y):
-        import torch
-        from torch.nn import functional as F
+        from .temporal_models import fit_network
 
-        torch.manual_seed(self.seed)
-        rng = np.random.default_rng(self.seed)
         X = self._reshape(X)
         self.mean_ = np.nanmean(X, axis=(0, 2), keepdims=True)
         self.std_ = np.nanstd(X, axis=(0, 2), keepdims=True) + 1e-6
         X = np.nan_to_num((X - self.mean_) / self.std_)
-        self.classes_, yi = np.unique(np.asarray(y), return_inverse=True)
-        counts = np.bincount(yi, minlength=len(self.classes_))
-        weight = torch.tensor(len(yi) / (len(counts) * np.maximum(counts, 1)), dtype=torch.float32) \
-            if self.class_weight else None
-        dev = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.net_ = self._net(X.shape[2], len(self.classes_)).to(dev)
-        opt = torch.optim.AdamW(self.net_.parameters(), lr=self.lr, weight_decay=1e-4)
-        Xt, yt = torch.from_numpy(X), torch.from_numpy(yi.astype("int64"))
-        self.net_.train()
-        for _ in range(self.epochs):
-            order = rng.permutation(len(X))
-            for i in range(0, len(X), self.batch_size):
-                b = order[i:i + self.batch_size]
-                if len(b) < 2:
-                    continue
-                opt.zero_grad()
-                loss = F.cross_entropy(self.net_(Xt[b].to(dev)), yt[b].to(dev),
-                                       weight=None if weight is None else weight.to(dev))
-                loss.backward()
-                opt.step()
-        self.net_.eval().cpu()
+        fit_network(self, lambda n_classes: self._net(X.shape[2], n_classes), X, y)
         return self
 
     def predict_proba(self, X):

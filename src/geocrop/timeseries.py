@@ -200,3 +200,62 @@ def harmonics(y: np.ndarray, w: np.ndarray, days: np.ndarray, order: int = 2, pe
         out[f"amp{k}"] = np.hypot(a, b)
         out[f"phase{k}"] = np.arctan2(b, a)
     return out
+
+
+def drop_events(z: np.ndarray, days: np.ndarray, min_drop: float, max_drop_days: float,
+                recovery_fraction: float = 0.5, recovery_days: float = 40.0) -> list[list[dict]]:
+    """Abrupt drops in smoothed series z (n_pixels, n_times), e.g. harvest or grassland mowing.
+
+    An event starts where the series falls by at least `min_drop` within `max_drop_days` (the steepest of
+    the overlapping qualifying windows is kept) and ends at the trough that follows; `drop` is the total
+    decline from start to trough. Gradual declines (senescence) spread over longer periods do not reach
+    `min_drop` inside the window. The event is `recovered` when, within
+    `recovery_days` after the minimum, the series regains at least `recovery_fraction` of the drop
+    (mowing, regrowth) — harvest and ploughing are usually not recovered. Scanning continues from the
+    minimum, so events do not overlap. Rows with NaN return no events.
+
+    Returns, per pixel, a list of dicts with start/drop/end day (drop day = steepest single-step decline),
+    their indices, `drop`, `recovery` (regained amount, NaN when no data follow) and `recovered`.
+    """
+    z = np.asarray(z, dtype="float64")
+    days = np.asarray(days, dtype="float64")
+    if z.ndim != 2 or z.shape[1] != len(days):
+        raise ValueError("z must be (n_pixels, n_times) matching days")
+    if not min_drop > 0 or not max_drop_days > 0 or not recovery_days > 0 or not 0 < recovery_fraction <= 1:
+        raise ValueError("min_drop, max_drop_days and recovery_days must be positive; recovery_fraction in (0, 1]")
+    n = len(days)
+    out: list[list[dict]] = []
+    for row in z:
+        events: list[dict] = []
+        out.append(events)
+        if n < 3 or not np.isfinite(row).all():
+            continue
+        def window_drop(start, row=row):
+            reach = np.flatnonzero((days > days[start]) & (days <= days[start] + max_drop_days))
+            if reach.size == 0:
+                return -np.inf, start
+            end = int(reach[np.argmin(row[reach])])
+            return row[start] - row[end], end
+
+        i = 0
+        while i < n - 1:
+            drop, j = window_drop(i)
+            if drop < min_drop:
+                i += 1
+                continue
+            for i2 in range(i + 1, j):           # steepest window among the overlapping qualifying starts
+                d2, j2 = window_drop(i2)
+                if d2 > drop:
+                    drop, i, j = d2, i2, j2
+            while j + 1 < n and row[j + 1] < row[j]:   # follow the decline to its trough
+                j += 1
+            drop = row[i] - row[j]
+            steps = np.diff(row[i:j + 1])
+            k = i + int(np.argmin(steps)) + 1
+            after = np.flatnonzero((days > days[j]) & (days <= days[j] + recovery_days))
+            recovery = float(row[after].max() - row[j]) if after.size else float("nan")
+            events.append({"start_doy": float(days[i]), "drop_doy": float(days[k]), "end_doy": float(days[j]),
+                           "start_index": i, "end_index": j, "drop": float(drop), "recovery": recovery,
+                           "recovered": bool(after.size and recovery >= recovery_fraction * drop)})
+            i = j
+    return out

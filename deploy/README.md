@@ -25,10 +25,20 @@ geocrop download --manifest manifests/s1.csv --out /data/geocrop/raw/s1 --limit 
 geocrop snap-graph --out configs/s1_sigma0.xml --crs EPSG:32634
 geocrop snap --gpt ~/esa-snap/bin/gpt --graph configs/s1_sigma0.xml --input <GRD.zip> --output /scratch/geocrop/<id>.tif
 geocrop s1-import --geotiff /scratch/geocrop/<id>.tif --product-name <GRD name> --orbit ASCENDING --out /data/geocrop/interim/s1/<id>
-geocrop run --config configs/rs_north_2023.yaml
+geocrop preflight --config configs/rs_north_2023.yaml --inventory manifests/s1.csv \
+    --out /data/geocrop/outputs/preflight_pilot.json --markdown /data/geocrop/outputs/preflight_pilot.md
+geocrop run --config configs/rs_north_2023.yaml        # only when preflight is not BLOCKED
 ```
+Read every preflight warning before the pilot ([docs/preflight.md](../docs/preflight.md)): missing windows,
+cloud-starved windows, classes that cannot be tested in every fold, CRS problems and the disk/RAM estimate.
 Measure from `<output>/stages.json` and `run.log` (seconds and peak RSS per stage) and `du -sh /data/geocrop/*`,
 then extrapolate by area before scaling to the whole AOI.
+
+**Before scaling** (e.g. 25 municipalities): switch the config to the full grid and inventories, rerun
+`geocrop preflight --config ... --strict` and start the long run only on `ready` (or on warnings you have
+accepted in writing). Compare the pilot's measured seconds and sizes with the preflight estimate and adjust
+`resources.compression_ratio` if needed; the disk guard stops `composite`, `features` and `predict` early when an
+output volume lacks the estimated space.
 
 ## 3. Long runs
 ```bash
@@ -47,5 +57,8 @@ SNAP is not in the image; run Sentinel-1 preprocessing on the host and mount the
 
 ## 5. Housekeeping
 * Keep 20–25 % free space on `/scratch`; SNAP temporary files go to `/scratch/geocrop/snap-tmp`.
+* `geocrop clean --config ... --dry-run` lists temporary files and quarantined partial outputs of failed stages
+  (`<output>/.quarantine`); without `--dry-run` it removes them. `--all-intermediates` also removes composites,
+  feature stacks and samples (regenerated on the next run). Scene folders, reference layers and configs are never removed.
 * Archive `run_manifest.json`, `stages.json`, configs and inventories with every result.
 * LPIS and field data stay on `/data/geocrop/reference` (restricted permissions); nothing is pushed to git.

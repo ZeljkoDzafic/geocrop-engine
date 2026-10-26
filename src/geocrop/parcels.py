@@ -138,7 +138,8 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
               min_confidence: float | None = None, min_majority_share: float | None = None,
               min_margin: float | None = None, crop_mapping: dict | None = None,
               conformal: str | Path | dict | None = None, alpha: float = 0.1, aoa: str | Path | None = None,
-              min_aoa_fraction: float = 0.5, markers: pd.DataFrame | None = None, calendar: dict | None = None) -> dict:
+              min_aoa_fraction: float = 0.5, markers: pd.DataFrame | None = None, calendar: dict | None = None,
+              marker_rules: dict | None = None) -> dict:
     """Summarise the probability raster per parcel and write GeoPackage + CSV + summary JSON.
 
     crop_mapping   maps declaration codes to model class names (e.g. {"1101": "soybean"}).
@@ -149,6 +150,9 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                    applicability are sent to review (the model extrapolates there).
     markers        table from `cbm.markers`; with `calendar` adds `calendar_consistent`.
     The `traffic_light` column combines all available evidence (see `geocrop.cbm.traffic_light`).
+    marker_rules   enabled `cbm.rules` (see `geocrop.cbm_markers.RULE_DEFAULTS`): copies the event-marker
+                   columns of `markers` (from `cbm.event_markers`), lets them escalate the traffic light and
+                   adds `traffic_light_reasons`. Without it the output is unchanged.
     """
     from . import cbm
 
@@ -256,10 +260,21 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
         ids = gdf[id_field].astype(str).reset_index(drop=True)
         m = markers.assign(parcel_id=markers.parcel_id.astype(str)).set_index("parcel_id").reindex(ids).reset_index(drop=True)
         for col in ("peak_doy", "harvest_doy", "bare_soil_days", "clear_observations"):
-            table[col] = m[col].to_numpy()
+            if col in m or marker_rules is None:
+                table[col] = m[col].to_numpy()
         if calendar:
             table["calendar_consistent"] = cbm.calendar_consistency(m, table["declared_class"], calendar).to_numpy()
-    table["traffic_light"] = cbm.traffic_light(table)
+    rules_on = marker_rules is not None and cbm.cbm_markers.resolve_rules(marker_rules)["enabled"]
+    if rules_on:
+        if markers is not None:
+            for col in cbm.cbm_markers.EVENT_COLUMNS:
+                if col in m:
+                    table[col] = m[col].to_numpy()
+        details = cbm.traffic_light_details(table, marker_rules)
+        table["traffic_light"] = details["traffic_light"].to_numpy()
+        table["traffic_light_reasons"] = details["traffic_light_reasons"].to_numpy()
+    else:
+        table["traffic_light"] = cbm.traffic_light(table)
     result = gdf.drop(columns=[c for c in table.columns if c in gdf.columns]).reset_index(drop=True)
     result = gpd.GeoDataFrame(pd.concat([result, table], axis=1), geometry=gdf.geometry.name, crs=gdf.crs)
     out = Path(output)
@@ -286,6 +301,9 @@ def aggregate(probabilities: str | Path, parcels: str | Path | gpd.GeoDataFrame,
                                      if result["declared_class"].notna().any() else {}),
         "note": "Review flags support inspection prioritisation; they are not findings of non-compliance.",
     }
+    if rules_on:
+        summary["traffic_light_reason_counts"] = dict(sorted(Counter(
+            code for codes in table["traffic_light_reasons"] for code in codes.split(";") if code).items()))
     out.with_suffix(".summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf8")
     return summary
 

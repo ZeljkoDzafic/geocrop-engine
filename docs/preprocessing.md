@@ -56,6 +56,32 @@ Sentinel-1B stopped operating in December 2021 (mission end declared August 2022
 Sentinel-1A alone (12-day repeat per orbit) until Sentinel-1C data are available; expect fewer radar
 observations per window.
 
+### Sentinel-1 RTC from STAC (no SNAP)
+`geocrop.s1_stac.import_season(grid, out, start, end)` reads radiometrically terrain-corrected Sentinel-1
+backscatter (terrain-flattened γ⁰, linear power; Small 2011, processed by Catalyst with PlanetDEM) from the
+Microsoft Planetary Computer collection `sentinel-1-rtc`. Only the grid window of each VV/VH COG is read and
+reprojected (bilinear, in linear power) onto the study grid; slices of one overpass are mosaicked, overpasses
+covering < 90 % of the grid are skipped, and each overpass becomes a standard scene folder (`VV.tif`, `VH.tif`
+float32 linear, `scene.json` with `orbit_direction` from `sat:orbit_state`, relative/absolute orbit, platform,
+`backscatter: gamma0`, source item ids, licence and attribution). Assets are signed with a short-lived SAS token
+(the optional `planetary-computer` package when installed, otherwise the public token endpoint via `requests`;
+`PC_SDK_SUBSCRIPTION_KEY` is sent when set). `s1_stac.plausibility(scene)` reports dB percentiles, the share of
+linear values in 10⁻⁴…1 and the VV > VH share. Over Semberija (June 2023) 99.9 % of values lie in 10⁻⁴…1, VV
+medians are −8 to −10 dB, VH −14 to −15 dB, and VV > VH in ≥ 98 % of pixels.
+
+The RTC data are CC BY 4.0 (Microsoft; derived from Copernicus Sentinel-1). Credit products with "Contains
+modified Copernicus Sentinel data <year>; Sentinel-1 RTC from Microsoft Planetary Computer (CC BY 4.0),
+processed by Catalyst." RTC products use the provider's DEM and processing chain; for studies that must
+control every step (orbit files, speckle filter, DEM), use the SNAP graph above.
+
+**Geolocation.** Over Semberija (2023) the RTC scenes are offset from Sentinel-2 L2A by a systematic amount per
+acquisition geometry (≈ 50 m for ascending relative orbit 73, ≈ 35 m for 175, ≈ 10 m for descending 153, < 10 m
+for 51; see [acceptance](acceptance.md)). `s1_stac.estimate_offsets(scenes, s2_ndvi)` estimates one sub-pixel
+offset per orbit direction and relative orbit by NDVI / VH cross-correlation, and `s1_stac.apply_offsets` writes
+corrected copies of the scene folders (raw imports stay untouched; `scene.json` records the shift). Estimate the
+offsets on part of the season and check the residual on the rest before composites from several geometries are
+used for features.
+
 See [timeseries.md](timeseries.md) for the full cloud/shadow screening chain (projected shadows, external
 masks such as OmniCloudMask, multi-temporal outlier screening) and for time-series features from individual scenes.
 
