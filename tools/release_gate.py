@@ -116,8 +116,18 @@ class Gate:
             status, evidence, notes = "fail", {"exception": traceback.format_exc()[-3000:]}, f"{type(exc).__name__}: {exc}"
         res = CheckResult(id_, priority, status, round(time.monotonic() - t0, 1), evidence, notes, commands)
         self.results.append(res)
+        self._partial()
         print(f"[gate] {id_}: {status.upper()} ({res.seconds} s) {notes}", flush=True)
         return res
+
+    def _partial(self) -> None:
+        """Write the results so far (``release_gate_report.partial.json``): an interrupted gate keeps its evidence
+        and can be completed with ``--reuse --merge``."""
+        report = build_report(self.results, self.facts, {"partial": True, "utc": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+        out = Path(self.args.out or self.scratch)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "release_gate_report.partial.json").write_text(json.dumps(report, indent=2, default=str),
+                                                              encoding="utf8")
 
     def network_ok(self) -> bool:
         if self.args.no_network:
@@ -543,7 +553,10 @@ class Gate:
         t0 = time.monotonic()
         self.prepare()
         R = self.record
-        install = R("a.install", "P0", self.check_install)
+        if self.args.reuse and self.args.merge and (self.venv / "bin" / "python").exists():
+            install = None        # keep the evidence of the original clean installation from the merged report
+        else:
+            install = R("a.install", "P0", self.check_install)
         if install is not None and install.status == "fail":
             print("[gate] installation failed; remaining checks are recorded as skipped", flush=True)
         ready = self.venv.exists()
@@ -765,6 +778,8 @@ def main(argv=None) -> int:
     report = gate.run()
     out = Path(args.out or gate.scratch)
     previous = out / "release_gate_report.json"
+    if args.merge and not previous.exists() and (out / "release_gate_report.partial.json").exists():
+        previous = out / "release_gate_report.partial.json"
     if args.merge and previous.exists():
         report = merge_reports(json.loads(previous.read_text()), report)
     paths = write_report(report, out)

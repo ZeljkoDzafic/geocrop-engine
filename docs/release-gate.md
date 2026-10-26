@@ -17,7 +17,7 @@ python3.12 tools/release_gate.py --commit HEAD --scratch /tmp/geocrop-gate --doc
 | `--scratch` | work directory: clone, venv, outputs, caches and one log per command under `logs/` |
 | `--python` | base interpreter for the clean venv (default `python3.12`; `constraints/py312.txt` targets CPython 3.12) |
 | `--only` / `--skip` | check ids or prefixes (`a.`, `b.integration`, `e.` ...); skipped checks are reported as `skip` |
-| `--merge` | rerun a few checks of the same commit and merge them into the existing report |
+| `--merge` | rerun a few checks of the same commit and merge them into the existing (or partial) report; with `--reuse` the original `a.install` evidence is kept |
 | `--no-network`, `--no-docker` | record the network/Docker checks as skipped instead of attempting them |
 | `--docker-no-cache` | build the image without the layer cache (slower, closer to a clean machine) |
 | `--reuse` | keep an existing clone/venv (development of the gate only; a release run starts clean) |
@@ -26,6 +26,10 @@ Outputs: `<out>/release_gate_report.json` (schema `geocrop-release-gate/1`) and 
 commit, the environment (platform, CPU, memory, Docker, hash of `pip freeze`, versions of key packages), and for
 every check its result (`pass`, `fail` or `skip`), duration, the commands with exit codes and the evidence. The exit
 status is 1 if any check fails. A skip is never counted as a pass: the verdict is then `PASS (with skips)`.
+
+After every check the results so far are written to `release_gate_report.partial.json`, so an interrupted gate
+(time limit, network outage) keeps its evidence and is completed with `--reuse --merge --only <remaining checks>`.
+Long checks can also run in a separate `--scratch` (own clean venv) and be merged afterwards.
 
 The code under test is always the pristine clone. The gate's helpers (`tools/gate_integration.py`,
 `tools/recovery_check.py`, `tools/check_weights.py`) and `tests/test_plugin_contracts.py` are taken from the
