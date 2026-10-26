@@ -261,6 +261,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--smooth", action="store_true", help="edge-aware smoothing of probabilities before argmax")
     x.add_argument("--smooth-window", type=int, help="odd neighbourhood size in pixels (default 7)")
     x.add_argument("--smoothness", type=float, help="smoothing strength; larger smooths more (default 10)")
+    x.add_argument("--registry", help="registry directory for --model registry:<name>@<version|stage>")
 
     x = cmd("ablation", "Feature-group ablation experiments on identical folds")
     x.add_argument("--samples", required=True)
@@ -777,6 +778,55 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     y.add_argument("--start", help="scenes: first date")
     y.add_argument("--end", help="scenes: last date")
     y.add_argument("--overwrite", action="store_true")
+
+    # --- local model and benchmark registry: models list|show|register|compare|promote|verify, benchmarks ... ---
+    def reg_parser(group, name, help_):
+        y = group.add_parser(name, help=help_, description=help_)
+        y.add_argument("--registry", help="registry directory (default $GEOCROP_REGISTRY or ./registry)")
+        return y
+
+    x = cmd("models", "Local model registry: register, list, show, compare, promote and verify trained models")
+    mr = x.add_subparsers(dest="models_cmd", required=True, metavar="action")
+    y = reg_parser(mr, "register", "Copy a trained model.joblib with immutable metadata into the registry")
+    y.add_argument("model", help="model.joblib written by geocrop train")
+    y.add_argument("--name", required=True)
+    y.add_argument("--tags", nargs="*", default=[])
+    y.add_argument("--description")
+    y.add_argument("--samples", help="samples.npz used for training (verifies the split fingerprints)")
+    y.add_argument("--features", help="feature stack: records the input contract (CRS, resolution, windows)")
+    y.add_argument("--hcat", help="CSV class_name,hcat_code,hcat_name for the taxonomy mapping")
+    y.add_argument("--taxonomy", help="name of the class taxonomy, e.g. national LPIS 2024")
+    y.add_argument("--licence", nargs="*", default=[], metavar="COMPONENT=LICENCE",
+                   help="licence of a pretrained component, e.g. presto=MIT")
+    y.add_argument("--link", action="store_true", help="hard-link instead of copying (same file system)")
+    y = reg_parser(mr, "list", "List registered model versions and pinned pretrained checkpoints")
+    y.add_argument("--kind", choices=["all", "model", "pretrained"], default="all")
+    y = reg_parser(mr, "show", "Show the full entry of name@version|stage|latest (or ftw/<model>, presto/default)")
+    y.add_argument("ref")
+    y = reg_parser(mr, "compare", "Metric deltas of two models on identical splits only")
+    y.add_argument("a")
+    y.add_argument("b")
+    y.add_argument("--format", choices=["json", "markdown"], default="markdown")
+    y = reg_parser(mr, "promote", "Move a version to staging, production (archives the previous one) or archived")
+    y.add_argument("ref", help="name@version")
+    y.add_argument("--stage", required=True, choices=["staging", "production", "archived"])
+    y.add_argument("--note")
+    y = reg_parser(mr, "verify", "Recompute hashes of one entry or of the whole registry (exit 2 on mismatch)")
+    y.add_argument("ref", nargs="?")
+
+    x = cmd("benchmarks", "Benchmark registry: recorded benchmark/ablation/transfer runs and leaderboards")
+    br = x.add_subparsers(dest="benchmarks_cmd", required=True, metavar="action")
+    y = reg_parser(br, "list", "List recorded benchmark runs")
+    y.add_argument("--task")
+    y.add_argument("--kind")
+    y = reg_parser(br, "show", "Show one recorded run (id or unique prefix/suffix)")
+    y.add_argument("run")
+    y = reg_parser(br, "leaderboard", "Ranked table per task, only across runs with identical split fingerprints")
+    y.add_argument("--task", required=True, help="e.g. crop-classification, crop-transfer/region, field-segmentation")
+    y.add_argument("--metric", help="default: the runs' primary metric")
+    y.add_argument("--split", help="restrict to one split fingerprint (prefix)")
+    y.add_argument("--format", choices=["markdown", "csv", "json"], default="markdown")
+    y.add_argument("--out", help="write the leaderboard to this file")
     return p
 
 
@@ -1095,7 +1145,19 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                 smoothing["window"] = a.smooth_window
             if a.smoothness is not None:
                 smoothing["smoothness"] = a.smoothness
-        _print(predict(a.features, a.model, a.out, smoothing=smoothing))
+        model_path, resolved = a.model, None
+        if a.model.startswith("registry:"):
+            from . import registry
+            try:
+                resolved = registry.resolve_for_predict(a.model, a.features, a.registry)
+            except registry.RegistryError as exc:
+                raise SystemExit(f"geocrop predict: {exc}") from exc
+            model_path = resolved["path"]
+        result = predict(a.features, model_path, a.out, smoothing=smoothing)
+        if resolved:
+            registry.annotate_prediction(result["manifest"], resolved)
+            result["registry"] = {k: resolved[k] for k in ("name", "version", "stage", "sha256")}
+        _print(result)
     elif c == "ablation":
         from . import experiments
         from .config import load
@@ -1462,6 +1524,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .experiments import smoothing_comparison
         r = smoothing_comparison(a.out, seed=a.seed, alpha=a.alpha)
         print(pd.DataFrame(r["rows"]).to_string(index=False))
+    elif c in ("models", "benchmarks"):
+        _registry_command(a)
     elif c in ("openeo-extract", "openeo-graph"):
         from . import openeo_adapter
         from .config import load
@@ -1608,6 +1672,59 @@ def _parcel_classify(a):
                                 for m, r in cmp["cross_validation"].items()}
         result["comparison"]["fold_fingerprint"] = cmp["fold_fingerprint"]
     _print(result)
+
+
+
+def _registry_command(a):
+    """`geocrop models ...` and `geocrop benchmarks ...` (exit 2 on refused or failed operations)."""
+    from . import registry
+    try:
+        if a.cmd == "models":
+            action = a.models_cmd
+            if action == "register":
+                if any("=" not in item for item in a.licence):
+                    raise registry.RegistryError("--licence expects COMPONENT=LICENCE, e.g. presto=MIT")
+                licences = dict(item.split("=", 1) for item in a.licence)
+                e = registry.register(a.model, a.name, root=a.registry, tags=a.tags, samples=a.samples,
+                                      features=a.features, hcat=a.hcat, taxonomy=a.taxonomy, licences=licences,
+                                      description=a.description, link=a.link)
+                _print({"registered": f"{e['name']}@{e['version']}", "sha256": e["artifact"]["sha256"],
+                        "fingerprints_verified": e["fingerprints"].get("verified"),
+                        "fingerprints_note": e["fingerprints"].get("reason"), "notes": e["notes"]})
+            elif action == "list":
+                _print(registry.list_models(a.registry, a.kind))
+            elif action == "show":
+                _print(registry.get(a.ref, a.registry))
+            elif action == "compare":
+                r = registry.compare(a.a, a.b, a.registry)
+                if a.format == "markdown":
+                    print(registry.compare_markdown(r), end="")
+                else:
+                    _print(r)
+            elif action == "promote":
+                _print(registry.promote(a.ref, a.stage, a.registry, a.note))
+            elif action == "verify":
+                results = registry.verify(a.ref, a.registry)
+                _print(results)
+                if not all(r["ok"] for r in results):
+                    sys.exit(2)
+        else:
+            action = a.benchmarks_cmd
+            if action == "list":
+                _print([registry.benchmark_summary(e) for e in registry.list_benchmarks(a.registry, a.task, a.kind)])
+            elif action == "show":
+                _print(registry.get_benchmark(a.run, a.registry))
+            elif action == "leaderboard":
+                groups = registry.leaderboard(a.task, a.registry, a.metric, a.split)
+                text = {"markdown": registry.leaderboard_markdown, "csv": registry.leaderboard_csv,
+                        "json": lambda g: json.dumps(g, indent=2) + "\n"}[a.format](groups)
+                if a.out:
+                    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+                    Path(a.out).write_text(text, encoding="utf8")
+                print(text, end="")
+    except registry.RegistryError as exc:
+        print(f"geocrop {a.cmd}: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

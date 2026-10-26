@@ -31,3 +31,4 @@
 25. [Acceptance run on real Sentinel-1/2 data](acceptance.md)
 26. [Security model](security.md)
 27. [Versioning, releases and rollback](release.md)
+28. [Model and benchmark registry, leaderboards](model-registry.md)

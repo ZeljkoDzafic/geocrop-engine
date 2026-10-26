@@ -8,6 +8,7 @@ ready for a manuscript table) and `ablation.json` (full metrics, per-class F1, f
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -54,6 +55,7 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
     from .estimators import predict_labels
     from .model import make_estimator, split_final_holdout
 
+    t_run = time.perf_counter()
     samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                                    calibration_mode, calibration_fraction)
@@ -123,6 +125,12 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
         "holdout_fraction": holdout_fraction, "holdout_samples": 0 if test is None else int(len(test.y)),
         "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups))), "experiments": full},
         indent=2, default=str), encoding="utf8")
+    from . import registry
+    registry.record_classification("ablation", out, rows, samples, n_splits=n_splits, seeds=[seed],
+                                   spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m, holdout=test,
+                                   strategies=() if cv_strategy == "spatial_blocks" else (cv_strategy,),
+                                   candidate_key="experiment", started=t_run,
+                                   protocol={"params": params, "calibration_mode": calibration_mode})
     return table
 
 
@@ -211,6 +219,7 @@ def transfer(samples: Samples, output_dir: str | Path, features: list[str] | Non
     Writes ``transfer.csv`` (one row per strategy and held-out group, plus a pooled ``ALL`` row per strategy)
     and ``transfer.json`` (full metrics). Strategies whose metadata are missing are reported as skipped.
     """
+    t_run = time.perf_counter()
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
@@ -249,6 +258,10 @@ def transfer(samples: Samples, output_dir: str | Path, features: list[str] | Non
         "seed": seed, "params": params, "n_samples": int(len(samples.y)), "features": len(features),
         "in_domain_spatial_cv": {k: in_domain[k] for k in ("overall_accuracy", "kappa", "macro_f1")},
         "strategies": full}, indent=2, default=str), encoding="utf8")
+    from . import registry
+    registry.record_transfer(out, rows, samples, features=features, strategies=strategies, n_splits=n_splits,
+                             seed=seed, spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m,
+                             params=params, started=t_run)
     return table
 
 
