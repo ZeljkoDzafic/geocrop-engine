@@ -40,6 +40,7 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
       are used, so calibration objects never influence feature selection.
     * spatial_buffer_m purges training polygons near test samples in every fold.
     """
+    from .estimators import predict_labels
     from .model import make_estimator, split_final_holdout
 
     samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
@@ -77,7 +78,7 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
         for t in targets or []:
             row[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
         if test is not None:
-            pred = np.asarray(make_estimator(params, seed).fit(X, samples.y).predict(test.subset(names))).astype(str)
+            pred = predict_labels(make_estimator(params, seed).fit(X, samples.y), test.subset(names)).astype(str)
             h = metrics.summary(test.y, pred, labels=np.unique(np.concatenate([samples.y, test.y])))
             if ref_hold is None:
                 ref_hold = pred

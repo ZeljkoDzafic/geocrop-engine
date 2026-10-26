@@ -44,6 +44,8 @@
   subprocess-running code.
 
 ### Fixed
+- CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
+  flattened through `estimators.predict_labels`.
 - Docker image build: the conda environment step tried to install the not-yet-copied checkout.
 - Packaging: SPDX license expression (`license = "Apache-2.0"`), removing setuptools deprecation warnings.
 - `geocrop benchmark` now removes the configured locked holdout before model selection (same split as `train`).
