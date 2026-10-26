@@ -191,7 +191,16 @@ const GeoMap = (() => {
         : L.geoJSON(layer.data, {
             style: vectorStyle(layer),
             pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 5, color: VECTOR, fillOpacity: 0.8 }),
-            onEachFeature: (f, l) => l.bindPopup(popup(f.properties || {})),
+            onEachFeature: (f, l) => {
+              l.bindPopup(popup(f.properties || {}));
+              // Review view: a click on a parcel opens it in the parcel card instead of a popup
+              l.on("click", () => {
+                const id = (f.properties || {}).parcel_id ?? (f.properties || {}).segment_id;
+                if (id === undefined || id === null || !el("map-shell").classList.contains("in-review")) return;
+                map.closePopup();
+                document.dispatchEvent(new CustomEvent("geomap:parcel", { detail: { id: String(id) } }));
+              });
+            },
           });
       overlays.push({ layer, leaflet });
       if (layer.group === "imagery") { imagery.push({ layer, leaflet }); continue; }
@@ -328,7 +337,27 @@ const GeoMap = (() => {
     });
   }
 
+  /* ----- Review: highlight one parcel (white outline on a dark halo, readable on any imagery) ----- */
+  let focus = null;
+  function focusParcel(feature, { fly = true } = {}) {
+    if (!ensureMap()) return;
+    if (focus) { map.removeLayer(focus); focus = null; }
+    if (!feature) return;
+    focus = L.layerGroup([
+      L.geoJSON(feature, { interactive: false, style: { color: "#0b0f0d", weight: 6, opacity: 0.45, fill: false } }),
+      L.geoJSON(feature, { interactive: false, style: { color: "#ffffff", weight: 2.5, opacity: 1, fillColor: "#ffffff", fillOpacity: 0.06 } }),
+    ]).addTo(map);
+    const [[s, w], [n, e]] = feature.bounds;
+    const dx = (e - w) * 1.6 + 0.0005, dy = (n - s) * 1.6 + 0.0005;
+    const target = L.latLngBounds([[s - dy, w - dx], [n + dy, e + dx]]);
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    map.invalidateSize();
+    if (fly && !reduce) map.flyToBounds(target, { maxZoom: 17, duration: 0.45 });
+    else map.fitBounds(target, { maxZoom: 17 });
+  }
+
   return {
+    focusParcel,
     load, forget, clear, loaded: () => loadedJob, step, showArea, pickArea, setBasemap,
     hasImagery: () => imagery.length > 0,
     invalidate: () => { if (map) setTimeout(() => map.invalidateSize(), 60); },
