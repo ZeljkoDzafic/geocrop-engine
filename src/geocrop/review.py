@@ -537,6 +537,78 @@ def series_from_imagery(gdf, pid: str, folders: list[dict]) -> dict:
     return _series_payload(panels, "imagery", sorted({str(m["folder"]) for m in folders}))
 
 
+# ------------------------------------------------------------------------------------------------ evidence packages
+
+EVIDENCE_SCHEMA = "geocrop-parcel-evidence"
+_EVIDENCE = _Cache(20000)
+
+
+def _evidence_id(path: Path):
+    try:
+        body = json.loads(path.read_text(encoding="utf8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(body, dict) or body.get("schema") != EVIDENCE_SCHEMA:
+        return None
+    return str(body.get("parcel_id"))
+
+
+def evidence_packages(files: list[Path], limit: int = 20000) -> dict[str, Path]:
+    """parcel id -> `evidence.json` of `geocrop evidence` packages among the (confined) files."""
+    out = {}
+    for f in files:
+        if f.name != "evidence.json" or f.stat().st_size > 16 * 1024 * 1024:
+            continue
+        pid = _EVIDENCE.get(f, _evidence_id)
+        if pid and pid not in out:
+            out[pid] = f
+            if len(out) >= limit:
+                break
+    return out
+
+
+def evidence_summary(path: Path) -> dict:
+    """Outcome, triggered rules and temporal support of one evidence package (for the parcel card)."""
+    body = json.loads(Path(path).read_text(encoding="utf8"))
+    rules = [{k: r.get(k) for k in ("rule", "stage", "outcome", "reason_code")}
+             for r in body.get("rules", []) if isinstance(r, dict) and r.get("triggered")]
+    support = body.get("temporal_support") or {}
+    return {"schema_version": body.get("schema_version"), "outcome": body.get("outcome"), "triggered_rules": rules,
+            "temporal_support": {k: support.get(k) for k in ("index", "clear_observations", "longest_gap_days",
+                                                             "season_coverage", "peak_gap_days") if k in support},
+            "notes": body.get("notes") or []}
+
+
+def series_from_evidence(path: Path) -> dict:
+    """Observed and rejected acquisitions plus the interpolated curve recorded in an evidence package."""
+    body = json.loads(Path(path).read_text(encoding="utf8"))
+    ds = body.get("data_sources") or {}
+    panels: dict[str, dict[str, list]] = {}
+    for o in ds.get("observed_acquisitions") or []:
+        index = str(o.get("index"))
+        panel = "Sentinel-1" if index.endswith("_dB") else "Sentinel-2"
+        mean = _plain(o.get("mean"))
+        panels.setdefault(panel, {}).setdefault(index, []).append({
+            "date": str(o.get("date"))[:10], "label": str(o.get("date"))[:10], "mean": mean, "std": _plain(o.get("std")),
+            "n_valid": _plain(o.get("n_valid")), "observed": mean is not None})
+    for o in ds.get("rejected_acquisitions") or []:
+        index = str(o.get("index"))
+        panel = "Sentinel-1" if index.endswith("_dB") else "Sentinel-2"
+        panels.setdefault(panel, {}).setdefault(index, []).append({
+            "date": str(o.get("date"))[:10], "label": str(o.get("date"))[:10], "mean": None, "std": None,
+            "n_valid": 0, "observed": False})
+    index = (body.get("temporal_support") or {}).get("index") or "NDVI"
+    grid = [g for g in ds.get("interpolated_grid") or [] if isinstance(g, dict)]
+    if grid:
+        panels.setdefault("Sentinel-2", {})[f"{index} curve"] = [{
+            "date": str(g.get("date"))[:10], "label": str(g.get("date"))[:10], "mean": _plain(g.get("value")),
+            "std": None, "n_valid": None, "observed": _plain(g.get("value")) is not None} for g in grid]
+    for series in panels.values():
+        for points in series.values():
+            points.sort(key=lambda p: p["date"])
+    return _series_payload(panels, "evidence", [path])
+
+
 # ------------------------------------------------------------------------------------------------ image chips
 
 NDVI_STOPS = ((-0.1, "#a6611a"), (0.2, "#dfc27d"), (0.4, "#f5f5a0"), (0.6, "#80cdc1"), (0.9, "#1a7837"))

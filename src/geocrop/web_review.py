@@ -73,6 +73,7 @@ class Context:
         if self.review_dir is not None:
             found = review.discover(self.files, exclude=self.review_dir)
         self.signatures, self.markers, self.imagery = found["signatures"], found["markers"], found["imagery"]
+        self._evidence = None
         self.evidence_jobs = []
         for other in _split(evidence, MAX_EVIDENCE_JOBS):
             if other == job_id:
@@ -87,6 +88,15 @@ class Context:
             self.signatures += [p for p in more["signatures"] if p not in self.signatures]
             self.markers += [p for p in more["markers"] if p not in self.markers]
             self.evidence_jobs.append(other)
+
+    def evidence(self) -> dict:
+        """parcel id -> evidence.json of `geocrop evidence` packages in this job's (and evidence jobs') outputs."""
+        if self._evidence is None:
+            files = list(self.files)
+            for other in self.evidence_jobs:
+                files += self.manager.output_files(other)
+            self._evidence = review.evidence_packages(files)
+        return self._evidence
 
     def rel(self, path: Path) -> str:
         return str(path.relative_to(self.workspace))
@@ -192,7 +202,8 @@ def register_review_routes(app: FastAPI, jobs, authenticate) -> None:
             "progress": {"reviewed": sum(counts.values()), "total": len(gdf), **counts},
             "model_sha256": review.model_sha256(ctx.files),
             "sources": {"signatures": [ctx.rel(p) for p in ctx.signatures], "markers": [ctx.rel(p) for p in ctx.markers],
-                        "imagery": len(ctx.imagery), "true_colour": sum(m["true_colour"] for m in ctx.imagery)},
+                        "imagery": len(ctx.imagery), "true_colour": sum(m["true_colour"] for m in ctx.imagery),
+                        "evidence_packages": len(ctx.evidence())},
             "review_dir": ctx.rel(ctx.review_dir) if ctx.review_dir else None,
             "sort_keys": list(review.SORT_KEYS),
         }
@@ -237,6 +248,18 @@ def register_review_routes(app: FastAPI, jobs, authenticate) -> None:
             series["files"] = [ctx.rel(Path(f)) for f in series["files"]]
         else:
             series = None
+        package = ctx.evidence().get(id)
+        body["evidence"] = None
+        if package is not None:
+            try:
+                body["evidence"] = {**review.evidence_summary(package), "json": ctx.rel(package),
+                                    "html": ctx.rel(package.with_name("evidence.html"))
+                                    if package.with_name("evidence.html").is_file() else None}
+                if not series or not series["panels"]:
+                    series = review.series_from_evidence(package)
+                    series["files"] = [ctx.rel(package)]
+            except (OSError, ValueError, TypeError, AttributeError):
+                body["evidence"] = None
         if not series or not series["panels"]:
             series = _cached(ctx, ("series", ctx.rel(ctx.layer), id),
                              lambda: review.series_from_imagery(gdf, id, ctx.imagery))
@@ -263,6 +286,22 @@ def register_review_routes(app: FastAPI, jobs, authenticate) -> None:
             return [{**{k: v for k, v in c.items() if k != "rgba"}, "url": _png(c["rgba"])} for c in chips]
         return {"kind": kind, "chips": _cached(ctx, ("chips", ctx.rel(ctx.layer), id, kind, size), compute),
                 "note": "Downsampled crops for visual checks; one stretch is shared by all dates."}
+
+    @app.get("/api/jobs/{job_id}/review/evidence", dependencies=auth)
+    def review_evidence(job_id: str, request: Request, id: str = Query(min_length=1, max_length=256),
+                        format: str = Query(default="html", pattern="^(html|json)$"),
+                        layer: str | None = Query(default=None, max_length=4096),
+                        evidence: str | None = Query(default=None, max_length=512)):
+        """Download the parcel's `geocrop evidence` package page or record (an attachment, never rendered here)."""
+        ctx = context(request, job_id, layer, evidence)
+        package = ctx.evidence().get(id)
+        if package is None:
+            raise HTTPException(status_code=404, detail="No evidence package for this parcel")
+        path = package if format == "json" else package.with_name("evidence.html")
+        if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(ctx.workspace):
+            raise HTTPException(status_code=404, detail="No evidence package for this parcel")
+        name = f"evidence_{''.join(c if c.isalnum() or c in '-_.' else '_' for c in id)[:80]}.{format}"
+        return FileResponse(path, filename=name, media_type="application/octet-stream")
 
     @app.get("/api/jobs/{job_id}/review/decisions", dependencies=auth)
     def review_decisions(job_id: str, request: Request, layer: str | None = Query(default=None, max_length=4096)):

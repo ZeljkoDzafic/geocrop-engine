@@ -897,7 +897,9 @@ dialog[open]::backdrop { animation: fadeIn 220ms var(--ease); }
 .verdict-arrow { display: grid; place-items: center; background: var(--surface-2); color: var(--text-3); }
 .verdict-arrow .icon { width: 16px; height: 16px; }
 .verdict-arrow.is-different { color: var(--red); }
-.reason-pills { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 0; padding: 0; }
+.reason-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-top: -4px; }
+.reason-pills { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.reason-rule { background: var(--orange-soft); color: var(--orange); }
 .reason { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--fill); color: var(--text-2); }
 .reason-declaration, .reason-traffic_light { background: var(--red-soft); color: var(--red); }
 .reason-decision { background: var(--orange-soft); color: var(--orange); }

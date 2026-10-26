@@ -121,13 +121,18 @@ instead.
 * **Time series** — inline SVG, one panel per sensor (Sentinel-2 indices; Sentinel-1 VV/VH/VH−VV in dB) with
   observed points, ±1 standard deviation for a single series, ticks for acquisitions without valid pixels and a
   hover read-out. The series come from signature tables (`geocrop signatures` / `s1-signatures`, CSV or Parquet)
-  found in the job's outputs; without them the view computes parcel means of NDVI and S1 backscatter from the job's
+  found in the job's outputs, else from an evidence package; without either the view computes parcel means of NDVI and S1 backscatter from the job's
   composites or scene folders. Signatures produced by another job can be passed as evidence
   (`evidence=<job id>` on the API).
 * **Image chips** — true colour or NDVI crops around the parcel for every composite window or scene date, with the
   parcel outline. One percentile stretch is shared by all dates of a parcel so brightness is comparable; dates with
   little valid data are dimmed and labelled. Chips are downsampled (at most 256 px) and cached in the web state
   directory (`<state>/review-cache/<job id>/`), never in the job's outputs.
+* **Evidence packages** — when the job's outputs (or an evidence job) contain `geocrop evidence` packages
+  (`<parcel>/evidence.json` with schema `geocrop-parcel-evidence`), the card adds the rules the package records as
+  triggered to the reason pills and offers the package page as a download (it is never rendered inside the
+  workspace). Without signature tables, the package's observed and rejected acquisitions and its interpolated curve
+  become the time series.
 
 ### Decisions
 
@@ -178,6 +183,7 @@ resolve outside the workspace.
 | `GET /api/v1/jobs/{id}/review/parcel?id=` | parcel detail, markers, reason codes, series, WGS 84 outline, decision history |
 | `GET /api/v1/jobs/{id}/review/chips?id=&kind=true\|ndvi&size=` | chips as PNG data URLs with outline and valid share |
 | `POST /api/v1/jobs/{id}/review/decisions` | `{parcel_id, decision, purpose, label?, analyst?, comment?, confidence?}` |
+| `GET /api/v1/jobs/{id}/review/evidence?id=&format=html\|json` | download the parcel's evidence package page or record |
 | `GET /api/v1/jobs/{id}/review/decisions` | latest decision per parcel |
 | `POST /api/v1/jobs/{id}/review/export` | `{purpose, round?}` → label table in the review folder |
 | `GET /api/v1/jobs/{id}/review/file?name=` | download `decisions.csv` or an exported `labels_*.csv` |

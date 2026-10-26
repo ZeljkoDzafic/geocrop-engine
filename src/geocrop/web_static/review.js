@@ -240,7 +240,22 @@ const GeoCropReview = (() => {
 
     const reasons = $("parcel-reasons"); reasons.replaceChildren();
     for (const r of d.reasons) reasons.append(h("li", { class: `reason reason-${r.source}`, title: `${human(r.source)} reason code` }, human(r.code)));
-    if (!d.reasons.length) reasons.append(h("li", { class: "reason reason-none", text: "No reason codes" }));
+    // rules triggered in the parcel's evidence package (geocrop evidence) that the layer itself does not list
+    const shown = new Set(d.reasons.map(r => r.code));
+    for (const r of (d.evidence ? d.evidence.triggered_rules : [])) {
+      if (!r.reason_code || shown.has(r.reason_code)) continue;
+      shown.add(r.reason_code);
+      reasons.append(h("li", { class: "reason reason-rule", title: `Evidence package: ${human(r.stage || r.rule)} → ${human(r.outcome)}` }, human(r.reason_code)));
+    }
+    if (!reasons.children.length) reasons.append(h("li", { class: "reason reason-none", text: "No reason codes" }));
+    const ev = $("parcel-evidence");
+    ev.hidden = !(d.evidence && d.evidence.html);
+    ev.onclick = () => {
+      const params = new URLSearchParams({ id: d.parcel_id, format: "html" });
+      if (R.summary.layer) params.set("layer", R.summary.layer);
+      if (R.evidence) params.set("evidence", R.evidence);
+      App().download(`${base()}/evidence?${params}`, `evidence_${d.parcel_id}.html`).catch(err => App().message(err.message));
+    };
 
     // probabilities: top classes as bars; predicted, declared and conformal-set membership marked
     const probs = Object.entries(d.probabilities).slice(0, 6);
@@ -266,6 +281,7 @@ const GeoCropReview = (() => {
 
     $("ts-source").textContent = d.series.source === "signatures"
       ? `Signatures · ${d.series.files.join(", ")}`
+      : d.series.source === "evidence" ? `Evidence package · observed points and interpolated curve`
       : d.series.panels.length ? "Parcel means from this job's imagery (no signature table found)" : "";
     R.chart = d.series; drawChart();
     GeoMap.focusParcel(d.geometry);

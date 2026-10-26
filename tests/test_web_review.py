@@ -285,3 +285,47 @@ def test_export_labels_unit():
     with pytest.raises(ValueError):
         review.export_labels(rows, "test")
     assert review._text("=1+1", 10) == "'=1+1" and review._text("a\x00b", 10) == "a b"
+
+
+def test_evidence_package_is_linked_and_feeds_the_series(env):
+    import json
+    pid = get(env, "/parcels", review="all", limit=1).json()["items"][0]["parcel_id"]
+    folder = env["root"] / "evidence_pkgs" / pid
+    folder.mkdir(parents=True)
+    body = {"schema": "geocrop-parcel-evidence", "schema_version": 1, "parcel_id": pid,
+            "outcome": {"traffic_light": "yellow", "consistent_with_table": False},
+            "rules": [{"rule": "gap_at_peak", "stage": "temporal_support", "triggered": True, "outcome": "yellow",
+                       "reason_code": "LONG_GAP_AT_PEAK", "inputs": {}, "threshold": 20},
+                      {"rule": "calendar", "stage": "calendar", "triggered": False, "outcome": "pass", "reason_code": None}],
+            "temporal_support": {"index": "NDVI", "clear_observations": 2},
+            "data_sources": {"observed_acquisitions": [{"date": "2023-05-01", "index": "NDVI", "mean": 0.4, "n_valid": 9},
+                                                       {"date": "2023-06-01", "index": "NDVI", "mean": 0.7, "n_valid": 9}],
+                             "rejected_acquisitions": [{"date": "2023-05-15", "index": "NDVI", "reason": "cloud"}],
+                             "interpolated_grid": [{"date": "2023-05-01", "value": 0.41, "interpolated": False},
+                                                   {"date": "2023-05-16", "value": 0.55, "interpolated": True},
+                                                   {"date": "2023-06-01", "value": 0.69, "interpolated": False}]}}
+    (folder / "evidence.json").write_text(json.dumps(body))
+    (folder / "evidence.html").write_text("<!doctype html><title>evidence</title>")
+    try:
+        assert get(env, "").json()["sources"]["evidence_packages"] == 1
+        d = get(env, "/parcel", id=pid).json()
+        assert d["evidence"]["html"] == f"outputs/demo/evidence_pkgs/{pid}/evidence.html"
+        assert [r["reason_code"] for r in d["evidence"]["triggered_rules"]] == ["LONG_GAP_AT_PEAK"]
+        s = d["series"]
+        assert s["source"] == "evidence"
+        names = [x["name"] for x in s["panels"][0]["series"]]
+        assert names == ["NDVI", "NDVI curve"]
+        assert [p["observed"] for p in s["panels"][0]["series"][0]["points"]] == [True, False, True]
+        r = get(env, "/evidence", id=pid)
+        assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+        assert r.headers["content-type"] == "application/octet-stream"
+        assert get(env, "/evidence", id=pid, format="json").json()["parcel_id"] == pid
+        assert get(env, "/evidence", id="P9999").status_code == 404
+        assert get(env, "/evidence", id=pid, format="exe").status_code == 422
+        # a package whose page is a symlink out of the workspace is not served
+        (folder / "evidence.html").unlink()
+        os.symlink("/etc/hosts", folder / "evidence.html")
+        assert get(env, "/evidence", id=pid).status_code == 404
+    finally:
+        import shutil
+        shutil.rmtree(env["root"] / "evidence_pkgs")

@@ -10,7 +10,8 @@
   agree / disagree with corrected class / can't tell with an explicit training or validation purpose into an
   append-only `review/decisions.csv` (analyst, UTC time, model SHA-256), exported as an `active-learning ingest`
   label table. Core logic in `geocrop.review`, routes in `geocrop.web_review` (authenticated, `/api/v1` aliases,
-  workspace-confined, no client-supplied paths).
+  workspace-confined, no client-supplied paths). Parcels with a `geocrop evidence` package get its triggered rules
+  as reason pills, a download of the package page and, without signatures, its observed/interpolated series.
 - Presentation website (`website/`) redesigned in the web workspace's design language (shared colour tokens, system
   fonts, light/dark appearance with toggle, phone layout), with sections reflecting the current engine and new
   real-imagery captures of the workspace (map light/dark, New analysis, command palette, terminal, phone).
