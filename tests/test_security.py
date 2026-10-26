@@ -89,10 +89,17 @@ def test_every_api_route_requires_the_bearer_token(app, client):
 
 
 @pytest.mark.parametrize("path", ["/api", "/api/", "/api/unknown", "/api/v1/unknown", "/api/v2/health",
-                                  "/api/files", "/api/v1/files"])
+                                  "/api/filez", "/api/v1/filez"])
 def test_unknown_api_paths_need_the_token_before_revealing_anything(client, path):
     assert client.get(path).status_code == 401
     assert client.get(path, headers=AUTH).status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/api/files", "/api/v1/files"])
+def test_workspace_listing_requires_the_token(client, path):
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers=AUTH).status_code == 200
+    assert client.get(path, params={"prefix": "../"}, headers=AUTH).status_code == 400
 
 
 def test_static_ui_is_public_but_carries_no_secrets(client):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -93,6 +94,49 @@ class JobRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     argv: list[str] | None = Field(default=None, max_length=256)
     command: str | None = Field(default=None, max_length=65536)
+
+
+FILE_LIMIT = 200
+_FILE_SCAN_LIMIT = 20000
+
+
+def workspace_entries(root: Path, state_dir: Path, prefix: str) -> list[dict]:
+    """Entries of a workspace directory whose names start with the last prefix component.
+
+    Rejects absolute paths, ``..`` and hidden components; resolves symlinks and drops anything that
+    leaves the workspace or touches the web state directory.
+    """
+    text = prefix.replace("\\", "/")
+    if "\x00" in text or text.startswith("/") or (len(text) > 1 and text[1] == ":"):
+        raise HTTPException(status_code=400, detail="Use a path relative to the workspace")
+    *parents, partial = text.split("/")
+    parts = [p for p in parents if p not in ("", ".")]
+    if any(p == ".." or p.startswith(".") for p in parts) or partial.startswith(".."):
+        raise HTTPException(status_code=400, detail="Use a path inside the workspace")
+    state = state_dir.resolve()
+    directory = root.joinpath(*parts).resolve()
+    if not directory.is_relative_to(root) or directory.is_relative_to(state) or not directory.is_dir():
+        return []
+    found, needle = [], partial.casefold()
+    try:
+        with os.scandir(directory) as scan:
+            for count, entry in enumerate(scan):
+                if count >= _FILE_SCAN_LIMIT:
+                    break
+                if entry.name.startswith(".") or not entry.name.casefold().startswith(needle):
+                    continue
+                try:
+                    target = Path(entry.path).resolve()
+                    is_dir = target.is_dir()
+                except OSError:
+                    continue
+                if not target.is_relative_to(root) or target.is_relative_to(state):
+                    continue
+                found.append({"name": entry.name, "path": "/".join([*parts, entry.name]), "is_dir": is_dir})
+    except OSError:
+        return []
+    found.sort(key=lambda e: (not e["is_dir"], e["name"].casefold()))
+    return found[:FILE_LIMIT]
 
 
 def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOKEN") -> FastAPI:
@@ -228,6 +272,11 @@ def create_app(workspace, token: str, state_dir=None, token_env="GEOCROP_WEB_TOK
         manager = jobs(request)
         files = manager.output_files(job_id)
         return job_layers(files, max_px)
+
+    @app.get("/api/files", dependencies=[Depends(authenticate)])
+    def files(request: Request, prefix: str = Query(default="", max_length=4096)):
+        """Workspace path completion for the terminal: at most 200 entries, never outside the workspace."""
+        return {"entries": workspace_entries(root, jobs(request).state_dir, prefix), "limit": FILE_LIMIT}
 
     @app.get("/api/openapi.json", dependencies=[Depends(authenticate)])
     def schema():

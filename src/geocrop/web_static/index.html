@@ -6,9 +6,11 @@
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/terminal.css">
   <script defer src="/static/vendor/leaflet/leaflet.js"></script>
   <script defer src="/static/map.js"></script>
   <script defer src="/static/app.js"></script>
+  <script defer src="/static/terminal.js"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -32,7 +34,7 @@
       <section class="card command-card">
         <div class="card-top"><div><span class="eyebrow">NEW RUN</span><h2 id="panel-title">Engine commands</h2></div><span class="step">01</span></div>
         <div id="commands-tab" class="tab-panel"><label for="command-select">Command</label><select id="command-select" disabled><option>Connect the engine to list commands</option></select><p class="help" id="command-help">Choose a command and enter paths and parameters.</p><form id="command-form"><div id="required-fields"></div><details id="advanced" hidden><summary>Advanced options</summary><div id="optional-fields"></div></details><button class="primary wide" id="run-command" disabled>Start run <span>→</span></button></form></div>
-        <div id="console-tab" class="tab-panel" hidden><p class="help">Enter one GeoCrop command. Quotes are supported for paths containing spaces.</p><form id="console-form"><label for="console-input">CLI command</label><textarea id="console-input" class="code-input" rows="5" spellcheck="false">geocrop indices --format markdown</textarea><p class="help">The console runs engine commands only. Shell operators and arbitrary programs are not supported.</p><button class="primary wide" id="run-console" disabled>Run command <span>→</span></button></form></div>
+        <div id="console-tab" class="tab-panel" hidden><div id="terminal-root"></div></div>
         <div id="notebook-tab" class="tab-panel" hidden><p>Call the same engine from a Jupyter notebook, JupyterLab or a Python script.</p><pre class="snippet"><code>import os
 from geocrop.client import EngineClient
 

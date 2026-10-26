@@ -106,14 +106,15 @@ $("connect-form").addEventListener("submit", async event => {
     $("version").textContent = `ENGINE ${health.version}`; $("workspace-path").textContent = health.workspace;
     $("connection-dot").classList.add("online"); $("connection-label").textContent = "Engine connected";
     $("auth-panel").hidden = true; $("token").value = ""; $("disconnect").hidden = false;
-    for (const id of ["run-command", "run-console", "refresh", "api-schema", "map-load"]) $(id).disabled = false;
+    for (const id of ["run-command", "refresh", "api-schema", "map-load"]) $(id).disabled = false;
     message(""); await refresh();
+    // --- terminal bridge (terminal.js) ---
+    document.dispatchEvent(new CustomEvent("geocrop:connected", { detail: { health, commands: state.commands } }));
   } catch (error) { state.token = ""; message(error.message); }
 });
 $("disconnect").addEventListener("click", () => { state.token = ""; location.reload(); });
 $("command-select").addEventListener("change", buildForm);
 $("command-form").addEventListener("submit", e => { e.preventDefault(); submit({ argv: argumentsFromForm() }); });
-$("console-form").addEventListener("submit", e => { e.preventDefault(); submit({ command: $("console-input").value }); });
 $("refresh").addEventListener("click", () => refresh().catch(e => message(e.message)));
 $("cancel").addEventListener("click", async () => { try { await api(`/api/jobs/${state.selected}/cancel`, { method: "POST" }); await refresh(); } catch (e) { message(e.message); } });
 $("map-load").addEventListener("click", () => { if (state.selected) GeoMap.load(state.selected, api); else message("Select a job first."); });
@@ -123,5 +124,8 @@ for (const button of document.querySelectorAll("[data-tab]")) button.addEventLis
   for (const name of ["commands", "console", "notebook"]) $(name + "-tab").hidden = name !== button.dataset.tab;
   $("panel-title").textContent = { commands: "Engine commands", console: "CLI console", notebook: "Jupyter & API" }[button.dataset.tab];
 });
+// --- terminal bridge (terminal.js): authenticated API helper and job selection ---
+window.GeoCropApp = { api, selectJob(id) { state.selected = id; state.offset = 0; state.log = ""; state.generation++;
+  if (typeof GeoMap !== "undefined") GeoMap.forget(); refresh().catch(e => message(e.message)); } };
 async function poll() { try { await refresh(); } catch (e) { message(e.message); } setTimeout(poll, 2000); }
 poll();

@@ -26,7 +26,7 @@ a security sandbox for untrusted model files. Inputs, configs and joblib models 
 The UI provides:
 
 * forms generated from the actual CLI parser, including required fields and optional settings;
-* an engine command console with quoted-argument support;
+* a terminal-style engine console (syntax colouring, completion, history; see below) with quoted-argument support;
 * persistent job history, queued/running/succeeded/failed/cancelled/interrupted states and exit codes;
 * incremental stdout/stderr logs, cancellation and artifact downloads;
 * Python/Jupyter examples and an authenticated OpenAPI schema download.
@@ -56,6 +56,46 @@ cross-origin browser requests are rejected and every response carries a strict c
 related headers (see [security](security.md)). Artifact downloads are attachments, and listings are
 limited to the first 200 files within a job's declared output locations. Use local filesystem tools
 for larger output inventories.
+
+## CLI console (terminal)
+
+The **CLI console** tab is a macOS Terminal-style session. Type an engine command with or without the
+leading `geocrop` (`indices --format markdown` and `geocrop indices --format markdown` are equivalent) and
+press Enter. The job's output streams inline; a closing line shows `✓` (green) or `✗` (red) with the exit
+code, duration and job ID. A started job is also selected in the *Command output* card, so its files and
+map layers are available there.
+
+While typing, the line is coloured: command names, known flags, numbers, quoted strings, paths and valid
+choices each have their own colour; unknown commands, unknown flags, invalid choices and shell operators
+are underlined in red. A hint line under the prompt lists the command's required flags (✓ provided /
+● still missing) and the help, choices and default of the flag being edited.
+
+Completion works like an editor's suggestion list: command names with descriptions; then the command's
+flags with help, default and a *required* marker (flags already used are hidden unless they accept several
+values); then `choices` of the current flag; and workspace paths for path-like flags (`--out`, `--root`,
+`--config`, `--samples`, `--raster`, …). Paths come from `GET /api/files?prefix=<relative prefix>`, which
+lists at most 200 entries of one workspace directory. It rejects absolute paths and `..`, never lists
+hidden dot-files or the web state directory, and drops symlinks resolving outside the workspace. The top
+suggestion (or the latest matching history entry) is shown as grey ghost text.
+
+Built-in commands run in the browser and are not sent to the engine: `help` / `?` (all commands;
+`help <command>` lists its flags), `clear`, `history` and `jobs` (recent jobs and their status). The last
+100 commands are kept in the browser's local storage (the access token is never stored).
+
+| Key | Action |
+|---|---|
+| Enter | run the line (accepts the highlighted suggestion while completing a partly typed word) |
+| Tab | accept the suggestion; opens the list when it is closed (a single match is inserted directly) |
+| Ctrl+Space | open the suggestion list |
+| ↑ / ↓ | move in the suggestion list; with the list closed, previous/next history entry |
+| → or End (at end of line) | accept the ghost-text hint |
+| Esc | close the suggestion list |
+| Ctrl+R | reverse history search (Ctrl+R again: older match, Enter: run, Esc: cancel) |
+| Ctrl+C | cancel the running job (prints `^C`); without a job, discard the current line |
+| Ctrl+L | clear the screen |
+| Ctrl+U | delete text before the cursor |
+
+The console still runs engine commands only, as an argument list and never through a shell.
 
 ## Jupyter Notebook / JupyterLab / Python
 
@@ -105,6 +145,7 @@ All endpoints below require `Authorization: Bearer <token>`:
 | POST | `/api/v1/jobs/{id}/cancel` | stop a queued/running job |
 | GET | `/api/v1/jobs/{id}/artifacts` | up to 200 local output files |
 | GET | `/api/v1/jobs/{id}/artifact?path=...` | download a listed artifact |
+| GET | `/api/v1/files?prefix=...` | up to 200 workspace entries for path completion (relative prefix only) |
 | GET | `/api/v1/jobs/{id}/map` | map-ready previews of the job's outputs (see below) |
 | GET | `/api/v1/openapi.json` | machine-readable API description |
 
