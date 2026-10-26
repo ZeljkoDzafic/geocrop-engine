@@ -2,6 +2,13 @@
 
 ## Unreleased
 ### Added
+- Lijevče polje case study (docs/studies/lijevce-polje.md): reproducible AOI script `tools/make_study_aoi.py`
+  (geoBoundaries municipalities Gradiška, Laktaši, Srbac ∩ Copernicus DEM GLO-30 below a histogram-derived
+  threshold, cleaned; pinned sources and checksums; area in EPSG:3035), the generated
+  `configs/studies/lijevce_polje/aoi.geojson` (719.4 km², UTM zone 33 only), the 2023 study configuration
+  `configs/studies/lijevce_polje/study_2023.yaml` (EPSG:32633), the planning check `tools/study_data_check.py`
+  (Sentinel-2 dates and SCL clear-observation coverage per window) and a "Lijevče polje, Jun–Aug 2023" preset in
+  the web workspace's New-analysis sheet.
 - Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
   (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
   season that starts before the series) no longer removes polygons; sample files record the classes of the

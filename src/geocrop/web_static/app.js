@@ -9,6 +9,9 @@ const STATUS = { queued: "Queued", running: "Running", succeeded: "Succeeded", f
 const terminal = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 const MAP_COMMANDS = new Set(["quicklook", "demo", "run", "predict"]);
 const SEMBERIJA = { bbox: [19.10, 44.72, 19.16, 44.76], start: "2023-06-01", end: "2023-08-31" };
+// Lijevče polje case study: a ~21 km² farmland subset in the centre of the study AOI
+// (configs/studies/lijevce_polje/aoi.geojson; the whole AOI bounding box exceeds the 2500 km² quicklook limit).
+const LIJEVCE = { bbox: [17.26, 45.04, 17.32, 45.08], start: "2023-06-01", end: "2023-08-31" };
 const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
 const VIEWS = {
   map: ["Map", "Imagery and results of the selected job"],
@@ -737,6 +740,11 @@ function bind() {
   $("preset-semberija").addEventListener("click", () => {
     bboxIds.forEach((id, k) => { $(id).value = SEMBERIJA.bbox[k].toFixed(2); });
     updateBboxInfo(); GeoMap.showArea(SEMBERIJA.bbox, true);
+  });
+  $("preset-lijevce").addEventListener("click", () => {
+    bboxIds.forEach((id, k) => { $(id).value = LIJEVCE.bbox[k].toFixed(2); });
+    $("period-start").value = LIJEVCE.start; $("period-end").value = LIJEVCE.end;
+    updateBboxInfo(); updatePeriodInfo(); GeoMap.showArea(LIJEVCE.bbox, true);
   });
   $("pick-area").addEventListener("click", pickOnMap);
   $("analysis-close").addEventListener("click", () => $("analysis-sheet").close());
