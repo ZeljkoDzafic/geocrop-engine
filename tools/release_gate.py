@@ -699,6 +699,14 @@ def build_report(results: list[CheckResult], facts: dict, env: dict) -> dict:
             "checks": [asdict(r) for r in results]}
 
 
+def redact(text: str, scratch: Path) -> str:
+    """Published copy: machine-specific scratch and home paths replaced by placeholders."""
+    for path in {str(Path(scratch).resolve()), str(scratch)}:
+        text = text.replace(path, "<scratch>")
+    text = text.replace(str(GATE_ROOT), "<gate>").replace(str(Path.home()), "~")
+    return re.sub(r"(/private)?/(tmp|var/folders)/[^\s\"'`|]*", "<tmp-path>", text)   # truncated leftovers
+
+
 def merge_reports(previous: dict, current: dict) -> dict:
     """`current` plus the checks of `previous` (same commit) that were not rerun; check order is preserved."""
     if previous.get("commit", {}).get("commit") != current.get("commit", {}).get("commit"):
@@ -786,7 +794,9 @@ def main(argv=None) -> int:
     if args.publish:
         dest = Path(args.publish) / f"release-gate-{report['commit']['short']}.md"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(paths["md"], dest)
+        public = json.loads(redact(json.dumps(report, default=str), gate.scratch))   # before any truncation
+        tmp = gate.scratch / "publish"
+        shutil.copyfile(write_report(public, tmp)["md"], dest)
         paths["published"] = str(dest)
     print(json.dumps({"verdict": report["verdict"], "counts": report["counts"], **paths}, indent=2))
     return 1 if report["verdict"] == "FAIL" else 0
