@@ -21,7 +21,14 @@ class HashCache:
         if mode not in ("content", "metadata"):
             raise ValueError("mode must be content or metadata")
         self.path, self.mode = Path(path), mode
-        self.entries = json.loads(self.path.read_text()) if self.path.exists() else {}
+        self.entries = {}
+        if self.path.exists():
+            # Only a cache: a damaged file (e.g. power loss) means re-hashing, never a failed or wrong run.
+            try:
+                entries = json.loads(self.path.read_text())
+            except (UnicodeDecodeError, ValueError):
+                entries = {}
+            self.entries = entries if isinstance(entries, dict) else {}
         self.dirty = False
 
     def file(self, path: str | Path) -> str:
@@ -33,7 +40,8 @@ class HashCache:
         hit = self.entries.get(key)
         # Small files (metadata, sidecars, configs) are always re-hashed: an edit that preserves size and
         # timestamp must still be detected. Only large rasters reuse the cached digest.
-        if hit and st.st_size > SMALL_FILE_BYTES and hit["size"] == st.st_size and hit["mtime_ns"] == st.st_mtime_ns:
+        if (isinstance(hit, dict) and st.st_size > SMALL_FILE_BYTES and hit.get("size") == st.st_size
+                and hit.get("mtime_ns") == st.st_mtime_ns and isinstance(hit.get("sha256"), str)):
             return hit["sha256"]
         h = hashlib.sha256()
         with p.open("rb") as fh:
@@ -83,18 +91,43 @@ class RunLock:
         self.path = Path(directory) / ".geocrop.lock"
 
     def __enter__(self):
-        if self.path.exists():
-            pid = self.path.read_text().strip()
-            try:
-                os.kill(int(pid), 0)
-                raise RuntimeError(f"Another geocrop run (pid {pid}) is using {self.path.parent}")
-            except (ProcessLookupError, ValueError):
-                pass                                   # stale lock from a crashed run
-            except PermissionError as exc:
-                raise RuntimeError(f"Output directory locked by pid {pid}") from exc
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(str(os.getpid()))
-        return self
+        # The pid is written to a private file which is then hard-linked into place: link() fails if the lock
+        # exists, so of two runs starting together exactly one wins, and the lock is never seen half-written.
+        tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
+        tmp.write_text(str(os.getpid()))
+        try:
+            for _ in range(3):
+                try:
+                    try:
+                        os.link(tmp, self.path)
+                    except FileExistsError:
+                        raise
+                    except OSError:                    # file system without hard links
+                        with os.fdopen(os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644), "w") as fh:
+                            fh.write(str(os.getpid()))
+                    return self
+                except FileExistsError:
+                    self._clear_stale()
+            raise RuntimeError(f"Could not acquire the run lock {self.path}")
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def _clear_stale(self):
+        try:
+            pid = self.path.read_text().strip()
+        except FileNotFoundError:
+            return
+        try:
+            os.kill(int(pid), 0)
+        except (ProcessLookupError, ValueError):
+            # Stale lock from a killed run (or written only partially): safe to take over.
+            self.path.unlink(missing_ok=True)
+            return
+        except PermissionError as exc:
+            raise RuntimeError(f"Output directory {self.path.parent} locked by pid {pid}") from exc
+        raise RuntimeError(f"Another geocrop run (pid {pid}) is using {self.path.parent}; if no such run "
+                           f"exists, delete {self.path}")
 
     def __exit__(self, *exc):
         self.path.unlink(missing_ok=True)

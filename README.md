@@ -170,6 +170,8 @@ empirical OOF calibration; independent field evaluation is required for both mod
 | [Reproducibility & privacy](docs/reproducibility.md) | manifests, caching, data protection |
 | [Deployment](docs/deployment.md) | hardware sizing, server layout |
 | [Scope & limitations](docs/limitations.md) | what is and is not validated |
+| [Security model](docs/security.md) | web API threat model, protections, dependency audits ([reporting](SECURITY.md)) |
+| [Releases & rollback](docs/release.md) | SemVer policy, pinned installs (`constraints/`), release checklist, rollback |
 
 ## Status
 

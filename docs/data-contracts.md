@@ -20,8 +20,12 @@ explicit nodata (`-9999` for float, `255` for class indices) and band descriptio
 
 `scene.json` example:
 ```json
-{"sensor": "S2", "datetime": "2023-06-12T09:30:41", "tile": "34TCQ", "relative_orbit": 36}
+{"schema_version": 1, "sensor": "S2", "datetime": "2023-06-12T09:30:41", "tile": "34TCQ", "relative_orbit": 36}
 ```
+
+Versioned contracts (`scene.json`, `model.joblib` payload, `run_manifest.json`) carry an integer
+`schema_version`; files without it are read as the original layout, files from a newer GeoCrop are refused
+with an upgrade hint. See [ADR 0003](adr/0003-file-contracts-and-schema-versions.md).
 
 ## Outputs
 
@@ -29,7 +33,7 @@ explicit nodata (`-9999` for float, `255` for class indices) and band descriptio
 |---|---|---|
 | `stack.tif` + `stack.features.json` | GeoTIFF float32 | one band per feature (description = name); manifest lists group, sensor, window(s), formula |
 | `samples.npz` | NumPy | `X, y, polygon, x, yy, features, crs` |
-| `model.joblib` | joblib | estimator, ordered feature list, classes, parameters, seed, scikit-learn version |
+| `model.joblib` | joblib | `schema_version`, estimator, ordered feature list, classes, parameters, seed, scikit-learn version |
 | `classes.tif` + `class_legend.json` | GeoTIFF uint8 | class index (255 = nodata) and index → name |
 | `probabilities.tif` | GeoTIFF float32 | one band per class (description = class) |
 | `uncertainty.tif` | GeoTIFF float32 | `max_probability`, `margin`, `entropy` (normalised to [0, 1]) |
