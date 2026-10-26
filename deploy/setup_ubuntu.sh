@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GeoCrop Engine — one-time setup of an Ubuntu 24.04 research VM (no GPU needed).
+# GeoCrop Engine — one-time setup of an Ubuntu 26.04/24.04 research VM (no GPU needed).
 #   sudo bash deploy/setup_ubuntu.sh            # system packages, directories
 #   bash deploy/setup_ubuntu.sh --user          # Miniforge, conda env, engine (as the run user)
 #   SNAP_VERSION=11.0 bash deploy/setup_ubuntu.sh --snap   # optional ESA SNAP (Sentinel-1)

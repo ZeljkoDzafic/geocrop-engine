@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +33,7 @@ jobs:
 
   pinned:
     # The audited, pinned dependency set (constraints/py312.txt) must install and pass the suite.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -43,7 +43,7 @@ jobs:
       - run: python -m pytest -q
 
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -59,7 +59,7 @@ jobs:
           pip-audit --progress-spinner off --path "$(/tmp/latest/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - run: docker build --pull -t geocrop-engine:ci .

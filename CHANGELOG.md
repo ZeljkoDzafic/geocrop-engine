@@ -248,6 +248,9 @@
 - Docker: job state, `.env` files and virtual environments are excluded from the build context.
 
 ### Changed
+- CI and release workflows run on `ubuntu-26.04` (pinned instead of `ubuntu-latest`); VM scripts and docs target Ubuntu 26.04
+  LTS (24.04 still supported; Python 3.12 from uv when the distribution has no `python3.12` package).
+- `matplotlib` is optional everywhere: the scale-benchmark report and evidence packages skip their PNG without it.
 - `constraints/py312.txt` pins every optional extra (156 packages, previous pins kept); the Docker image now uses
   `python:3.12-slim-bookworm` and installs from the constraints file (`--build-arg EXTRAS=...`), runs as an
   unprivileged user and keeps `/usr/local/bin/_entrypoint.sh`.

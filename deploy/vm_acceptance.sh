@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GeoCrop Engine - release acceptance on a FRESH Ubuntu 24.04 VM (the real "clean machine" test).
+# GeoCrop Engine - release acceptance on a FRESH Ubuntu 26.04 (or 24.04) VM (the real "clean machine" test).
 #
 # Runs the same release gate as tools/release_gate.py does on a workstation, but on the target machine, so that
 # the installation, the test tiers, the real Sentinel-1/2 acceptance run, the demo, crash recovery, the combined
@@ -7,7 +7,7 @@
 # system, CPU and network that production will use. Docker is not needed (the VM itself is the clean machine).
 #
 #   git clone https://github.com/ZeljkoDzafic/geocrop-engine.git && cd geocrop-engine
-#   sudo bash deploy/vm_acceptance.sh --system          # once: apt packages (python3.12-venv, git, build tools)
+#   sudo bash deploy/vm_acceptance.sh --system          # once: apt packages (git, build tools; Python 3.12 via apt or uv)
 #   bash deploy/vm_acceptance.sh                        # as the run user; verifies HEAD
 #   COMMIT=v0.9.0 bash deploy/vm_acceptance.sh          # verify a tag or commit
 #   SKIP="c. d." bash deploy/vm_acceptance.sh           # skip slow/network-heavy checks by id prefix
@@ -23,8 +23,16 @@ PYTHON=${PYTHON:-python3.12}
 
 if [[ "${1:-}" == "--system" ]]; then
   apt-get update
-  apt-get install -y --no-install-recommends git curl ca-certificates python3.12 python3.12-venv python3.12-dev \
-    build-essential libgomp1
+  apt-get install -y --no-install-recommends git curl ca-certificates build-essential libgomp1
+  # Ubuntu 24.04 ships Python 3.12; Ubuntu 26.04 ships a newer default, so 3.12 (the pinned constraints'
+  # interpreter) comes from uv's standalone builds when the distribution has no python3.12 package.
+  if apt-cache show python3.12-venv >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends python3.12 python3.12-venv python3.12-dev
+  else
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+    UV_PYTHON_INSTALL_DIR=/opt/uv-python uv python install 3.12
+    ln -sf "$(UV_PYTHON_INSTALL_DIR=/opt/uv-python uv python find 3.12)" /usr/local/bin/python3.12
+  fi
   mkdir -p "$SCRATCH" && chmod 1777 "$SCRATCH"
   echo "System packages installed. Next, as the run user: bash deploy/vm_acceptance.sh"
   exit 0

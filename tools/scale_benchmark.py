@@ -532,11 +532,15 @@ def _compare(lines, comparisons, w, label, e, st, sz):
 
 
 def _plots_and_fits(rows, images, out, comparisons, lines):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        plt = None
+        print("matplotlib is not installed: tables and fits only, no plot (pip install matplotlib)")
     # plots
-    if rows:
+    if rows and plt is not None:
         a = [w["area"] for w in rows]
         fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
         ax = axes[0]

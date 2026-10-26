@@ -168,6 +168,11 @@ def test_scale_benchmark_square_dir_bytes_and_report(tmp_path):
             "stages": stages, "info": {"area_km2": area, "pixels": area * 10000, "scenes": {"s2": 10, "s1": 0},
                                        "features": 97, "samples": 1000}}))
     summary = tool.report(tmp_path / "out", tmp_path / "img")
-    assert (tmp_path / "img" / "scale_benchmark.png").is_file()
+    try:
+        import matplotlib  # noqa: F401
+    except ImportError:
+        assert not (tmp_path / "img" / "scale_benchmark.png").exists()
+    else:
+        assert (tmp_path / "img" / "scale_benchmark.png").is_file()
     a, b = summary["linear_fits_a_plus_b_area"]["features"]["wall"]
     assert b == pytest.approx(0.4) and a == pytest.approx(0, abs=1e-9)

@@ -11,6 +11,12 @@ from test_temporal_quality import END, START, signatures
 
 from geocrop import cli, contracts, evidence, provenance
 
+try:
+    import matplotlib  # noqa: F401
+    HAS_MPL = True
+except ImportError:   # optional `plots` extra: packages are built without the PNG
+    HAS_MPL = False
+
 
 def _inputs(tmp_path):
     ids = ["A", "B", "C"]
@@ -91,7 +97,8 @@ def test_index_html_png_and_selection(tmp_path):
     assert "<script" not in html.lower() and "style=" not in html
     assert not re.findall(r"(?:src|href)=\"https?:", html)
     assert "<svg" in html and "observed (clear)" in html
-    assert (out / "B" / "timeseries.png").read_bytes()[:4] == b"\x89PNG"
+    png = out / "B" / "timeseries.png"
+    assert png.read_bytes()[:4] == b"\x89PNG" if HAS_MPL else not png.exists()
     manifest = json.loads((out / "evidence_manifest.json").read_text())
     assert contracts.check("evidence", manifest)["packages"] == 1
     with pytest.raises(ValueError, match="Unknown parcel"):
@@ -101,7 +108,7 @@ def test_index_html_png_and_selection(tmp_path):
 def test_packages_are_deterministic(tmp_path):
     _build(tmp_path, "one")
     _build(tmp_path, "two")
-    for name in ("evidence.json", "evidence.html", "timeseries.png"):
+    for name in ("evidence.json", "evidence.html") + (("timeseries.png",) if HAS_MPL else ()):
         for pid in ("A", "B", "C"):
             assert (tmp_path / "one" / pid / name).read_bytes() == (tmp_path / "two" / pid / name).read_bytes()
     assert (tmp_path / "one" / "index.csv").read_bytes() == (tmp_path / "two" / "index.csv").read_bytes()
