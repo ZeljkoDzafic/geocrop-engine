@@ -4,9 +4,10 @@ The web extra adds a local interface around the existing engine CLI. All existin
 Python functions remain available. No frontend build service, Node runtime, external fonts or CDN is
 needed. HTML/CSS/JavaScript are shipped inside the Python package.
 
-![GeoCrop workspace after a synthetic software-check run](images/web-workspace.png)
+![GeoCrop workspace with a Sentinel-2 quicklook of Semberija on the map](images/web-workspace.png)
 
-The screenshot shows synthetic verification data, not an observational crop-accuracy result.
+The screenshot shows a monthly true-colour composite from `geocrop quicklook` (contains modified Copernicus
+Sentinel data 2023); it is imagery for orientation, not a crop-accuracy result.
 
 ## Start the workspace
 
@@ -23,13 +24,53 @@ loopback only. A notebook on another machine can use an SSH-forwarded local port
 trusted owner's research tool running as that owner's account, not a public/multi-tenant service or
 a security sandbox for untrusted model files. Inputs, configs and joblib models must be trusted.
 
-The UI provides:
+## First steps: from an area and dates to imagery
 
-* forms generated from the actual CLI parser, including required fields and optional settings;
-* an engine command console with quoted-argument support;
-* persistent job history, queued/running/succeeded/failed/cancelled/interrupted states and exit codes;
-* incremental stdout/stderr logs, cancellation and artifact downloads;
-* Python/Jupyter examples and an authenticated OpenAPI schema download.
+The workspace opens on the **Map**. With no job selected it offers three ways in:
+
+1. **New analysis** (or press <kbd>N</kbd>) opens a three-step sheet:
+   *Area* — type a bounding box in degrees (WGS 84), use the Semberija example, or choose **Draw on map** and drag a
+   rectangle (or click/tap two corners; <kbd>Esc</kbd> cancels); *Period* — start and end dates or a preset such as
+   the latest growing season; *Run* — review the area size, the period and a fresh output folder. The sheet shows the
+   exact `geocrop quicklook ...` command it submits, so the same run can be repeated in a shell or notebook.
+2. **Try Semberija, Jun–Aug 2023** submits that quicklook with one click.
+3. **Run the synthetic demo** is a software check that produces crop classes, uncertainty and parcels.
+
+While a job runs, the map shows its progress and the output streams below the map. When it finishes, a
+notification appears and the imagery is drawn on the map. The *imagery bar* at the bottom of the map switches between
+monthly composites and single scenes, between true colour, false colour and NDVI, and steps through the dates
+(<kbd>[</kbd> and <kbd>]</kbd>). The side panel holds the imagery switch and opacity, a switch per result layer and
+the legend. The expand button (or <kbd>F</kbd>) shows the map full-window.
+
+## Views
+
+* **Map** — imagery and results of the selected job, its output log and its files (with type and size; click to
+  download).
+* **Commands** — every engine command as a form generated from the actual CLI parser, grouped by purpose and
+  filterable. Required inputs come first; optional settings sit under *Advanced options*. The live *Command line*
+  preview omits unchanged defaults, so it is exactly what one would type.
+* **Jobs** — the persistent job history with status, relative start time, duration and exit code;
+  queued/running/succeeded/failed/cancelled/interrupted states, incremental logs and cancellation.
+* **Terminal** — a macOS-style engine console with syntax colouring, completion and history (see below).
+* **Python & API** — Jupyter/Python and HTTP examples and an authenticated OpenAPI schema download.
+
+The sidebar lists recent jobs; on a phone the views move to a bottom tab bar. Light and dark appearance follow the
+system; the moon/sun button overrides it (remembered in this browser only).
+
+### Keyboard shortcuts
+
+| Keys | Action |
+|---|---|
+| <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> | command palette: search commands and actions |
+| <kbd>N</kbd> | new analysis |
+| <kbd>1</kbd>–<kbd>5</kbd> | Map, Commands, Jobs, Terminal, Python & API |
+| <kbd>F</kbd> | expand or restore the map |
+| <kbd>[</kbd> / <kbd>]</kbd> | previous / next imagery date |
+| <kbd>J</kbd> / <kbd>K</kbd> | next / previous job |
+| <kbd>?</kbd> | shortcut overview |
+| <kbd>Esc</kbd> | close a sheet, cancel area drawing or leave the expanded map |
+
+Single-key shortcuts are ignored while typing in a field or the terminal.
 
 The console invokes `python -m geocrop.cli` with an argument list, never a shell. `serve`, direct SNAP
 executable invocation and `manifest --snap-gpt` are unavailable in the web console; use the ordinary
@@ -52,9 +93,50 @@ commands are removed by installing the interface.
 `GEOCROP_WEB_THREADS` sets OpenMP/OpenBLAS threads per job (default 2); the model's `n_jobs` setting remains
 independent. The server access token is removed from child-job environments. The UI holds it only in
 page memory, not URLs or browser local storage. Every API request requires Bearer authentication;
-cross-origin browser requests are rejected. Artifact downloads are attachments, and listings are
+cross-origin browser requests are rejected and every response carries a strict content-security policy and
+related headers (see [security](security.md)). Artifact downloads are attachments, and listings are
 limited to the first 200 files within a job's declared output locations. Use local filesystem tools
 for larger output inventories.
+
+## CLI console (terminal)
+
+The **CLI console** tab is a macOS Terminal-style session. Type an engine command with or without the
+leading `geocrop` (`indices --format markdown` and `geocrop indices --format markdown` are equivalent) and
+press Enter. The job's output streams inline; a closing line shows `✓` (green) or `✗` (red) with the exit
+code, duration and job ID. A started job is also selected in the *Command output* card, so its files and
+map layers are available there.
+
+While typing, the line is coloured: command names, known flags, numbers, quoted strings, paths and valid
+choices each have their own colour; unknown commands, unknown flags, invalid choices and shell operators
+are underlined in red. A hint line under the prompt lists the command's required flags (✓ provided /
+● still missing) and the help, choices and default of the flag being edited.
+
+Completion works like an editor's suggestion list: command names with descriptions; then the command's
+flags with help, default and a *required* marker (flags already used are hidden unless they accept several
+values); then `choices` of the current flag; and workspace paths for path-like flags (`--out`, `--root`,
+`--config`, `--samples`, `--raster`, …). Paths come from `GET /api/files?prefix=<relative prefix>`, which
+lists at most 200 entries of one workspace directory. It rejects absolute paths and `..`, never lists
+hidden dot-files or the web state directory, and drops symlinks resolving outside the workspace. The top
+suggestion (or the latest matching history entry) is shown as grey ghost text.
+
+Built-in commands run in the browser and are not sent to the engine: `help` / `?` (all commands;
+`help <command>` lists its flags), `clear`, `history` and `jobs` (recent jobs and their status). The last
+100 commands are kept in the browser's local storage (the access token is never stored).
+
+| Key | Action |
+|---|---|
+| Enter | run the line (accepts the highlighted suggestion while completing a partly typed word) |
+| Tab | accept the suggestion; opens the list when it is closed (a single match is inserted directly) |
+| Ctrl+Space | open the suggestion list |
+| ↑ / ↓ | move in the suggestion list; with the list closed, previous/next history entry |
+| → or End (at end of line) | accept the ghost-text hint |
+| Esc | close the suggestion list |
+| Ctrl+R | reverse history search (Ctrl+R again: older match, Enter: run, Esc: cancel) |
+| Ctrl+C | cancel the running job (prints `^C`); without a job, discard the current line |
+| Ctrl+L | clear the screen |
+| Ctrl+U | delete text before the cursor |
+
+The console still runs engine commands only, as an argument list and never through a shell.
 
 ## Jupyter Notebook / JupyterLab / Python
 
@@ -83,29 +165,46 @@ See the runnable [example notebook](../examples/web_notebook.ipynb); it contains
 
 ## HTTP API
 
+**`/api/v1` is the stable REST contract.** Its paths, parameters, response fields and status codes follow the
+[versioning policy](release.md): within 1.x they only gain optional parameters, fields and endpoints. Every
+endpoint is also served without the version segment (`/api/health`, `/api/jobs`, ...) as a **compatibility
+alias** with identical behaviour, used by the bundled UI and older clients; new integrations should use
+`/api/v1`. The OpenAPI schema lists the `/api/v1` paths only. `EngineClient` uses `/api/v1` and falls back to
+the unversioned paths when talking to a server older than this contract (`EngineClient(api_prefix="/api")`
+pins a prefix).
+
 All endpoints below require `Authorization: Bearer <token>`:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | version, workspace and worker count |
-| GET | `/api/commands` | actual parser command/argument catalogue |
-| POST | `/api/jobs` | submit `{"argv": ["indices", "--format", "json"]}` or `{"command": "geocrop indices"}` |
-| GET | `/api/jobs` | newest jobs; `limit` defaults to 50, maximum 200 |
-| GET | `/api/jobs/{id}` | status, times, args, outputs and exit code |
-| GET | `/api/jobs/{id}/logs` | byte `offset` and bounded `limit` (up to 262144) |
-| POST | `/api/jobs/{id}/cancel` | stop a queued/running job |
-| GET | `/api/jobs/{id}/artifacts` | up to 200 local output files |
-| GET | `/api/jobs/{id}/artifact?path=...` | download a listed artifact |
-| GET | `/api/openapi.json` | machine-readable API description |
+| GET | `/api/v1/health` | version, workspace and worker count |
+| GET | `/api/v1/commands` | actual parser command/argument catalogue |
+| POST | `/api/v1/jobs` | submit `{"argv": ["indices", "--format", "json"]}` or `{"command": "geocrop indices"}` |
+| GET | `/api/v1/jobs` | newest jobs; `limit` defaults to 50, maximum 200 |
+| GET | `/api/v1/jobs/{id}` | status, times, args, outputs and exit code |
+| GET | `/api/v1/jobs/{id}/logs` | byte `offset` and bounded `limit` (up to 262144) |
+| POST | `/api/v1/jobs/{id}/cancel` | stop a queued/running job |
+| GET | `/api/v1/jobs/{id}/artifacts` | up to 200 local output files |
+| GET | `/api/v1/jobs/{id}/artifact?path=...` | download a listed artifact |
+| GET | `/api/v1/files?prefix=...` | up to 200 workspace entries for path completion (relative prefix only) |
+| GET | `/api/v1/jobs/{id}/map` | map-ready previews of the job's outputs (see below) |
+| GET | `/api/v1/openapi.json` | machine-readable API description |
 
-Submission returns HTTP 202 and a job ID, not the final engine result. HTTP 400 reports invalid commands
-or output locations, 401 missing/incorrect authentication, 403 cross-origin requests and 404 unknown
-jobs/artifacts. Typed request validation can return 422. A job with engine exit code 0 succeeds; any
-other code is recorded as failed, including audit/readiness commands that intentionally use nonzero
-exit codes to report data problems. Use the logs to distinguish those outcomes.
+Submission returns HTTP 202 and a job ID, not the final engine result. HTTP 400 reports invalid commands,
+output locations or a full job queue (32 queued jobs), 401 missing/incorrect authentication, 403 cross-origin
+requests, 404 unknown jobs/artifacts/paths and 413 request bodies over 1 MiB. Typed request validation can
+return 422. Job arguments are limited to 256 items, 64 KiB each and 128 KiB in total. A job with engine exit
+code 0 succeeds; any other code is recorded as failed, including audit/readiness commands that intentionally
+use nonzero exit codes to report data problems. Use the logs to distinguish those outcomes.
+
+For developers: routes are registered once under `/api/...` in `geocrop.web.create_app`; the final
+`add_versioned_aliases(app)` call adds the `/api/v1/...` twin of every route registered before it, so a new
+endpoint needs no separate versioned definition. Authentication is enforced for every `/api` path by
+middleware as well as by the per-route dependency. The protections, their limits and the threat model are
+described in [security](security.md).
 
 ## Results map
-Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /api/jobs/{id}/map`):
+Selecting a succeeded job loads its spatial outputs on the **Map** (`GET /api/v1/jobs/{id}/map`):
 
 | Layer | Source | Default |
 |---|---|---|
@@ -116,7 +215,8 @@ Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /a
 | Other vector outputs (segments, reference layers, observations) | `.gpkg` / `.geojson` | off |
 | Satellite imagery: true colour (B4-B3-B2), false colour (B8-B4-B3), NDVI | every window composite and scene folder of the job | latest cloud-free composite (true colour) when the job has no classification |
 
-Imagery is chosen with one compact control (date or window, product, opacity), so only one image is drawn at a time.
+Imagery is chosen with the imagery bar (composites or scenes, product, date) and the side panel (on/off, opacity), so
+only one image is drawn at a time.
 
 ### Real imagery in two minutes
 ```bash

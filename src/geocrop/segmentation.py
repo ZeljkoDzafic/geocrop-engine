@@ -148,8 +148,13 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
 
 
 def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, threshold: float = 0.5,
-                          min_area_pixels: int = 16, seed_percentile: float = 55) -> dict:
-    """Watershed on the distance transform of field interiors (probability < threshold)."""
+                          min_area_pixels: int = 16, seed_percentile: float = 55,
+                          min_seed_distance: float = 2.0) -> dict:
+    """Watershed on the distance transform of field interiors (probability < threshold).
+
+    Seeds are interior pixels farther than ``max(min_seed_distance, percentile(distance, seed_percentile))``
+    pixels from the nearest boundary; lower both for narrow strip fields.
+    """
     from scipy.ndimage import distance_transform_edt
     from skimage.measure import label
     from skimage.segmentation import watershed
@@ -163,7 +168,7 @@ def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, 
         if not interior.any():
             raise ValueError("No field interiors below threshold")
         dist = distance_transform_edt(interior)
-        seeds = label(dist > max(2.0, float(np.percentile(dist[interior], seed_percentile))))
+        seeds = label(dist > max(min_seed_distance, float(np.percentile(dist[interior], seed_percentile))))
         regions = watershed(-dist, seeds, mask=interior)
         polys = []
         px = abs(src.transform.a * src.transform.e)

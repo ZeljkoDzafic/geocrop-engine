@@ -1,0 +1,67 @@
+name: release
+# Tag-driven release: push a tag vX.Y.Z (matching pyproject.toml, CITATION.cff and the CHANGELOG heading).
+# Builds sdist + wheel, runs the test suite against the pinned dependency set and publishes a GitHub
+# Release whose notes are that version's CHANGELOG section. PyPI publishing is off; see docs/release.md.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[dev,all,stac,web]' -c constraints/py312.txt
+      - run: python tools/check_versions.py --tag "$GITHUB_REF_NAME" --notes release-notes.md
+      - run: ruff check src tests tools
+      - run: python -m pytest
+      - run: python -m build --sdist --wheel --outdir dist
+      - name: Smoke-test the wheel in a fresh environment
+        run: |
+          python -m venv /tmp/wheel
+          /tmp/wheel/bin/python -m pip install dist/*.whl -c constraints/py312.txt
+          /tmp/wheel/bin/geocrop --version
+          (cd dist && sha256sum * > SHA256SUMS)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            dist/
+            release-notes.md
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$GITHUB_REF_NAME" in *[0-9]a[0-9]*|*[0-9]b[0-9]*|*rc*|*dev*) flags="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "GeoCrop Engine ${GITHUB_REF_NAME#v}" --notes-file release-notes.md $flags
+
+  # PyPI publishing (disabled). To enable: register a trusted publisher for this repository and the
+  # workflow file release.yml on pypi.org, create a GitHub environment named "pypi", then uncomment.
+  # pypi:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   environment: pypi
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/download-artifact@v8
+  #       with:
+  #         name: release
+  #     - run: rm -f dist/SHA256SUMS
+  #     - uses: pypa/gh-action-pypi-publish@release/v1
