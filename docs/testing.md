@@ -55,7 +55,7 @@ python -m pytest --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
 ```
 
 `coverage.xml` is uploaded as a workflow artifact. The build fails below the current total minus two points
-(`--cov-fail-under=77`); raise the threshold when coverage improves. Engine commands run by web jobs execute in
+(`--cov-fail-under=71`, measured on the minimal CI install `.[dev,stac,web]` where optional backends are skipped); raise the threshold when coverage improves. Engine commands run by web jobs execute in
 subprocesses and are not counted; the CLI's own tests cover them in-process.
 
 Measured on 2026-10-26 (Python 3.12, default tier; statements + branches combined: **79.9 %**; statements
