@@ -650,12 +650,12 @@ Concatenate feature stacks on one grid
 
 ## `geocrop embeddings`
 
-Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study grid
+Foundation-model embeddings (feature providers: AlphaEarth, TESSERA, on-VM Presto, Galileo, AnySat, plugins) on the study grid
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
 | `--config` |  |  | features.embeddings, grid.reference and paths sections |
-| `--source` |  |  | override features.embeddings.source |
+| `--source` |  |  | override features.embeddings.source: one or more feature providers (alphaearth, tessera, presto, galileo, anysat or a plugin; see --list) |
 | `--year` |  |  | override features.embeddings.year |
 | `--reference` |  |  | study grid GeoTIFF (default grid.reference) |
 | `--out` |  |  | output directory (default <features dir>/embeddings) |
@@ -666,6 +666,9 @@ Foundation-model embeddings (AlphaEarth, TESSERA, on-VM Presto) on the study gri
 | `--id-field` |  |  | parcel id field (default parcels.id_field) |
 | `--checkpoint` |  |  | Presto: local checkpoint instead of the pinned download |
 | `--make-monthly` |  |  | Presto: first build calendar-month composites from paths.s2_scenes / paths.s1_scenes |
+| `--namespace, --no-namespace` |  |  | feature names emb_<provider>_NN (default for new providers and several sources) or legacy emb_NN |
+| `--allow-license` |  |  | acknowledge a licence id of a provider whose weights/data are not permissive (repeatable) |
+| `--list` |  |  | list the registered feature providers and exit |
 
 ## `geocrop signatures`
 

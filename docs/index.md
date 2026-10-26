@@ -23,7 +23,7 @@
 18. [Open-source review and implementation evidence](open-source-review.md)
 19. [Testing](testing.md)
 20. [Public benchmarks](benchmarks/README.md) and [crop calendars](calendars.md)
-21. [Foundation-model embeddings (AlphaEarth, TESSERA, Presto)](embeddings.md)
+21. [Foundation-model embeddings and feature providers (AlphaEarth, TESSERA, Presto, Galileo, AnySat)](embeddings.md)
 22. [Active learning: field campaigns, label ingestion, budget curves](active-learning.md)
 23. [Validation protocols: spatial CV, leave-one-region-out, leave-one-year-out](validation-protocols.md)
 24. [Optional openEO back-end (CDSE)](openeo.md)

@@ -164,7 +164,7 @@ class ConfigError(ValueError):
 
 #: Keys of the optional ``features.embeddings`` mapping (docs/embeddings.md).
 EMBEDDING_DEFAULTS: dict[str, Any] = {
-    "source": None,            # alphaearth | tessera | presto
+    "source": None,            # a feature provider (alphaearth | tessera | presto | galileo | anysat | plugin) or a list
     "year": None,
     "dir": None,               # default: <paths.features parent>/embeddings
     "resampling": "nearest",   # pre-computed sources: nearest | bilinear
@@ -176,7 +176,21 @@ EMBEDDING_DEFAULTS: dict[str, Any] = {
     "checkpoint": None,        # Presto: local checkpoint (default: pinned official download)
     "parcels": False,          # Presto: also write parcel-level embeddings from paths.parcels
     "attach": True,            # append the embeddings raster to the feature stack
+    "namespace": None,         # feature names emb_<source>_NN (true) / legacy emb_NN (false); default: new providers
+                               # and lists of sources are namespaced, alphaearth/tessera/presto alone are legacy
+    "allow_license": [],       # licence ids acknowledged for providers that are not permissive
 }
+
+
+def embedding_sources(opts: dict) -> list[str]:
+    """``features.embeddings.source`` as a list (one or several feature providers)."""
+    src = opts.get("source")
+    return [] if not src else [src] if isinstance(src, str) else list(src)
+
+
+def embedding_namespace(opts: dict) -> bool | None:
+    """Namespace option: several sources always need namespaced feature names."""
+    return True if len(embedding_sources(opts)) > 1 and opts.get("namespace") is None else opts.get("namespace")
 
 
 def embedding_options(cfg: dict, always: bool = False) -> dict | None:
@@ -300,8 +314,20 @@ def _validate_embeddings(raw) -> None:
     unknown = set(raw) - set(EMBEDDING_DEFAULTS)
     if unknown:
         raise ConfigError(f"Unknown configuration key: features.embeddings.{sorted(unknown)[0]}")
-    if raw.get("source") not in ("alphaearth", "tessera", "presto"):
-        raise ConfigError("features.embeddings.source must be alphaearth, tessera or presto")
+    from . import plugins
+    sources = embedding_sources(raw)
+    known = plugins.feature_providers.names()
+    if not sources or not all(isinstance(x, str) and x in plugins.feature_providers for x in sources):
+        raise ConfigError(f"features.embeddings.source must be one or a list of: {', '.join(known)}")
+    if len(set(sources)) != len(sources):
+        raise ConfigError("features.embeddings.source lists a provider twice")
+    if raw.get("namespace") not in (None, True, False):
+        raise ConfigError("features.embeddings.namespace must be true, false or unset")
+    if len(sources) > 1 and raw.get("namespace") is False:
+        raise ConfigError("Several embedding sources need namespaced feature names (features.embeddings.namespace)")
+    allow = raw.get("allow_license", [])
+    if not isinstance(allow, list) or not all(isinstance(x, str) for x in allow):
+        raise ConfigError("features.embeddings.allow_license must be a list of licence ids")
     year = raw.get("year")
     if isinstance(year, bool) or not isinstance(year, int) or not 2015 <= year <= 2100:
         raise ConfigError("features.embeddings.year must be a year, e.g. 2023")

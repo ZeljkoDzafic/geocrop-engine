@@ -38,7 +38,7 @@ enforced by `tests/test_architecture.py` ([ADR 0001](adr/0001-layered-architectu
  │               cbm · segmentation · segmenters · unet · segmentation_metrics ·         │
  │               plugins · contracts · hashing                                           │
  └──────────────────────────────────────────────────────────────────────────────────────┘
-        ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators)
+        ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators / feature_providers)
 ```
 
 Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture.md),
@@ -66,7 +66,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `clouds` | sun-angle shadow projection, external cloud masks (OmniCloudMask), multi-temporal outlier screening |
 | `timeseries`, `tsfeatures` | regular-grid binning, weighted Whittaker smoothing, phenology, harmonics; time-series feature stack, stack merging |
 | `estimators` | RF, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN and plugin classifiers behind one factory |
-| `plugins` | registries for estimators, indices, segmenters, exporters and validators; lazy entry-point discovery |
+| `plugins` | registries for estimators, indices, segmenters, exporters, validators and feature providers; lazy entry-point discovery |
 | `contracts`, `hashing` | `schema_version` stamping/validation/migration of JSON contracts; SHA-256 of files |
 | `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
