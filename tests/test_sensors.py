@@ -173,3 +173,12 @@ def test_stac_cache_requires_same_grid_and_complete_bands(tmp_path):
     assert not stac_import.cached_scene_valid(scene, stac_import.grid_identity(g2))     # moved grid
     (scene / "B11.tif").unlink()
     assert not stac_import.cached_scene_valid(scene, stac_import.grid_identity(g1))     # missing band
+
+
+def test_remote_reads_time_out_instead_of_hanging():
+    """A stalled HTTPS connection once hung a 1000 km2 Sentinel-1 import for > 1 h (docs/performance.md)."""
+    from geocrop.s1_stac import S1_GDAL_ENV
+    from geocrop.stac_import import GDAL_ENV
+    for env in (GDAL_ENV, S1_GDAL_ENV):
+        assert 0 < int(env["GDAL_HTTP_TIMEOUT"]) <= 3600 and int(env["GDAL_HTTP_CONNECTTIMEOUT"]) > 0
+        assert int(env["GDAL_HTTP_LOW_SPEED_TIME"]) > 0 and int(env["GDAL_HTTP_LOW_SPEED_LIMIT"]) > 0

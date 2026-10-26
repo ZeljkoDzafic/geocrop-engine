@@ -1,0 +1,2612 @@
+{
+  "schema": "geocrop-public-transfer/1",
+  "protocol": {
+    "id": "si-transfer-pomurje",
+    "version": 1,
+    "file": "si_transfer_pomurje.v1.yaml",
+    "sha256": "5620feeaf651b96032cee1b328600ec605cafc065274ed8ac353b80f64e68ebe"
+  },
+  "command": "geocrop benchmark-transfer --protocol configs/benchmarks/si_transfer_pomurje.v1.yaml --work outputs/transfer-v1",
+  "started_utc": "2026-10-26T06:09:21+00:00",
+  "finished_utc": "2026-10-26T06:24:21+00:00",
+  "engine": {
+    "version": "0.9.0",
+    "git_commit": "42f65b0739417b98bfabdb432e2c1b7855614951",
+    "git_dirty": false
+  },
+  "runtime": {
+    "python": "3.12.15",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "cpu_count": 15,
+    "geocrop-engine": "0.9.0",
+    "numpy": "2.5.4",
+    "pandas": "2.3.3",
+    "scikit-learn": "1.9.1",
+    "rasterio": "1.5.2",
+    "geopandas": "1.2.0",
+    "shapely": "2.2.0",
+    "pyproj": "3.8.0",
+    "scipy": "1.18.1",
+    "scikit-image": "0.26.0",
+    "torch": "2.14.1",
+    "pystac-client": "0.9.1",
+    "gdal (rasterio)": "3.12.2"
+  },
+  "sources": {
+    "eurocrops_si_2021": {
+      "kind": "eurocrops",
+      "zenodo_record": "14094196",
+      "archive": "SI_2021.zip",
+      "url": null,
+      "checksum": "md5:b2acea403d8372ccb9c5f5276130f23b",
+      "licence": "CC-BY-SA-4.0",
+      "citation": "Schneider, M., Schelte, T., Schmitz, F., Koerner, M. (2023). EuroCrops: The Largest Harmonized Open Crop Dataset Across the European Union. Scientific Data 10, 612. Data: doi:10.5281/zenodo.14094196."
+    },
+    "kmrs_si_2025": {
+      "kind": "url",
+      "zenodo_record": null,
+      "archive": null,
+      "url": "https://rkg.gov.si/razno/portal_analysis/KMRS_2025.zip",
+      "checksum": "sha256:2977a4163ce60d7b83e9cbc0a86bdfb5e437e5abde6f37c0e6a061335eb9fa14",
+      "licence": "MKGP open data: public, no restriction of use, citation of the source mandatory",
+      "citation": "Ministrstvo za kmetijstvo, gozdarstvo in prehrano (MKGP), Sloj kmetijskih rastlin iz zbirnih vlog (KMRS) 2025, https://rkg.gov.si/ (metadata: eprostor.gov.si record 21ecba4a-1214-4617-8bf4-020d2f235a25)."
+    }
+  },
+  "code_maps": {
+    "kmrs_si_2025": {
+      "national_codes": 157,
+      "inconsistent_codes": 0,
+      "min_consistency": 1.0,
+      "sha256": "62053186a7a0d615043740b589e625a1189c5654e92e689b575c43f320e8e4dc"
+    }
+  },
+  "domains": {
+    "pomurje_2021": {
+      "region": "pomurje",
+      "year": 2021,
+      "source": "eurocrops_si_2021",
+      "tiles": [
+        "SI-MS-S",
+        "SI-LE-W",
+        "SI-LJ"
+      ],
+      "labels": {
+        "population_per_class": {
+          "grassland": 594,
+          "maize": 2777,
+          "oil_pumpkin": 347,
+          "winter_cereals": 3261,
+          "winter_rapeseed": 307
+        },
+        "sampled_per_class": {
+          "grassland": 150,
+          "maize": 150,
+          "oil_pumpkin": 150,
+          "winter_cereals": 150,
+          "winter_rapeseed": 150
+        },
+        "classes_dropped_below_minimum": {},
+        "parcels_with_unmapped_code": 0
+      }
+    },
+    "podravje_2021": {
+      "region": "podravje",
+      "year": 2021,
+      "source": "eurocrops_si_2021",
+      "tiles": [
+        "SI-PT-E",
+        "SI-DP"
+      ],
+      "labels": {
+        "population_per_class": {
+          "grassland": 757,
+          "maize": 2313,
+          "oil_pumpkin": 258,
+          "winter_cereals": 1990,
+          "winter_rapeseed": 86
+        },
+        "sampled_per_class": {
+          "grassland": 150,
+          "maize": 150,
+          "oil_pumpkin": 150,
+          "winter_cereals": 150,
+          "winter_rapeseed": 86
+        },
+        "classes_dropped_below_minimum": {},
+        "parcels_with_unmapped_code": 0
+      }
+    },
+    "posavje_2021": {
+      "region": "posavje",
+      "year": 2021,
+      "source": "eurocrops_si_2021",
+      "tiles": [
+        "SI-KK-W",
+        "SI-KK-E"
+      ],
+      "labels": {
+        "population_per_class": {
+          "grassland": 1461,
+          "maize": 1234,
+          "oil_pumpkin": 10,
+          "winter_cereals": 1037,
+          "winter_rapeseed": 123
+        },
+        "sampled_per_class": {
+          "grassland": 150,
+          "maize": 150,
+          "winter_cereals": 150,
+          "winter_rapeseed": 123
+        },
+        "classes_dropped_below_minimum": {
+          "oil_pumpkin": 10
+        },
+        "parcels_with_unmapped_code": 0
+      }
+    },
+    "gorenjska_2021": {
+      "region": "gorenjska",
+      "year": 2021,
+      "source": "eurocrops_si_2021",
+      "tiles": [
+        "SI-KR-S",
+        "SI-KR-N"
+      ],
+      "labels": {
+        "population_per_class": {
+          "grassland": 2162,
+          "maize": 1124,
+          "oil_pumpkin": 1,
+          "winter_cereals": 591
+        },
+        "sampled_per_class": {
+          "grassland": 150,
+          "maize": 150,
+          "winter_cereals": 150
+        },
+        "classes_dropped_below_minimum": {
+          "oil_pumpkin": 1,
+          "winter_rapeseed": 0
+        },
+        "parcels_with_unmapped_code": 0
+      }
+    },
+    "pomurje_2025": {
+      "region": "pomurje",
+      "year": 2025,
+      "source": "kmrs_si_2025",
+      "tiles": [
+        "SI-MS-S",
+        "SI-LE-W",
+        "SI-LJ"
+      ],
+      "labels": {
+        "population_per_class": {
+          "grassland": 545,
+          "maize": 2717,
+          "oil_pumpkin": 364,
+          "winter_cereals": 3586,
+          "winter_rapeseed": 181
+        },
+        "sampled_per_class": {
+          "grassland": 150,
+          "maize": 150,
+          "oil_pumpkin": 150,
+          "winter_cereals": 150,
+          "winter_rapeseed": 150
+        },
+        "classes_dropped_below_minimum": {},
+        "parcels_with_unmapped_code": 133
+      }
+    }
+  },
+  "source_domain": "pomurje_2021",
+  "classes": [
+    "grassland",
+    "maize",
+    "oil_pumpkin",
+    "winter_cereals",
+    "winter_rapeseed"
+  ],
+  "source_split": {
+    "buffer_excluded": 5,
+    "calibration": 147,
+    "fit": 303,
+    "test": 232
+  },
+  "samples": {
+    "pixels": 124620,
+    "features": 127,
+    "fingerprint": "065e98f90c4f54c85f48afa8ce93411757206f57c550f7761a815c68ecd9cff3"
+  },
+  "results": {
+    "pomurje_2021": {
+      "kind": "in-domain (source test parcels)",
+      "parcels": 232,
+      "pixels": 9603,
+      "classes_present": [
+        "grassland",
+        "maize",
+        "oil_pumpkin",
+        "winter_cereals",
+        "winter_rapeseed"
+      ],
+      "overall_accuracy": 0.9310344827586207,
+      "macro_f1": 0.9310988353309539,
+      "kappa": 0.9137005091483968,
+      "overall_accuracy_ci": [
+        0.8883777551862329,
+        0.9690800547022933
+      ],
+      "macro_f1_ci": [
+        0.8884003179015048,
+        0.9674930889665431
+      ],
+      "per_class_f1": {
+        "grassland": 0.9245283018867925,
+        "maize": 0.8863636363636365,
+        "oil_pumpkin": 0.9545454545454546,
+        "winter_cereals": 0.9438202247191011,
+        "winter_rapeseed": 0.946236559139785
+      },
+      "per_class_f1_ci": {
+        "grassland": [
+          0.8598130841121496,
+          0.9807783018867924
+        ],
+        "maize": [
+          0.789455151964418,
+          0.958347602739726
+        ],
+        "oil_pumpkin": [
+          0.89794610151753,
+          0.9906584926691246
+        ],
+        "winter_cereals": [
+          0.8695652173913043,
+          0.98989898989899
+        ],
+        "winter_rapeseed": [
+          0.8935842880523731,
+          1.0
+        ]
+      },
+      "per_class_parcels": {
+        "grassland": 51,
+        "maize": 46,
+        "oil_pumpkin": 44,
+        "winter_cereals": 43,
+        "winter_rapeseed": 48
+      },
+      "bootstrap_units": 24,
+      "confusion_matrix": [
+        [
+          49,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          4,
+          39,
+          2,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          42,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          42,
+          1
+        ],
+        [
+          1,
+          1,
+          0,
+          2,
+          44
+        ]
+      ],
+      "labels": [
+        "grassland",
+        "maize",
+        "oil_pumpkin",
+        "winter_cereals",
+        "winter_rapeseed"
+      ],
+      "common_classes": {
+        "classes": [
+          "grassland",
+          "maize",
+          "winter_cereals"
+        ],
+        "parcels": 140,
+        "overall_accuracy": 0.9285714285714286,
+        "macro_f1": 0.9382672259576831,
+        "overall_accuracy_ci": [
+          0.8783701384311141,
+          0.9735099337748344
+        ],
+        "macro_f1_ci": [
+          0.8873813002332177,
+          0.9811247019067809
+        ]
+      },
+      "conformal": {
+        "coverage": 0.896551724137931,
+        "mean_set_size": 0.9525862068965517,
+        "singleton_rate": 0.9181034482758621,
+        "empty_rate": 0.06465517241379311,
+        "per_class_coverage": {
+          "grassland": 0.9411764705882353,
+          "maize": 0.8913043478260869,
+          "oil_pumpkin": 0.9772727272727273,
+          "winter_cereals": 0.7441860465116279,
+          "winter_rapeseed": 0.9166666666666666
+        },
+        "target": 0.9
+      },
+      "aoa": {
+        "pixel_share_inside": 0.9743830053108403,
+        "median_di": 0.18596526119455717,
+        "parcel_share_inside": 0.9870689655172413,
+        "threshold": 0.3515648515851902,
+        "oa_inside_parcels": 0.9344978165938864,
+        "oa_outside_parcels": 0.6666666666666666
+      }
+    },
+    "podravje_2021": {
+      "kind": "out-of-domain (other region)",
+      "all_parcels": {
+        "parcels": 660,
+        "pixels": 29303,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9363636363636364,
+        "macro_f1": 0.9392514836564537,
+        "kappa": 0.919696864353751,
+        "overall_accuracy_ci": [
+          0.9155693771810567,
+          0.9558366148156207
+        ],
+        "macro_f1_ci": [
+          0.9181628783305152,
+          0.9579630294520953
+        ],
+        "per_class_f1": {
+          "grassland": 0.9364548494983277,
+          "maize": 0.9067524115755626,
+          "oil_pumpkin": 0.9389312977099237,
+          "winter_cereals": 0.9507042253521126,
+          "winter_rapeseed": 0.9634146341463415
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9071408656399362,
+            0.9644089091947459
+          ],
+          "maize": [
+            0.8628623188405797,
+            0.941860465116279
+          ],
+          "oil_pumpkin": [
+            0.9128485113197933,
+            0.9618534237210893
+          ],
+          "winter_cereals": [
+            0.9206262939958593,
+            0.9752080717226879
+          ],
+          "winter_rapeseed": [
+            0.9324298922983134,
+            0.9911650698456812
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 147,
+          "maize": 147,
+          "oil_pumpkin": 139,
+          "winter_cereals": 147,
+          "winter_rapeseed": 80
+        },
+        "bootstrap_units": 52,
+        "confusion_matrix": [
+          [
+            140,
+            5,
+            0,
+            1,
+            1
+          ],
+          [
+            5,
+            141,
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            14,
+            123,
+            0,
+            0
+          ],
+          [
+            5,
+            3,
+            0,
+            135,
+            4
+          ],
+          [
+            0,
+            1,
+            0,
+            0,
+            79
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 441,
+          "overall_accuracy": 0.9433106575963719,
+          "macro_f1": 0.9487226236052525,
+          "overall_accuracy_ci": [
+            0.9171689645267844,
+            0.9652857415902141
+          ],
+          "macro_f1_ci": [
+            0.92623079649735,
+            0.9690535776844819
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8924242424242425,
+          "mean_set_size": 0.990909090909091,
+          "singleton_rate": 0.896969696969697,
+          "empty_rate": 0.05606060606060606,
+          "per_class_coverage": {
+            "grassland": 0.9591836734693877,
+            "maize": 0.9795918367346939,
+            "oil_pumpkin": 0.9136690647482014,
+            "winter_cereals": 0.6666666666666666,
+            "winter_rapeseed": 0.9875
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9516431764665734,
+          "median_di": 0.19216938062231656,
+          "parcel_share_inside": 0.9666666666666667,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9404388714733543,
+          "oa_outside_parcels": 0.8181818181818182
+        }
+      },
+      "test_parcels_transferred": {
+        "parcels": 222,
+        "pixels": 9774,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9369369369369369,
+        "macro_f1": 0.939669634603221,
+        "kappa": 0.9205704209154335,
+        "overall_accuracy_ci": [
+          0.8936962306794983,
+          0.9726957621206836
+        ],
+        "macro_f1_ci": [
+          0.8928625060268591,
+          0.9756114841624363
+        ],
+        "per_class_f1": {
+          "grassland": 0.9423076923076923,
+          "maize": 0.9019607843137256,
+          "oil_pumpkin": 0.9411764705882353,
+          "winter_cereals": 0.946236559139785,
+          "winter_rapeseed": 0.9666666666666666
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.8907096171802055,
+            0.9767530623113795
+          ],
+          "maize": [
+            0.8041140765006263,
+            0.960790679908327
+          ],
+          "oil_pumpkin": [
+            0.8985228539576364,
+            0.9795918367346939
+          ],
+          "winter_cereals": [
+            0.8607521342360906,
+            1.0
+          ],
+          "winter_rapeseed": [
+            0.9090909090909091,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 52,
+          "maize": 48,
+          "oil_pumpkin": 45,
+          "winter_cereals": 48,
+          "winter_rapeseed": 29
+        },
+        "bootstrap_units": 16,
+        "confusion_matrix": [
+          [
+            49,
+            2,
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            46,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            5,
+            40,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            44,
+            2
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            29
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 148,
+          "overall_accuracy": 0.9391891891891891,
+          "macro_f1": 0.9456659532316333,
+          "overall_accuracy_ci": [
+            0.8796268406961179,
+            0.9851905920519058
+          ],
+          "macro_f1_ci": [
+            0.8931031409374894,
+            0.9836601307189543
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8783783783783784,
+          "mean_set_size": 0.963963963963964,
+          "singleton_rate": 0.8918918918918919,
+          "empty_rate": 0.07207207207207207,
+          "per_class_coverage": {
+            "grassland": 0.9423076923076923,
+            "maize": 0.9791666666666666,
+            "oil_pumpkin": 0.9111111111111111,
+            "winter_cereals": 0.6041666666666666,
+            "winter_rapeseed": 1.0
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9538571720892163,
+          "median_di": 0.19321357749775245,
+          "parcel_share_inside": 0.9594594594594594,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9436619718309859,
+          "oa_outside_parcels": 0.7777777777777778
+        }
+      },
+      "test_parcels_local": {
+        "parcels": 222,
+        "pixels": 9774,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.972972972972973,
+        "macro_f1": 0.9752661291797178,
+        "kappa": 0.9659491794059002,
+        "overall_accuracy_ci": [
+          0.9426943440082645,
+          0.9951934523809524
+        ],
+        "macro_f1_ci": [
+          0.9441842202551912,
+          0.9949044736221401
+        ],
+        "per_class_f1": {
+          "grassland": 0.9702970297029703,
+          "maize": 0.9591836734693877,
+          "oil_pumpkin": 0.9777777777777777,
+          "winter_cereals": 0.9690721649484536,
+          "winter_rapeseed": 1.0
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9382716049382717,
+            1.0
+          ],
+          "maize": [
+            0.8666216216216216,
+            1.0
+          ],
+          "oil_pumpkin": [
+            0.9459084084084083,
+            1.0
+          ],
+          "winter_cereals": [
+            0.9391215616681455,
+            1.0
+          ],
+          "winter_rapeseed": [
+            1.0,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 52,
+          "maize": 48,
+          "oil_pumpkin": 45,
+          "winter_cereals": 48,
+          "winter_rapeseed": 29
+        },
+        "bootstrap_units": 16,
+        "confusion_matrix": [
+          [
+            49,
+            1,
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            47,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            44,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            47,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            29
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 148,
+          "overall_accuracy": 0.9662162162162162,
+          "macro_f1": 0.9694804531999592,
+          "overall_accuracy_ci": [
+            0.9369330537433985,
+            0.992593954248366
+          ],
+          "macro_f1_ci": [
+            0.9348122689330162,
+            0.9920055952382204
+          ]
+        },
+        "conformal": {
+          "coverage": 0.9279279279279279,
+          "mean_set_size": 1.8468468468468469,
+          "singleton_rate": 0.15765765765765766,
+          "empty_rate": 0.0,
+          "per_class_coverage": {
+            "grassland": 0.9038461538461539,
+            "maize": 0.9166666666666666,
+            "oil_pumpkin": 0.8666666666666667,
+            "winter_cereals": 0.9791666666666666,
+            "winter_rapeseed": 1.0
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9925312052383876,
+          "median_di": 0.18049923681709015,
+          "parcel_share_inside": 1.0,
+          "threshold": 0.38444846963425383
+        }
+      },
+      "local_baseline": {
+        "fit_parcels": 335,
+        "status": "ok"
+      }
+    },
+    "posavje_2021": {
+      "kind": "out-of-domain (other region)",
+      "all_parcels": {
+        "parcels": 561,
+        "pixels": 22981,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.8877005347593583,
+        "macro_f1": 0.8933912924247874,
+        "kappa": 0.8504341864716636,
+        "overall_accuracy_ci": [
+          0.8541478413654618,
+          0.9218266743861395
+        ],
+        "macro_f1_ci": [
+          0.8598965623327761,
+          0.9261879136128914
+        ],
+        "per_class_f1": {
+          "grassland": 0.8623853211009173,
+          "maize": 0.9553264604810996,
+          "winter_cereals": 0.8698884758364314,
+          "winter_rapeseed": 0.8859649122807017
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.8070008354218882,
+            0.9096753681392237
+          ],
+          "maize": [
+            0.9259259259259259,
+            0.9791060323383086
+          ],
+          "winter_cereals": [
+            0.8168955399061033,
+            0.914910886985355
+          ],
+          "winter_rapeseed": [
+            0.8257862903225806,
+            0.931151295207108
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 144,
+          "maize": 150,
+          "winter_cereals": 144,
+          "winter_rapeseed": 123
+        },
+        "bootstrap_units": 46,
+        "confusion_matrix": [
+          [
+            141,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            2,
+            139,
+            7,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            23,
+            1,
+            0,
+            117,
+            3
+          ],
+          [
+            17,
+            0,
+            0,
+            5,
+            101
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 438,
+          "overall_accuracy": 0.906392694063927,
+          "macro_f1": 0.9171225053998583,
+          "overall_accuracy_ci": [
+            0.8723099578530443,
+            0.9370826477363546
+          ],
+          "macro_f1_ci": [
+            0.886145138923791,
+            0.9456565012331001
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8467023172905526,
+          "mean_set_size": 0.9607843137254902,
+          "singleton_rate": 0.910873440285205,
+          "empty_rate": 0.06417112299465241,
+          "per_class_coverage": {
+            "grassland": 0.9791666666666666,
+            "maize": 0.94,
+            "winter_cereals": 0.6319444444444444,
+            "winter_rapeseed": 0.8292682926829268
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.980331578260302,
+          "median_di": 0.20569554118675945,
+          "parcel_share_inside": 0.9964349376114082,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.8872987477638641,
+          "oa_outside_parcels": 1.0
+        }
+      },
+      "test_parcels_transferred": {
+        "parcels": 181,
+        "pixels": 7253,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9226519337016574,
+        "macro_f1": 0.923924570575056,
+        "kappa": 0.8966431455724599,
+        "overall_accuracy_ci": [
+          0.8638923917612442,
+          0.9638569742889082
+        ],
+        "macro_f1_ci": [
+          0.8568297641176198,
+          0.9618752031048784
+        ],
+        "per_class_f1": {
+          "grassland": 0.9126213592233009,
+          "maize": 0.96,
+          "winter_cereals": 0.9,
+          "winter_rapeseed": 0.923076923076923
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.8394586894586895,
+            0.9636418400876232
+          ],
+          "maize": [
+            0.8888257575757575,
+            1.0
+          ],
+          "winter_cereals": [
+            0.8437500000000001,
+            0.9565217391304348
+          ],
+          "winter_rapeseed": [
+            0.7777210884353741,
+            0.9791666666666666
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 47,
+          "maize": 51,
+          "winter_cereals": 42,
+          "winter_rapeseed": 41
+        },
+        "bootstrap_units": 14,
+        "confusion_matrix": [
+          [
+            47,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            48,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            1,
+            0,
+            36,
+            1
+          ],
+          [
+            4,
+            0,
+            0,
+            1,
+            36
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 140,
+          "overall_accuracy": 0.9357142857142857,
+          "macro_f1": 0.9402957848527468,
+          "overall_accuracy_ci": [
+            0.8888649425287356,
+            0.9768884655806621
+          ],
+          "macro_f1_ci": [
+            0.8997102250054464,
+            0.9760090526131231
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8839779005524862,
+          "mean_set_size": 0.9502762430939227,
+          "singleton_rate": 0.9281767955801105,
+          "empty_rate": 0.06077348066298342,
+          "per_class_coverage": {
+            "grassland": 1.0,
+            "maize": 0.9607843137254902,
+            "winter_cereals": 0.6666666666666666,
+            "winter_rapeseed": 0.8780487804878049
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9848338618502689,
+          "median_di": 0.20199652764130258,
+          "parcel_share_inside": 0.994475138121547,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9222222222222223,
+          "oa_outside_parcels": 1.0
+        }
+      },
+      "test_parcels_local": {
+        "parcels": 181,
+        "pixels": 7253,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9723756906077348,
+        "macro_f1": 0.9727695714187862,
+        "kappa": 0.9630747888530743,
+        "overall_accuracy_ci": [
+          0.9447767552828903,
+          0.9941860465116279
+        ],
+        "macro_f1_ci": [
+          0.9451322365815804,
+          0.9941469412806107
+        ],
+        "per_class_f1": {
+          "grassland": 0.968421052631579,
+          "maize": 0.9702970297029702,
+          "winter_cereals": 0.9647058823529412,
+          "winter_rapeseed": 0.9876543209876543
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9366953945596552,
+            1.0
+          ],
+          "maize": [
+            0.90665625,
+            1.0
+          ],
+          "winter_cereals": [
+            0.9152300242130751,
+            1.0
+          ],
+          "winter_rapeseed": [
+            0.9411764705882353,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 47,
+          "maize": 51,
+          "winter_cereals": 42,
+          "winter_rapeseed": 41
+        },
+        "bootstrap_units": 14,
+        "confusion_matrix": [
+          [
+            46,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            49,
+            1,
+            0
+          ],
+          [
+            0,
+            1,
+            41,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            40
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 140,
+          "overall_accuracy": 0.9714285714285714,
+          "macro_f1": 0.9712421054370769,
+          "overall_accuracy_ci": [
+            0.9370406189555126,
+            1.0
+          ],
+          "macro_f1_ci": [
+            0.9360532307498328,
+            1.0
+          ]
+        },
+        "conformal": {
+          "coverage": 0.9558011049723757,
+          "mean_set_size": 0.9834254143646409,
+          "singleton_rate": 0.9834254143646409,
+          "empty_rate": 0.016574585635359115,
+          "per_class_coverage": {
+            "grassland": 0.9787234042553191,
+            "maize": 0.9215686274509803,
+            "winter_cereals": 0.9761904761904762,
+            "winter_rapeseed": 0.9512195121951219
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9899351992279057,
+          "median_di": 0.16521022016018694,
+          "parcel_share_inside": 1.0,
+          "threshold": 0.31559012680306264
+        }
+      },
+      "local_baseline": {
+        "fit_parcels": 262,
+        "status": "ok"
+      }
+    },
+    "gorenjska_2021": {
+      "kind": "out-of-domain (other region)",
+      "all_parcels": {
+        "parcels": 392,
+        "pixels": 15051,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals"
+        ],
+        "overall_accuracy": 0.9030612244897959,
+        "macro_f1": 0.911774798287648,
+        "kappa": 0.8557008621524751,
+        "overall_accuracy_ci": [
+          0.870077499014843,
+          0.937047589446056
+        ],
+        "macro_f1_ci": [
+          0.8804607196554148,
+          0.9418393162515886
+        ],
+        "per_class_f1": {
+          "grassland": 0.8972602739726028,
+          "maize": 0.8983050847457626,
+          "winter_cereals": 0.9397590361445783
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.8447527667633307,
+            0.9426773038238008
+          ],
+          "maize": [
+            0.8631515280135823,
+            0.934689617240431
+          ],
+          "winter_cereals": [
+            0.90297681944261,
+            0.9722222222222222
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 133,
+          "maize": 127,
+          "winter_cereals": 132
+        },
+        "bootstrap_units": 56,
+        "confusion_matrix": [
+          [
+            131,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            20,
+            106,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            8,
+            3,
+            0,
+            117,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 392,
+          "overall_accuracy": 0.9030612244897959,
+          "macro_f1": 0.911774798287648,
+          "overall_accuracy_ci": [
+            0.870077499014843,
+            0.937047589446056
+          ],
+          "macro_f1_ci": [
+            0.8804607196554148,
+            0.9418393162515886
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8214285714285714,
+          "mean_set_size": 0.9183673469387755,
+          "singleton_rate": 0.8520408163265306,
+          "empty_rate": 0.11479591836734694,
+          "per_class_coverage": {
+            "grassland": 0.9849624060150376,
+            "maize": 0.9212598425196851,
+            "winter_cereals": 0.5606060606060606
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.8344960467743007,
+          "median_di": 0.24736577426609022,
+          "parcel_share_inside": 0.8698979591836735,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9442815249266863,
+          "oa_outside_parcels": 0.6274509803921569
+        }
+      },
+      "test_parcels_transferred": {
+        "parcels": 125,
+        "pixels": 4734,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals"
+        ],
+        "overall_accuracy": 0.896,
+        "macro_f1": 0.9031827526451183,
+        "kappa": 0.8451200914982844,
+        "overall_accuracy_ci": [
+          0.8453577565046637,
+          0.9565217391304348
+        ],
+        "macro_f1_ci": [
+          0.8447323241848489,
+          0.9591211520816785
+        ],
+        "per_class_f1": {
+          "grassland": 0.8817204301075269,
+          "maize": 0.8648648648648648,
+          "winter_cereals": 0.962962962962963
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.7692307692307693,
+            0.9655172413793104
+          ],
+          "maize": [
+            0.7837837837837838,
+            0.9473684210526316
+          ],
+          "winter_cereals": [
+            0.9179986338797813,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 42,
+          "maize": 41,
+          "winter_cereals": 42
+        },
+        "bootstrap_units": 17,
+        "confusion_matrix": [
+          [
+            41,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            8,
+            32,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            39,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 125,
+          "overall_accuracy": 0.896,
+          "macro_f1": 0.9031827526451183,
+          "overall_accuracy_ci": [
+            0.8453577565046637,
+            0.9565217391304348
+          ],
+          "macro_f1_ci": [
+            0.8447323241848489,
+            0.9591211520816785
+          ]
+        },
+        "conformal": {
+          "coverage": 0.84,
+          "mean_set_size": 0.944,
+          "singleton_rate": 0.816,
+          "empty_rate": 0.12,
+          "per_class_coverage": {
+            "grassland": 0.9761904761904762,
+            "maize": 0.9512195121951219,
+            "winter_cereals": 0.5952380952380952
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.8221377270806929,
+          "median_di": 0.24545293431501986,
+          "parcel_share_inside": 0.856,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9626168224299065,
+          "oa_outside_parcels": 0.5
+        }
+      },
+      "test_parcels_local": {
+        "parcels": 125,
+        "pixels": 4734,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "winter_cereals"
+        ],
+        "overall_accuracy": 0.992,
+        "macro_f1": 0.9919632050351005,
+        "kappa": 0.9879980796927509,
+        "overall_accuracy_ci": [
+          0.9759951612903226,
+          1.0
+        ],
+        "macro_f1_ci": [
+          0.9747598455903964,
+          1.0
+        ],
+        "per_class_f1": {
+          "grassland": 1.0,
+          "maize": 0.9876543209876543,
+          "winter_cereals": 0.988235294117647
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            1.0,
+            1.0
+          ],
+          "maize": [
+            0.961038961038961,
+            1.0
+          ],
+          "winter_cereals": [
+            0.962962962962963,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 42,
+          "maize": 41,
+          "winter_cereals": 42
+        },
+        "bootstrap_units": 17,
+        "confusion_matrix": [
+          [
+            42,
+            0,
+            0
+          ],
+          [
+            0,
+            40,
+            1
+          ],
+          [
+            0,
+            0,
+            42
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "winter_cereals"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 125,
+          "overall_accuracy": 0.992,
+          "macro_f1": 0.9919632050351005,
+          "overall_accuracy_ci": [
+            0.9759951612903226,
+            1.0
+          ],
+          "macro_f1_ci": [
+            0.9747598455903964,
+            1.0
+          ]
+        },
+        "conformal": {
+          "coverage": 0.96,
+          "mean_set_size": 0.96,
+          "singleton_rate": 0.96,
+          "empty_rate": 0.04,
+          "per_class_coverage": {
+            "grassland": 0.9523809523809523,
+            "maize": 0.9512195121951219,
+            "winter_cereals": 0.9761904761904762
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9740177439797212,
+          "median_di": 0.12774367157493322,
+          "parcel_share_inside": 0.984,
+          "threshold": 0.25718882326333814,
+          "oa_inside_parcels": 1.0,
+          "oa_outside_parcels": 0.5
+        }
+      },
+      "local_baseline": {
+        "fit_parcels": 201,
+        "status": "ok"
+      }
+    },
+    "pomurje_2025": {
+      "kind": "out-of-domain (other year, same region)",
+      "all_parcels": {
+        "parcels": 697,
+        "pixels": 29547,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9182209469153515,
+        "macro_f1": 0.9177203282579764,
+        "kappa": 0.8977361356002008,
+        "overall_accuracy_ci": [
+          0.8952189284254314,
+          0.9394409332339883
+        ],
+        "macro_f1_ci": [
+          0.8937103686265981,
+          0.9376997600289164
+        ],
+        "per_class_f1": {
+          "grassland": 0.9494949494949495,
+          "maize": 0.9257950530035335,
+          "oil_pumpkin": 0.9147286821705426,
+          "winter_cereals": 0.899628252788104,
+          "winter_rapeseed": 0.8989547038327527
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9169960474308301,
+            0.975015243902439
+          ],
+          "maize": [
+            0.8784093637454983,
+            0.9606895614353026
+          ],
+          "oil_pumpkin": [
+            0.8669061344640886,
+            0.948531591490351
+          ],
+          "winter_cereals": [
+            0.8592566510172144,
+            0.9363530826319499
+          ],
+          "winter_rapeseed": [
+            0.8538197969543149,
+            0.9333333333333332
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 146,
+          "maize": 140,
+          "oil_pumpkin": 134,
+          "winter_cereals": 139,
+          "winter_rapeseed": 138
+        },
+        "bootstrap_units": 68,
+        "confusion_matrix": [
+          [
+            141,
+            0,
+            2,
+            1,
+            2
+          ],
+          [
+            5,
+            131,
+            4,
+            0,
+            0
+          ],
+          [
+            4,
+            12,
+            118,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            121,
+            18
+          ],
+          [
+            1,
+            0,
+            0,
+            8,
+            129
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 425,
+          "overall_accuracy": 0.9247058823529412,
+          "macro_f1": 0.9532487192294375,
+          "overall_accuracy_ci": [
+            0.8966953528399312,
+            0.9508996054817275
+          ],
+          "macro_f1_ci": [
+            0.9345146470193759,
+            0.9703976966809535
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8479196556671449,
+          "mean_set_size": 0.9296987087517934,
+          "singleton_rate": 0.8809182209469153,
+          "empty_rate": 0.09469153515064563,
+          "per_class_coverage": {
+            "grassland": 0.958904109589041,
+            "maize": 0.9571428571428572,
+            "oil_pumpkin": 0.8880597014925373,
+            "winter_cereals": 0.49640287769784175,
+            "winter_rapeseed": 0.9347826086956522
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9091955190036214,
+          "median_di": 0.24232247394477371,
+          "parcel_share_inside": 0.9311334289813487,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.9322033898305084,
+          "oa_outside_parcels": 0.7291666666666666
+        }
+      },
+      "test_parcels_transferred": {
+        "parcels": 234,
+        "pixels": 10098,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9401709401709402,
+        "macro_f1": 0.939957537985071,
+        "kappa": 0.9251730202599301,
+        "overall_accuracy_ci": [
+          0.9120183691756273,
+          0.9680437612347362
+        ],
+        "macro_f1_ci": [
+          0.9085353469229387,
+          0.9671810380515561
+        ],
+        "per_class_f1": {
+          "grassland": 0.9504950495049506,
+          "maize": 0.9361702127659575,
+          "oil_pumpkin": 0.9318181818181819,
+          "winter_cereals": 0.9425287356321839,
+          "winter_rapeseed": 0.9387755102040817
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.8852459016393442,
+            0.989010989010989
+          ],
+          "maize": [
+            0.8856868131868133,
+            0.9777898550724637
+          ],
+          "oil_pumpkin": [
+            0.8641835016835017,
+            0.9791772959183673
+          ],
+          "winter_cereals": [
+            0.8865979381443299,
+            0.988235294117647
+          ],
+          "winter_rapeseed": [
+            0.8695652173913043,
+            0.983050847457627
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 49,
+          "maize": 47,
+          "oil_pumpkin": 45,
+          "winter_cereals": 46,
+          "winter_rapeseed": 47
+        },
+        "bootstrap_units": 21,
+        "confusion_matrix": [
+          [
+            48,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            44,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            3,
+            41,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            41,
+            5
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            46
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 142,
+          "overall_accuracy": 0.9366197183098591,
+          "macro_f1": 0.9597528907873736,
+          "overall_accuracy_ci": [
+            0.8840455628350209,
+            0.9816166182326983
+          ],
+          "macro_f1_ci": [
+            0.923794752514842,
+            0.9880962823725982
+          ]
+        },
+        "conformal": {
+          "coverage": 0.8760683760683761,
+          "mean_set_size": 0.9615384615384616,
+          "singleton_rate": 0.8760683760683761,
+          "empty_rate": 0.0811965811965812,
+          "per_class_coverage": {
+            "grassland": 0.9795918367346939,
+            "maize": 0.9574468085106383,
+            "oil_pumpkin": 0.9333333333333333,
+            "winter_cereals": 0.5217391304347826,
+            "winter_rapeseed": 0.9787234042553191
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9155278272925331,
+          "median_di": 0.24399438657264533,
+          "parcel_share_inside": 0.9358974358974359,
+          "threshold": 0.3515648515851902,
+          "oa_inside_parcels": 0.954337899543379,
+          "oa_outside_parcels": 0.7333333333333333
+        }
+      },
+      "test_parcels_local": {
+        "parcels": 234,
+        "pixels": 10098,
+        "classes_present": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "overall_accuracy": 0.9572649572649573,
+        "macro_f1": 0.9571479021501432,
+        "kappa": 0.9465680230168517,
+        "overall_accuracy_ci": [
+          0.9230769230769231,
+          0.9875063775510204
+        ],
+        "macro_f1_ci": [
+          0.9198978455708933,
+          0.9866001758038838
+        ],
+        "per_class_f1": {
+          "grassland": 0.9696969696969697,
+          "maize": 0.9565217391304347,
+          "oil_pumpkin": 0.9565217391304347,
+          "winter_cereals": 0.9545454545454545,
+          "winter_rapeseed": 0.9484536082474226
+        },
+        "per_class_f1_ci": {
+          "grassland": [
+            0.9206349206349207,
+            1.0
+          ],
+          "maize": [
+            0.9189051296194154,
+            0.9896907216494846
+          ],
+          "oil_pumpkin": [
+            0.8985507246376812,
+            1.0
+          ],
+          "winter_cereals": [
+            0.879969696969697,
+            1.0
+          ],
+          "winter_rapeseed": [
+            0.862704248366013,
+            1.0
+          ]
+        },
+        "per_class_parcels": {
+          "grassland": 49,
+          "maize": 47,
+          "oil_pumpkin": 45,
+          "winter_cereals": 46,
+          "winter_rapeseed": 47
+        },
+        "bootstrap_units": 21,
+        "confusion_matrix": [
+          [
+            48,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            44,
+            2,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            44,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            42,
+            4
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            46
+          ]
+        ],
+        "labels": [
+          "grassland",
+          "maize",
+          "oil_pumpkin",
+          "winter_cereals",
+          "winter_rapeseed"
+        ],
+        "common_classes": {
+          "classes": [
+            "grassland",
+            "maize",
+            "winter_cereals"
+          ],
+          "parcels": 142,
+          "overall_accuracy": 0.9436619718309859,
+          "macro_f1": 0.9670567527710384,
+          "overall_accuracy_ci": [
+            0.8920814699591678,
+            0.9866666666666667
+          ],
+          "macro_f1_ci": [
+            0.935672736517946,
+            0.9933339032730825
+          ]
+        },
+        "conformal": {
+          "coverage": 0.9230769230769231,
+          "mean_set_size": 0.9401709401709402,
+          "singleton_rate": 0.9401709401709402,
+          "empty_rate": 0.05982905982905983,
+          "per_class_coverage": {
+            "grassland": 0.9795918367346939,
+            "maize": 0.9148936170212766,
+            "oil_pumpkin": 0.9333333333333333,
+            "winter_cereals": 0.9130434782608695,
+            "winter_rapeseed": 0.8723404255319149
+          },
+          "target": 0.9
+        },
+        "aoa": {
+          "pixel_share_inside": 0.9635571400277283,
+          "median_di": 0.17169901289290626,
+          "parcel_share_inside": 0.9786324786324786,
+          "threshold": 0.3060603293495346,
+          "oa_inside_parcels": 0.9737991266375546,
+          "oa_outside_parcels": 0.2
+        }
+      },
+      "local_baseline": {
+        "fit_parcels": 319,
+        "status": "ok"
+      }
+    }
+  },
+  "transfer_cv": {
+    "in_domain_spatial_cv": {
+      "overall_accuracy": 0.9617557374418232,
+      "kappa": 0.9516834485713396,
+      "macro_f1": 0.9615532554636947
+    },
+    "strategies": {
+      "region": {
+        "in_domain": {
+          "overall_accuracy": 0.9617557374418232,
+          "kappa": 0.9516834485713396,
+          "macro_f1": 0.9615532554636947,
+          "protocol": "spatial-block k-fold CV on all groups"
+        },
+        "out_of_domain": {
+          "overall_accuracy": 0.9242176215695715,
+          "kappa": 0.9039664700560048,
+          "macro_f1": 0.9210991264478572
+        },
+        "transfer_gap": {
+          "overall_accuracy": 0.03753811587225164,
+          "kappa": 0.04771697851533474,
+          "macro_f1": 0.04045412901583756
+        },
+        "group_macro_f1_mean": 0.9382556323598995,
+        "worst_group": "pomurje",
+        "per_group": [
+          {
+            "held_out_group": "gorenjska",
+            "n_test": 15051,
+            "in_domain_macro_f1": 0.9865430173030806,
+            "out_of_domain_macro_f1": 0.9676151003208576,
+            "gap_macro_f1": 0.01892791698222296,
+            "missing_train_classes": []
+          },
+          {
+            "held_out_group": "podravje",
+            "n_test": 29303,
+            "in_domain_macro_f1": 0.9668764780595411,
+            "out_of_domain_macro_f1": 0.9498818107758875,
+            "gap_macro_f1": 0.01699466728365362,
+            "missing_train_classes": []
+          },
+          {
+            "held_out_group": "pomurje",
+            "n_test": 57285,
+            "in_domain_macro_f1": 0.9560685911218144,
+            "out_of_domain_macro_f1": 0.899474430153273,
+            "gap_macro_f1": 0.05659416096854142,
+            "missing_train_classes": []
+          },
+          {
+            "held_out_group": "posavje",
+            "n_test": 22981,
+            "in_domain_macro_f1": 0.9575230551360852,
+            "out_of_domain_macro_f1": 0.9360511881895799,
+            "gap_macro_f1": 0.02147186694650527,
+            "missing_train_classes": []
+          }
+        ]
+      },
+      "year": {
+        "in_domain": {
+          "overall_accuracy": 0.9617557374418232,
+          "kappa": 0.9516834485713396,
+          "macro_f1": 0.9615532554636947,
+          "protocol": "spatial-block k-fold CV on all groups"
+        },
+        "out_of_domain": {
+          "overall_accuracy": 0.9212325469427058,
+          "kappa": 0.9004984519504349,
+          "macro_f1": 0.9215944536771759
+        },
+        "transfer_gap": {
+          "overall_accuracy": 0.040523190499117345,
+          "kappa": 0.0511849966209047,
+          "macro_f1": 0.039958801786518894
+        },
+        "group_macro_f1_mean": 0.9312008857934597,
+        "worst_group": "2021",
+        "per_group": [
+          {
+            "held_out_group": "2021",
+            "n_test": 95073,
+            "in_domain_macro_f1": 0.9583971816840384,
+            "out_of_domain_macro_f1": 0.9128108972359185,
+            "gap_macro_f1": 0.04558628444811996,
+            "missing_train_classes": []
+          },
+          {
+            "held_out_group": "2025",
+            "n_test": 29547,
+            "in_domain_macro_f1": 0.9706244714052501,
+            "out_of_domain_macro_f1": 0.9495908743510009,
+            "gap_macro_f1": 0.02103359705424923,
+            "missing_train_classes": []
+          }
+        ]
+      }
+    },
+    "rows": 8
+  },
+  "imagery": {
+    "2021_SI-MS-S": {
+      "bbox_wgs84": [
+        16.175585,
+        46.622105,
+        16.308342,
+        46.713496
+      ],
+      "items_found": 190,
+      "windows": {
+        "P1": [
+          "S2A_33TWM_20210331_1_L2A",
+          "S2B_33TWM_20210326_1_L2A",
+          "S2B_33TWM_20210405_1_L2A"
+        ],
+        "P2": [
+          "S2B_33TWM_20210505_1_L2A",
+          "S2B_33TWM_20210515_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20210621_1_L2A",
+          "S2A_33TWM_20210629_1_L2A",
+          "S2B_33TWM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TWM_20210706_1_L2A",
+          "S2B_33TWM_20210724_1_L2A",
+          "S2A_33TWM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWM_20210815_1_L2A",
+          "S2B_33TWM_20210810_1_L2A",
+          "S2B_33TWM_20210820_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TWM_20210912_1_L2A",
+          "S2A_33TWM_20210904_1_L2A",
+          "S2A_33TWM_20211014_2_L2A"
+        ]
+      }
+    },
+    "2021_SI-LE-W": {
+      "bbox_wgs84": [
+        16.305308,
+        46.584554,
+        16.43818,
+        46.676087
+      ],
+      "items_found": 190,
+      "windows": {
+        "P1": [
+          "S2A_33TXM_20210331_1_L2A",
+          "S2A_33TXM_20210321_1_L2A",
+          "S2B_33TXM_20210405_2_L2A"
+        ],
+        "P2": [
+          "S2B_33TXM_20210505_1_L2A"
+        ],
+        "P3": [
+          "S2B_33TXM_20210624_1_L2A",
+          "S2A_33TXM_20210616_1_L2A",
+          "S2A_33TXM_20210619_1_L2A"
+        ],
+        "P4": [
+          "S2B_33TXM_20210724_1_L2A",
+          "S2A_33TXM_20210729_1_L2A",
+          "S2A_33TXM_20210706_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TXM_20210815_1_L2A",
+          "S2B_33TXM_20210810_1_L2A",
+          "S2A_33TXM_20210808_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TXM_20210912_1_L2A",
+          "S2A_33TXM_20211004_1_L2A",
+          "S2A_33TXM_20211014_1_L2A"
+        ]
+      }
+    },
+    "2021_SI-LJ": {
+      "bbox_wgs84": [
+        16.017856,
+        46.569802,
+        16.150229,
+        46.661017
+      ],
+      "items_found": 94,
+      "windows": {
+        "P1": [
+          "S2A_33TWM_20210331_1_L2A",
+          "S2B_33TWM_20210326_1_L2A",
+          "S2B_33TWM_20210405_1_L2A"
+        ],
+        "P2": [
+          "S2A_33TWM_20210510_1_L2A",
+          "S2B_33TWM_20210505_1_L2A",
+          "S2A_33TWM_20210527_1_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20210621_1_L2A",
+          "S2A_33TWM_20210629_1_L2A",
+          "S2B_33TWM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TWM_20210706_1_L2A",
+          "S2B_33TWM_20210724_1_L2A",
+          "S2A_33TWM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWM_20210815_1_L2A",
+          "S2B_33TWM_20210810_1_L2A",
+          "S2B_33TWM_20210820_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TWM_20210912_1_L2A",
+          "S2A_33TWM_20210904_1_L2A",
+          "S2A_33TWM_20211014_2_L2A"
+        ]
+      }
+    },
+    "2021_SI-PT-E": {
+      "bbox_wgs84": [
+        15.910168,
+        46.372844,
+        16.041884,
+        46.463938
+      ],
+      "items_found": 94,
+      "windows": {
+        "P1": [
+          "S2A_33TWM_20210331_1_L2A",
+          "S2B_33TWM_20210326_1_L2A",
+          "S2B_33TWM_20210405_1_L2A"
+        ],
+        "P2": [
+          "S2A_33TWM_20210510_1_L2A",
+          "S2B_33TWM_20210505_1_L2A",
+          "S2A_33TWM_20210527_1_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20210621_1_L2A",
+          "S2A_33TWM_20210629_1_L2A",
+          "S2B_33TWM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TWM_20210706_1_L2A",
+          "S2B_33TWM_20210724_1_L2A",
+          "S2A_33TWM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWM_20210815_1_L2A",
+          "S2B_33TWM_20210810_1_L2A",
+          "S2B_33TWM_20210820_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TWM_20210912_1_L2A",
+          "S2A_33TWM_20210904_1_L2A",
+          "S2A_33TWM_20211014_2_L2A"
+        ]
+      }
+    },
+    "2021_SI-DP": {
+      "bbox_wgs84": [
+        15.64982,
+        46.347916,
+        15.781056,
+        46.43872
+      ],
+      "items_found": 94,
+      "windows": {
+        "P1": [
+          "S2A_33TWM_20210331_1_L2A",
+          "S2B_33TWM_20210326_1_L2A",
+          "S2B_33TWM_20210405_1_L2A"
+        ],
+        "P2": [
+          "S2A_33TWM_20210510_1_L2A",
+          "S2B_33TWM_20210505_1_L2A",
+          "S2A_33TWM_20210527_1_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20210621_1_L2A",
+          "S2A_33TWM_20210629_1_L2A",
+          "S2B_33TWM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TWM_20210706_1_L2A",
+          "S2B_33TWM_20210724_1_L2A",
+          "S2A_33TWM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWM_20210815_1_L2A",
+          "S2B_33TWM_20210810_1_L2A",
+          "S2B_33TWM_20210820_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TWM_20210912_1_L2A",
+          "S2A_33TWM_20210904_1_L2A",
+          "S2A_33TWM_20211014_2_L2A"
+        ]
+      }
+    },
+    "2021_SI-KK-W": {
+      "bbox_wgs84": [
+        15.476744,
+        45.871962,
+        15.606567,
+        45.962573
+      ],
+      "items_found": 171,
+      "windows": {
+        "P1": [
+          "S2B_33TWL_20210405_2_L2A",
+          "S2A_33TWL_20210321_1_L2A",
+          "S2A_33TWL_20210331_1_L2A"
+        ],
+        "P2": [
+          "S2A_33TWL_20210527_1_L2A",
+          "S2A_33TWL_20210510_1_L2A",
+          "S2B_33TWL_20210515_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TWL_20210624_1_L2A",
+          "S2A_33TWL_20210629_1_L2A",
+          "S2B_33TWL_20210621_1_L2A"
+        ],
+        "P4": [
+          "S2B_33TWL_20210724_1_L2A",
+          "S2A_33TWL_20210706_1_L2A",
+          "S2A_33TWL_20210729_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWL_20210815_1_L2A",
+          "S2A_33TWL_20210808_1_L2A",
+          "S2B_33TWL_20210803_1_L2A"
+        ],
+        "P6": [
+          "S2A_33TWL_20210924_2_L2A",
+          "S2B_33TWL_20210912_1_L2A",
+          "S2A_33TWL_20211004_1_L2A"
+        ]
+      }
+    },
+    "2021_SI-KK-E": {
+      "bbox_wgs84": [
+        15.605587,
+        45.871206,
+        15.735613,
+        45.961961
+      ],
+      "items_found": 171,
+      "windows": {
+        "P1": [
+          "S2B_33TWL_20210405_2_L2A",
+          "S2A_33TWL_20210321_1_L2A",
+          "S2A_33TWL_20210331_1_L2A"
+        ],
+        "P2": [
+          "S2A_33TWL_20210527_1_L2A",
+          "S2A_33TWL_20210510_1_L2A",
+          "S2B_33TWL_20210515_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TWL_20210624_1_L2A",
+          "S2A_33TWL_20210629_1_L2A",
+          "S2B_33TWL_20210621_1_L2A"
+        ],
+        "P4": [
+          "S2B_33TWL_20210724_1_L2A",
+          "S2A_33TWL_20210706_1_L2A",
+          "S2A_33TWL_20210729_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TWL_20210815_1_L2A",
+          "S2A_33TWL_20210808_1_L2A",
+          "S2B_33TWL_20210820_1_L2A"
+        ],
+        "P6": [
+          "S2A_33TWL_20210924_2_L2A",
+          "S2B_33TWL_20210912_1_L2A",
+          "S2A_33TWL_20211004_1_L2A"
+        ]
+      }
+    },
+    "2021_SI-KR-S": {
+      "bbox_wgs84": [
+        14.260667,
+        46.150193,
+        14.391361,
+        46.240951
+      ],
+      "items_found": 43,
+      "windows": {
+        "P1": [
+          "S2A_33TVM_20210331_1_L2A",
+          "S2B_33TVM_20210326_1_L2A",
+          "S2B_33TVM_20210405_2_L2A"
+        ],
+        "P2": [
+          "S2A_33TVM_20210510_1_L2A",
+          "S2A_33TVM_20210520_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TVM_20210614_1_L2A",
+          "S2A_33TVM_20210629_1_L2A",
+          "S2B_33TVM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TVM_20210729_1_L2A",
+          "S2A_33TVM_20210719_1_L2A",
+          "S2A_33TVM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2A_33TVM_20210818_1_L2A",
+          "S2B_33TVM_20210803_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TVM_20210902_1_L2A",
+          "S2B_33TVM_20210912_1_L2A"
+        ]
+      }
+    },
+    "2021_SI-KR-N": {
+      "bbox_wgs84": [
+        14.32441,
+        46.240587,
+        14.455218,
+        46.331274
+      ],
+      "items_found": 43,
+      "windows": {
+        "P1": [
+          "S2A_33TVM_20210331_1_L2A",
+          "S2B_33TVM_20210326_1_L2A",
+          "S2B_33TVM_20210405_2_L2A"
+        ],
+        "P2": [
+          "S2A_33TVM_20210510_1_L2A",
+          "S2A_33TVM_20210520_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TVM_20210614_1_L2A",
+          "S2A_33TVM_20210629_1_L2A",
+          "S2B_33TVM_20210624_1_L2A"
+        ],
+        "P4": [
+          "S2A_33TVM_20210729_1_L2A",
+          "S2A_33TVM_20210719_1_L2A",
+          "S2A_33TVM_20210709_1_L2A"
+        ],
+        "P5": [
+          "S2B_33TVM_20210803_1_L2A"
+        ],
+        "P6": [
+          "S2B_33TVM_20210902_1_L2A",
+          "S2B_33TVM_20210912_1_L2A"
+        ]
+      }
+    },
+    "2025_SI-MS-S": {
+      "bbox_wgs84": [
+        16.175585,
+        46.622105,
+        16.308342,
+        46.713496
+      ],
+      "items_found": 134,
+      "windows": {
+        "P1": [
+          "S2C_33TWM_20250320_0_L2A",
+          "S2A_33TWM_20250319_0_L2A",
+          "S2C_33TWM_20250416_0_L2A"
+        ],
+        "P2": [
+          "S2B_33TWM_20250501_0_L2A",
+          "S2B_33TWM_20250531_0_L2A",
+          "S2B_33TWM_20250511_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20250610_0_L2A",
+          "S2B_33TWM_20250613_0_L2A",
+          "S2C_33TWM_20250615_0_L2A"
+        ],
+        "P4": [
+          "S2B_33TWM_20250703_0_L2A",
+          "S2C_33TWM_20250715_0_L2A",
+          "S2B_33TWM_20250720_1_L2A"
+        ],
+        "P5": [
+          "S2B_33TWM_20250809_0_L2A",
+          "S2C_33TWM_20250814_0_L2A",
+          "S2B_33TWM_20250812_0_L2A"
+        ],
+        "P6": [
+          "S2A_33TWM_20250918_0_L2A",
+          "S2A_33TWM_20250915_0_L2A",
+          "S2C_33TWM_20251003_0_L2A"
+        ]
+      }
+    },
+    "2025_SI-LE-W": {
+      "bbox_wgs84": [
+        16.305308,
+        46.584554,
+        16.43818,
+        46.676087
+      ],
+      "items_found": 134,
+      "windows": {
+        "P1": [
+          "S2C_33TXM_20250320_0_L2A",
+          "S2A_33TXM_20250319_1_L2A",
+          "S2C_33TXM_20250416_0_L2A"
+        ],
+        "P2": [
+          "S2A_33TXM_20250501_1_L2A",
+          "S2B_33TXM_20250531_0_L2A",
+          "S2C_33TXM_20250519_0_L2A"
+        ],
+        "P3": [
+          "S2C_33TXM_20250615_0_L2A",
+          "S2B_33TXM_20250610_0_L2A",
+          "S2C_33TXM_20250625_0_L2A"
+        ],
+        "P4": [
+          "S2C_33TXM_20250705_0_L2A",
+          "S2A_33TXM_20250720_1_L2A",
+          "S2B_33TXM_20250703_0_L2A"
+        ],
+        "P5": [
+          "S2A_33TXM_20250809_1_L2A",
+          "S2C_33TXM_20250814_0_L2A",
+          "S2B_33TXM_20250812_0_L2A"
+        ],
+        "P6": [
+          "S2A_33TXM_20250918_0_L2A",
+          "S2B_33TXM_20250901_0_L2A",
+          "S2A_33TXM_20250915_0_L2A"
+        ]
+      }
+    },
+    "2025_SI-LJ": {
+      "bbox_wgs84": [
+        16.017856,
+        46.569802,
+        16.150229,
+        46.661017
+      ],
+      "items_found": 68,
+      "windows": {
+        "P1": [
+          "S2C_33TWM_20250320_0_L2A",
+          "S2A_33TWM_20250319_0_L2A",
+          "S2C_33TWM_20250416_0_L2A"
+        ],
+        "P2": [
+          "S2B_33TWM_20250501_0_L2A",
+          "S2B_33TWM_20250531_0_L2A",
+          "S2B_33TWM_20250511_0_L2A"
+        ],
+        "P3": [
+          "S2B_33TWM_20250610_0_L2A",
+          "S2B_33TWM_20250613_0_L2A",
+          "S2C_33TWM_20250615_0_L2A"
+        ],
+        "P4": [
+          "S2B_33TWM_20250703_0_L2A",
+          "S2C_33TWM_20250715_0_L2A",
+          "S2B_33TWM_20250720_1_L2A"
+        ],
+        "P5": [
+          "S2B_33TWM_20250809_0_L2A",
+          "S2C_33TWM_20250814_0_L2A",
+          "S2B_33TWM_20250812_0_L2A"
+        ],
+        "P6": [
+          "S2A_33TWM_20250918_0_L2A",
+          "S2A_33TWM_20250915_0_L2A",
+          "S2C_33TWM_20251003_0_L2A"
+        ]
+      }
+    }
+  },
+  "stages": {
+    "labels": {
+      "seconds": 4.6,
+      "peak_rss_mb": 456.2
+    },
+    "imagery_and_samples": {
+      "seconds": 19.0,
+      "peak_rss_mb": 1339.1
+    },
+    "source_model": {
+      "seconds": 3.0,
+      "peak_rss_mb": 1632.9
+    },
+    "transfer_scoring": {
+      "seconds": 29.0,
+      "peak_rss_mb": 1906.2
+    },
+    "transfer_cv": {
+      "seconds": 127.3,
+      "peak_rss_mb": 2047.9
+    }
+  },
+  "peak_rss_mb": 2047.9,
+  "note": "European public transfer task (Slovenia; declared, not field-verified labels). Not Republic of Srpska data and not evidence of accuracy there."
+}

@@ -822,6 +822,19 @@ Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC
 | `--layer` |  |  | local copy of the EuroCrops layer instead of the pinned download |
 | `--publish` |  |  | directory to copy results.md/.json to (named after the protocol) |
 
+## `geocrop benchmark-transfer`
+
+Run a frozen public region/year TRANSFER protocol (train in one domain, test in others)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--protocol` | yes |  | versioned transfer protocol YAML (configs/benchmarks/*transfer*) |
+| `--work` | yes |  | working directory (tiles, transfer_cv, results.json/.md) |
+| `--cache` |  |  | download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public |
+| `--workers` |  | `4` | parallel scene imports |
+| `--skip-transfer-cv` |  |  | skip the pooled leave-one-region/year-out CV |
+| `--publish` |  |  | directory to copy results.md/.json to (named after the protocol) |
+
 ## `geocrop calendar`
 
 Derive a crop calendar and phenological windows from parcel markers, or read WorldCereal calendar priors

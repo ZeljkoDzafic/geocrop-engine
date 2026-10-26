@@ -13,6 +13,10 @@ The engine runs on one machine; the bottleneck is I/O and concurrent raster work
 | GPU | not needed | optional 12–16 GB VRAM for U-Net training only |
 | OS | Ubuntu 24.04 LTS (or macOS/Windows for development) | Ubuntu 24.04 LTS |
 
+**Measured** ([performance](performance.md)): the full S2 + S1 chain on 1000 km² of Semberija (one season, 4
+windows, 97 features) needed 7.4 GiB peak RAM, 11.5 GiB of disk and 60 min on a 15-core laptop; extrapolated,
+~10 000 km² needs ~115 GiB per season and 9–14 h sequential — the sizes below are confirmed and not memory-bound.
+
 **Data volume model** (10 000 km² at 10 m ≈ 10⁸ pixels): one float32 layer ≈ 0.4 GB; a 125-feature stack
 ≈ 50 GB uncompressed (less with deflate). Typical one-season planning ranges: S2 input 150–400 GB, S1 input
 100–300 GB, derived rasters 100–350 GB, scratch 100–300 GB — confirm with `geocrop catalog` totals and a pilot.

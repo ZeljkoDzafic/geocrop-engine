@@ -600,6 +600,15 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--layer", help="local copy of the EuroCrops layer instead of the pinned download")
     x.add_argument("--publish", help="directory to copy results.md/.json to (named after the protocol)")
 
+    x = cmd("benchmark-transfer", "Run a frozen public region/year TRANSFER protocol (train in one domain, "
+                                  "test in others)")
+    x.add_argument("--protocol", required=True, help="versioned transfer protocol YAML (configs/benchmarks/*transfer*)")
+    x.add_argument("--work", required=True, help="working directory (tiles, transfer_cv, results.json/.md)")
+    x.add_argument("--cache", help="download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public")
+    x.add_argument("--workers", type=int, default=4, help="parallel scene imports")
+    x.add_argument("--skip-transfer-cv", action="store_true", help="skip the pooled leave-one-region/year-out CV")
+    x.add_argument("--publish", help="directory to copy results.md/.json to (named after the protocol)")
+
     x = cmd("calendar", "Derive a crop calendar and phenological windows from parcel markers, or read "
                         "WorldCereal calendar priors")
     x.add_argument("action", choices=["derive", "worldcereal"])
@@ -1454,6 +1463,20 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                 shutil.copyfile(Path(a.work) / f"results.{suffix}", dest / f"{stem}.{suffix}")
         _print({"results": str(Path(a.work) / "results.json"), "protocol_sha256": report["protocol"]["sha256"],
                 "models": {k: v["status"] for k, v in report["models"].items()}})
+    elif c == "benchmark-transfer":
+        import shutil
+
+        from .public_transfer import run as run_transfer
+        report = run_transfer(a.protocol, a.work, a.cache, a.workers, skip_transfer_cv=a.skip_transfer_cv)
+        if a.publish:
+            dest = Path(a.publish)
+            dest.mkdir(parents=True, exist_ok=True)
+            stem = f"{report['protocol']['id']}.v{report['protocol']['version']}"
+            for suffix in ("md", "json"):
+                shutil.copyfile(Path(a.work) / f"results.{suffix}", dest / f"{stem}.{suffix}")
+        _print({"results": str(Path(a.work) / "results.json"), "protocol_sha256": report["protocol"]["sha256"],
+                "macro_f1": {k: (v if k == report["source_domain"] else v["all_parcels"])["macro_f1"]
+                             for k, v in report["results"].items()}})
     elif c == "calendar":
         _calendar(a)
     elif c == "ftw-boundaries":
