@@ -18,6 +18,12 @@ from geocrop import cbm, cbm_markers, config, parcels, scenes, timeseries
 START, END = date(2023, 3, 15), date(2023, 10, 31)
 YEAR0 = date(2023, 1, 1)
 
+try:   # Parquet needs the optional `parquet` extra; CSV exercises the same code path otherwise
+    import pyarrow  # noqa: F401
+    S1_TABLE = "s1.parquet"
+except ImportError:
+    S1_TABLE = "s1.csv"
+
 
 def _doy(d):
     return d.timetuple().tm_yday
@@ -369,13 +375,13 @@ def test_parcel_signature_moments(tiny, tmp_path):
 
 
 def test_s1_signatures_per_orbit(tiny, tmp_path):
-    t = cbm.s1_signatures(tiny["root"] / "scenes", tiny["parcels"], tiny["ref"], tmp_path / "s1.parquet",
+    t = cbm.s1_signatures(tiny["root"] / "scenes", tiny["parcels"], tiny["ref"], tmp_path / S1_TABLE,
                           START, END, interior_buffer_px=0)
     assert set(t["index"]) == {"VV_dB", "VH_dB", "VHVV_dB"} and set(t.orbit_direction) == {"ASCENDING", "DESCENDING"}
     asc = t[(t.orbit_direction == "ASCENDING") & (t.parcel_id == "split")].set_index("index")["mean"]
     assert asc["VV_dB"] == pytest.approx(-10, abs=1e-4) and asc["VH_dB"] == pytest.approx(-20, abs=1e-4)
     assert asc["VHVV_dB"] == pytest.approx(-10, abs=1e-4)
-    assert (tmp_path / "s1.parquet").exists()
+    assert (tmp_path / S1_TABLE).exists()
 
 
 def test_aggregate_with_marker_rules(tiny, tmp_path, markers):
@@ -411,8 +417,8 @@ def test_cli_event_markers_and_traffic_light(tiny, tmp_path, capsys):
 
     s2, s1 = make_s2(), make_s1()
     s2.to_csv(tmp_path / "s2.csv", index=False)
-    s1.to_parquet(tmp_path / "s1.parquet", index=False)
-    main(["event-markers", "--signatures", str(tmp_path / "s2.csv"), "--s1-signatures", str(tmp_path / "s1.parquet"),
+    (s1.to_parquet if S1_TABLE.endswith(".parquet") else s1.to_csv)(tmp_path / S1_TABLE, index=False)
+    main(["event-markers", "--signatures", str(tmp_path / "s2.csv"), "--s1-signatures", str(tmp_path / S1_TABLE),
           "--start", START.isoformat(), "--end", END.isoformat(), "--out", str(tmp_path / "events.csv")])
     report = json.loads(capsys.readouterr().out)
     assert report["parcels"] == len(S2_PARCELS) and report["tillage_detected"] == 1
