@@ -111,6 +111,11 @@ def make_estimator(params: dict, seed: int):
     return estimator
 
 
+def predict_labels(estimator, X) -> np.ndarray:
+    """Class labels as a 1-D array (CatBoost returns a column vector)."""
+    return np.asarray(estimator.predict(X)).ravel()
+
+
 def importances(model, n_features: int) -> np.ndarray:
     imp = getattr(model, "feature_importances_", None)
     if imp is None:

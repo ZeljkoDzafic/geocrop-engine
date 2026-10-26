@@ -55,6 +55,8 @@
   subprocess-running code.
 
 ### Fixed
+- CatBoost predictions (a column vector) broke cross-validation, benchmarks and ablation; labels are now
+  flattened through `estimators.predict_labels`.
 - Downstream stages no longer consume the partial products of an upstream stage that failed or was killed
   (e.g. `--stages validate` after an interrupted predict used to evaluate a half-written class raster). They
   now stop and ask for the upstream stage to be rerun.
