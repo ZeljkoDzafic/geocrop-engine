@@ -30,19 +30,22 @@ Any STAC browser, QGIS, GDAL, openEO back-end or data catalogue can consume the 
 import the GeoPackage/GeoParquet parcel table and COG layers.
 
 ## Inputs from other systems
-Data discovery via CDSE OData or any STAC API; Sentinel-1 via ESA SNAP; any external cloud mask through
+Data discovery via CDSE OData or any STAC API; Sentinel-2 L2A COG windows from any STAC API (`stac-import`,
+`cube load` via odc-stac); Sentinel-1 via ESA SNAP or as RTC γ⁰ from Microsoft Planetary Computer (`s1_stac`,
+used by `geocrop acceptance`); composites and signatures from an openEO back-end ([openEO](openeo.md));
+external xarray/Zarr/NetCDF cubes through `geocrop cube import` ([datacube](datacube.md)); any external cloud mask through
 `CLOUDMASK.tif`; parcels and declarations from any LPIS/IACS through `normalize-parcels` and crop mappings.
 
 ## How GeoCrop Engine relates to other open systems
 
 | System | Focus | Relation |
 |---|---|---|
-| ESA WorldCereal (MIT) | global seasonal crop maps on openEO/CDSE, Presto + CatBoost | GeoCrop runs locally, adds parcel-level declaration verification; CatBoost available as `algorithm: catboost` |
+| ESA WorldCereal (MIT) | global seasonal crop maps on openEO/CDSE, Presto + CatBoost | GeoCrop runs locally (optional openEO back-end), adds parcel-level declaration verification; CatBoost available as `algorithm: catboost`, Presto embeddings as a feature provider |
 | Sen2-Agri / Sen4CAP | national operational systems for paying agencies | shares signatures/markers/traffic-light concepts; GeoCrop is a light Python library with research-grade validation |
 | sits (R, GPL-2) | complete SITS analysis in R | similar scope in Python under Apache-2.0; ideas (smoothing, uncertainty sampling) re-implemented, no code reused |
 | eo-learn (MIT), JRC CbM (BSD-3) | EO processing framework, CbM notebooks | GeoCrop offers an end-to-end, config-driven pipeline with spatial CV, conformal sets and AOA |
 | FORCE (GPL-3) | ARD and time-series analysis | complementary preprocessing alternative; GeoCrop reads any per-scene or composite rasters |
-| Fields of The World (MIT) | field-boundary benchmark, pretrained models | can supply boundary probability to `boundaries-to-parcels` |
+| Fields of The World (MIT) | field-boundary benchmark, pretrained models | pretrained CC-BY checkpoints run via `geocrop ftw-boundaries` / segmenter `ftw` ([field boundaries](field-boundaries.md)) |
 
 GPL- or share-alike-licensed tools are used only as ideas or external programs; nothing is vendored into this
 Apache-2.0 code base.

@@ -35,3 +35,4 @@
 28. [Versioning, releases and rollback](release.md)
 29. [Model and benchmark registry, leaderboards](model-registry.md)
 30. [Case study: Lijevče polje 2023 (AOI, configuration, data availability)](studies/lijevce-polje.md)
+31. [Model and benchmark registry, leaderboards](model-registry.md)

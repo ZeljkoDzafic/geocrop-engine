@@ -195,3 +195,15 @@ def test_obia_merges_fields_across_tile_seams(tmp_path):
     crossing = seg[(seg.geometry.bounds.minx < seam_x) & (seg.geometry.bounds.maxx > seam_x) & seg.seam_merged]
     assert len(crossing) >= 1
     assert list(seg.segment_id) == list(range(1, len(seg) + 1))
+
+
+def test_missing_scikit_image_names_the_extra(monkeypatch, tmp_path):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "skimage", None)
+    monkeypatch.setitem(sys.modules, "skimage.segmentation", None)
+    monkeypatch.setitem(sys.modules, "skimage.measure", None)
+    with pytest.raises(RuntimeError, match=r"\.\[segmentation\]"):
+        segmentation.obia(tmp_path / "missing.tif", tmp_path / "out.gpkg")
+    with pytest.raises(RuntimeError, match=r"\.\[segmentation\]"):
+        segmentation.boundaries_to_parcels(tmp_path / "missing.tif", tmp_path / "out.gpkg")

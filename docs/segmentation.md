@@ -7,7 +7,9 @@ checking boundary changes, and for research comparison.
 `geocrop segment-obia --raster stack.tif --bands P3_B04 P3_B08 P3_B11 P3_NDVI --out segments.gpkg`
 * SLIC superpixels on 2–98 % stretched bands, per tile (`--tile-size`, default 1024 px).
 * `--segments-per-km2` controls the expected object density (≈ 1 / mean field size); `--compactness` the shape regularity.
-* Objects smaller than 9 px are dropped; objects are not merged across tile seams (the `tile` column supports seam QA).
+* Objects smaller than 9 px are dropped. Segments cut by a tile border are merged across the seam by default
+  (see [seam reconciliation](#hardening-in-09); `--no-merge-seams` disables it); `tile`, `parts` and
+  `seam_merged` support seam QA.
 
 ## Path B — U-Net boundaries (optional GPU)
 ```bash

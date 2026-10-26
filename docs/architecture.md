@@ -18,25 +18,32 @@ enforced by `tests/test_architecture.py` ([ADR 0001](adr/0001-layered-architectu
 
 ```
  ┌──────────────────────────────────────────────────────────────────────────────────────┐
- │ interface     cli · web · web_jobs · web_map         (web imported only by cli)      │
+ │ interface     cli · web · web_jobs · web_map · web_review   (web* imported only by    │
+ │               cli and by each other)                                                  │
  └──────────────────────────────────────┬───────────────────────────────────────────────┘
                                         ▼
  ┌──────────────────────────────────────────────────────────────────────────────────────┐
- │ application   pipeline · config · provenance · cache · audit · experiments ·         │
- │               benchmark · demo                                                       │
+ │ application   pipeline · config · provenance · cache · cleanup · audit · preflight ·  │
+ │               experiments · benchmark · public_benchmark · public_transfer ·          │
+ │               acceptance · evidence · registry · demo                                 │
  └──────────────────────────────────────┬───────────────────────────────────────────────┘
                                         ▼
  ┌──────────────────────────────────────────────────────────────────────────────────────┐
- │ adapters      catalog (CDSE) · stac · stac_import · quicklook · export ·             │
- │               adapters (LPIS) · snap (SNAP gpt) · client                             │
+ │ adapters      catalog (CDSE) · stac · stac_import · s1_stac · quicklook · export ·    │
+ │               adapters (LPIS) · snap (SNAP gpt) · client · downloads · public_data ·  │
+ │               embedding_sources · ftw_weights · openeo_adapter · datacube             │
  └──────────────────────────────────────┬───────────────────────────────────────────────┘
                                         ▼
  ┌──────────────────────────────────────────────────────────────────────────────────────┐
  │ core          raster · scenes · s2 · s1 · clouds · indices · features · timeseries ·  │
- │ (local files, tsfeatures · samples · model · estimators · metrics · uncertainty ·     │
- │  no network)  applicability · spatial · splits · parcels · validation · fieldwork ·   │
- │               cbm · segmentation · segmenters · unet · segmentation_metrics ·         │
- │               plugins · contracts · hashing                                           │
+ │ (local files, tsfeatures · temporal_quality · samples · model · estimators ·          │
+ │  no network)  temporal_models · metrics · uncertainty · applicability · spatial ·     │
+ │               splits · parcels · parcel_classify · validation · fieldwork · cbm ·     │
+ │               cbm_markers · calendars · hcat · segmentation · segmenters · unet ·     │
+ │               segmentation_metrics · ftw · embeddings · feature_providers ·           │
+ │               presto_encoder · galileo_encoder · anysat_encoder · active_learning ·   │
+ │               review · attribution · cachedirs · faultinject · plugins · contracts ·  │
+ │               hashing · _layers                                                       │
  └──────────────────────────────────────────────────────────────────────────────────────┘
         ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators / feature_providers)
 ```
@@ -65,17 +72,33 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `validation` | independent point validation with year filter, leakage exclusion and window vote; mapped area |
 | `clouds` | sun-angle shadow projection, external cloud masks (OmniCloudMask), multi-temporal outlier screening |
 | `timeseries`, `tsfeatures` | regular-grid binning, weighted Whittaker smoothing, phenology, harmonics; time-series feature stack, stack merging |
-| `estimators` | RF, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN and plugin classifiers behind one factory |
+| `estimators` | RF, ExtraTrees, HistGradientBoosting, LightGBM, CatBoost, TempCNN, L-TAE and plugin classifiers behind one factory |
 | `plugins` | registries for estimators, indices, segmenters, exporters, validators and feature providers; lazy entry-point discovery |
 | `contracts`, `hashing` | `schema_version` stamping/validation/migration of JSON contracts; SHA-256 of files |
 | `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
 | `export` | COG, GeoParquet, STAC items, HCAT mapping |
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
-| `segmenters` | `Segmenter` protocol and registered OBIA / U-Net + watershed segmenters |
+| `segmenters` | `Segmenter` protocol and registered OBIA, U-Net + watershed and Fields of The World (`ftw`) segmenters |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
 | `audit` | read-only input audit: schema, geometry, class support, contradictory overlaps and field/training proximity |
 | `pipeline`, `config`, `provenance`, `cli` | orchestration, configuration, manifests and checks, command line |
+| `s1_stac`, `stac_import`, `quicklook` | Sentinel-1 RTC (Planetary Computer) and Sentinel-2 L2A (Earth Search) windowed COG import; quicklooks |
+| `downloads`, `cachedirs`, `public_data` | run-time downloads with retry, Range resume and checksums; cache root `$GEOCROP_CACHE`; public reference datasets |
+| `attribution` | Copernicus attribution tags carried from scene import to exports |
+| `temporal_quality` | observed-vs-interpolated temporal support rasters and review routing ([temporal quality](temporal-quality.md)) |
+| `temporal_models` | TempCNN and L-TAE sequence classifiers (PyTorch, optional) |
+| `cbm_markers`, `calendars`, `hcat` | event/homogeneity markers and marker rules; data-driven crop calendars; EuroCrops HCAT harmonisation |
+| `parcel_classify` | parcel-level classifier on parcel signatures ([parcel classification](parcel-classification.md)) |
+| `ftw`, `ftw_weights` | Fields of The World boundary models and their pinned checkpoint download ([field boundaries](field-boundaries.md)) |
+| `embeddings`, `feature_providers`, `embedding_sources`, `presto_encoder`, `galileo_encoder`, `anysat_encoder` | foundation-model feature providers and encoders ([embeddings](embeddings.md)) |
+| `active_learning` | batch selection, label ingestion and budget simulation ([active learning](active-learning.md)) |
+| `review`, `evidence` | analyst parcel review queue and decisions; per-parcel evidence packages ([evidence](evidence.md)) |
+| `openeo_adapter`, `datacube` | optional openEO back-end ([openEO](openeo.md)); external xarray/Zarr/NetCDF cubes and odc-stac ([datacube](datacube.md)) |
+| `preflight`, `cleanup`, `cache` | pre-run checks and resource estimates; removal of temporary/partial outputs; content hash cache |
+| `benchmark`, `public_benchmark`, `public_transfer`, `registry` | classifier/segmentation benchmarks; frozen public protocols; local model and benchmark registry |
+| `acceptance`, `demo`, `faultinject` | real-data and offline acceptance run; synthetic demo; test-only fault-injection hook |
+| `web`, `web_jobs`, `web_map`, `web_review` | optional local HTML workspace, job queue, map layers and review API ([web interface](web-interface.md)) |
 
 ## Stage graph
 

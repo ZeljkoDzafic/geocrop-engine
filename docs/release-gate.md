@@ -76,10 +76,10 @@ the container shares the host kernel and CPU architecture (arm64 on a Mac workst
 torch/boost/cloud extras (the clean venv does), and does not exercise `deploy/setup_ubuntu.sh` (conda path),
 systemd units or the target network.
 
-On the target Ubuntu 24.04 VM (for example the Telelink research VM provisioned with `deploy/setup_ubuntu.sh`):
+On the target Ubuntu 26.04 (or 24.04) VM (for example the Telelink research VM provisioned with `deploy/setup_ubuntu.sh`):
 
 ```bash
-sudo bash deploy/vm_acceptance.sh --system     # python3.12-venv, git, build tools
+sudo bash deploy/vm_acceptance.sh --system     # Python 3.12 venv (via uv where no python3.12-venv package), git, build tools
 bash deploy/vm_acceptance.sh                   # the same gate on the VM, Docker checks skipped
 CONDA=1 bash deploy/vm_acceptance.sh           # additionally exercise setup_ubuntu.sh --user (Miniforge path)
 ```

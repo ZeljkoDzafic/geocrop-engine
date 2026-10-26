@@ -8,6 +8,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 |---|---|---|---|
 | (top) | `project` | `geocrop-experiment` | name used in reports |
 | | `seed` | 42 | seed for sampling, folds and models |
+| `cache` | `hash` | `content` | stage-fingerprint hashing: `content` (SHA-256) or `metadata` (size + mtime, for raw archives too large to hash; see [reproducibility](reproducibility.md)) |
 | `grid` | `crs`, `resolution_m`, `reference` | –, 10, – | study grid; `reference` = GeoTIFF from `geocrop grid` |
 | `windows` | `<name>: {start, end}` | – | non-overlapping phenological windows (ISO dates, inclusive) |
 | `paths` | `s2_scenes`, `s1_scenes`, `composites`, `features`, `training`, `parcels`, `observations`, `output` | `data/...` | file locations |
@@ -41,6 +42,8 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `calibration_mode`, `calibration_fraction` | oof, 0.2 | empirical OOF sets or frozen-predictor holdout; fraction of spatial groups reserved in holdout |
 | | `max_samples_per_polygon` | 250 | sampling cap |
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
+| | `holdout_fraction` | 0 | share of spatial blocks locked away as a final test set before CV and tuning (`train_report.json` `holdout_design`); 0 disables |
+| | `inner_splits` | 3 | inner spatial folds of nested tuning when `tune_grid` is set |
 | | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
 | | `feature_groups` | null | train on these feature groups only (e.g. `[s2_band, s2_index, ts, harmonic]`); the samples stage then extracts only their features, so NaN in other groups does not remove polygons |
@@ -61,6 +64,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `conformal_alpha`, `min_aoa_fraction` | 0.1, 0.5 | conformal level for parcel sets; AOA share required for acceptance |
 | `validation` | `label_field`, `date_field`, `year` | `class_name`, `observed_at`, null | observation schema and season |
 | | `training_exclusion_m`, `window_px`, `bootstrap` | 0, 1, 1000 | leakage buffer, GNSS window, bootstrap replicates |
+| `openeo` | `url`, `products`, `s2_collection`, `s1_collection`, `s1_coefficient`, `s1_card4l`, `max_cloud_cover`, `signature_indices`, `start`, `end`, `job_options`, `work_dir` | CDSE openEO, `[s2_composites]`, … | optional openEO back-end of `geocrop openeo-graph` / `openeo-extract`; not read by `geocrop run`; defaults and meaning in [openEO](openeo.md#configuration) |
 | `data` | `source` | `local` | `local` or `odc-stac`; read by `geocrop cube load --config`, not by `geocrop run` (the pipeline always reads `paths.s2_scenes`), see [datacube](datacube.md) |
 | | `endpoint`, `collection`, `max_cloud`, `min_clear_fraction` | Earth Search v1, `sentinel-2-l2a`, 80, 0.2 | STAC defaults for `cube load` |
 | `resources` | `disk_guard` | true | free-space check before `composite`, `features`, `predict` ([preflight](preflight.md)) |

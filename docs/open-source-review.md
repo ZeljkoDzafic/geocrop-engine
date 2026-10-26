@@ -47,16 +47,23 @@ and recovery from interruption. Keep model selection separate from the final tes
 defined crop-learning tasks; Fields of The World evaluates field boundaries and cannot alone establish
 crop-type/declaration accuracy. The local synthetic demo establishes software behavior only.
 
-## Next priorities requiring separate evidence
+## Priorities identified by the review: status
 
-* Temporal-support QA rasters: observed counts, occupied bins and longest unsupported gaps, kept separate
-  from classifier features until an explicit study policy opts in.
-* STAC-to-existing-scene import with explicit band/radiometry mapping and nearest-neighbour mask handling.
-* A pinned external embedding adapter with artifact checksum and a real-data comparison against RF and
-  ExtraTrees. WorldCereal's reviewed version uses Presto through a pinned PromethEO wrapper; current
+The review named four follow-up priorities. All four now exist in the engine; what is still missing is
+real-data evidence, not code:
+
+* **Temporal-support QA rasters** (observed counts, occupied bins, longest unsupported gaps, kept separate from
+  classifier features unless a study opts in): implemented, off by default (`timeseries.temporal_support`,
+  `cbm.temporal_support`, `geocrop temporal-support`; [temporal quality](temporal-quality.md)).
+* **STAC-to-scene import with explicit band/radiometry mapping**: `geocrop stac-import` and
+  `geocrop cube import --band-map` ([datacube](datacube.md)).
+* **Pinned external embedding adapters**: Presto, Galileo and AnySat weights pinned by URL and SHA-256
+  ([embeddings](embeddings.md)). **Open:** a real-data comparison of embeddings against RF/ExtraTrees on
+  handcrafted features. WorldCereal's reviewed version uses Presto through a pinned PromethEO wrapper; current
   framework features must not be attributed automatically to older pinned versions.
-* Parcel evidence/reason-code reports and deployment-distance diagnostics, followed by analyst interfaces
-  only where an operational workflow requires them.
+* **Parcel evidence/reason-code reports, deployment-distance diagnostics and analyst interfaces**:
+  `geocrop evidence` ([evidence](evidence.md)), the Area of Applicability ([uncertainty](uncertainty.md)) and
+  the analyst review view of the web workspace ([review](web-interface.md#review-analyst-parcel-decisions)).
 
 ## Primary-source evidence
 

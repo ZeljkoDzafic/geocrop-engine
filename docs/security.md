@@ -62,10 +62,13 @@ browser tabs and notebook clients then receive HTTP 401 until given the new toke
 
 ## Container and deployment
 
-The Docker image runs as the unprivileged `mambauser` and does not start the web server by default. The
-`.dockerignore` keeps `data/`, `outputs/`, `.geocrop-web/` job state, `.env` files and virtual environments out
-of the build context. If the web server is run in a container, publish the port to `127.0.0.1` only
-(`-p 127.0.0.1:8765:8765`) and keep in mind that the Host allow-list requires a loopback host name.
+The Docker image runs as the unprivileged user `geocrop` (uid 1000) and does not start the web server by
+default. The `.dockerignore` keeps `data/`, `outputs/`, `.geocrop-web/` job state, `.env` files and virtual
+environments out of the build context. `geocrop serve --host` accepts only loopback addresses (`127.0.0.1`,
+`localhost`, `::1`), so inside a container the server is reachable only from that container's own network
+namespace; Docker port publishing (`-p`) does not reach it. Run the web workspace on the host, or on Linux with
+`--network host` (the container then binds the host's loopback interface); the Host allow-list also requires a
+loopback host name.
 
 ## Dependency vulnerabilities
 
@@ -76,7 +79,7 @@ or high vulnerability without a documented resolution below.
 
 | Date | Scope | Result |
 |---|---|---|
-| 2026-10-26 | `constraints/py312.txt` (73 packages, extras `all,stac,web`), PyPI advisory database and OSV | no known vulnerabilities |
+| 2026-10-26 | `constraints/py312.txt` (then 73 packages, extras `all,stac,web`; the file now pins every extra), PyPI advisory database and OSV | no known vulnerabilities |
 | 2026-10-26 | development environment (pytest, ruff, build, pip-audit, coverage) | no known vulnerabilities |
 
 **Accepted risks:** none at present. When an advisory cannot be fixed by a constraint bump, record it here with

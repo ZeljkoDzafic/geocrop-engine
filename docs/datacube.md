@@ -22,6 +22,7 @@ Three entry points:
 All dependencies are optional and imported lazily; a missing package is reported with the install command.
 
 ```bash
+pip install -e '.[cube]'           # all of the following (extra `cube`)
 pip install xarray                 # every cube function (Apache-2.0)
 pip install "odc-stac>=0.4"        # cube load only (Apache-2.0; pulls odc-geo, odc-loader)
 pip install zarr                   # .zarr input/output (MIT)
