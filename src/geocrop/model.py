@@ -204,6 +204,15 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
     return s
 
 
+def split_final_holdout(samples: Samples, spatial_block_m: float | None, fraction: float, seed: int):
+    """(development, locked test or None): the single definition of the final holdout used by train, ablation
+    and both benchmarks, so that model selection never sees the objects later reported as holdout accuracy."""
+    if not fraction:
+        return samples, None
+    mask = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), fraction, seed)
+    return _subset(samples, ~mask), _subset(samples, mask)
+
+
 def _subset(samples: Samples, mask) -> Samples:
     return Samples(samples.X[mask], samples.y[mask], samples.polygon[mask], samples.x[mask], samples.yy[mask],
                    samples.features, samples.crs)
@@ -306,10 +315,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
-    test = None
-    if holdout_fraction:
-        test_mask = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), holdout_fraction, seed)
-        test, samples = _subset(samples, test_mask), _subset(samples, ~test_mask)
+    samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     input_samples = samples
     samples, split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                        calibration_mode, calibration_fraction)

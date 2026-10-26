@@ -60,7 +60,9 @@ function renderJobs() {
     const status = document.createElement("td"); status.append(badge(job.status));
     const created = document.createElement("td"); created.textContent = new Date(job.created).toLocaleString();
     const code = document.createElement("td"); code.textContent = job.returncode === null ? "—" : job.returncode;
-    const select = () => { state.selected = job.id; state.offset = 0; state.log = ""; state.generation++; refresh().catch(e => message(e.message)); };
+    const select = () => { state.selected = job.id; state.offset = 0; state.log = ""; state.generation++;
+      if (typeof GeoMap !== "undefined") GeoMap.forget();   // drop any map request of the previous job
+      refresh().catch(e => message(e.message)); };
     row.addEventListener("click", select); row.addEventListener("keydown", e => { if (e.key === "Enter") select(); });
     row.append(command, status, created, code); $("jobs").append(row);
   }

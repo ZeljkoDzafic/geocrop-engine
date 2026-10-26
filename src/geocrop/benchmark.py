@@ -50,8 +50,12 @@ def _json_safe(value):
 def run(samples: Samples, output_dir: str | Path,
         candidates: dict[str, dict] | None = None, n_splits: int = 5,
         spatial_block_m: float | None = 5000, seed: int = 42,
-        spatial_buffer_m: float = 0, calibration_mode: str = "oof", calibration_fraction: float = 0.2) -> dict:
+        spatial_buffer_m: float = 0, calibration_mode: str = "oof", calibration_fraction: float = 0.2,
+        holdout_fraction: float = 0.0) -> dict:
     """Run named parameter sets on the same folds, persisting successful and failed outcomes.
+
+    The locked final holdout (`holdout_fraction`, same deterministic split as `train`) is removed before
+    the calibration split, so the report never selects a model on objects later used as holdout evidence.
 
     Optional-model dependency failures remain visible as failed candidates. A partial run
     has status ``incomplete``; callers must inspect it instead of selecting from only the
@@ -68,7 +72,10 @@ def run(samples: Samples, output_dir: str | Path,
             raise ValueError("Candidates must map nonempty names to estimator parameter dictionaries")
         if params.get("algorithm", "rf") not in ALGORITHMS:
             raise ValueError(f"Unknown algorithm in candidate {name!r}")
+    from .model import split_final_holdout
+
     input_count = len(samples.y)
+    samples, final_test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                                    calibration_mode, calibration_fraction)
     groups = spatial_blocks(samples, spatial_block_m)
@@ -111,6 +118,8 @@ def run(samples: Samples, output_dir: str | Path,
                 "cross-engine superiority is established. Timings include CV fit/prediction on this machine.",
         "samples": len(samples.y), "input_samples": input_count, "features": samples.features,
         "calibration_mode": calibration_mode, "calibration_split": calibration_split,
+        "holdout_fraction": holdout_fraction,
+        "holdout_samples_excluded": 0 if final_test is None else int(len(final_test.y)),
         "sample_fingerprint": sample_fingerprint,
         "fold_fingerprint": fold_fingerprint, "folds": fold_records,
         "seed": seed, "requested_folds": n_splits, "actual_folds": len(plan),
@@ -156,16 +165,13 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
 
     Uses only the objects allowed for model selection under the declared calibration design
     (`selection_samples`) and the same optional spatial buffer as training."""
-    from .model import _subset, holdout_mask, nested_cross_validate
+    from .model import nested_cross_validate, split_final_holdout, tune
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     candidates = candidates or DEFAULT_MODELS
     grids = grids or {}
-    test = None
-    if holdout_fraction:
-        tm = holdout_mask(samples.y, spatial_blocks(samples, spatial_block_m), holdout_fraction, seed)
-        test, samples = _subset(samples, tm), _subset(samples, ~tm)
+    samples, test = split_final_holdout(samples, spatial_block_m, holdout_fraction, seed)
     samples, calibration_split = selection_samples(samples, spatial_block_m, seed, spatial_buffer_m,
                                                    calibration_mode, calibration_fraction)
     X = samples.subset(features) if features else samples.X
@@ -191,14 +197,22 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 oof = cv.pop("_oof")
                 cv.pop("_oof_proba"), cv.pop("_classes")
             cv_seconds = time.perf_counter() - t0
+            fit_params = params
+            if name in grids:      # select on development data only, then fit the selected configuration
+                chosen = tune(X, y, poly, groups, params, grids[name], n_splits, s, **spatial)["best_params"]
+                fit_params = {**params, **chosen}
+                run_selected = chosen
+            else:
+                run_selected = None
             t0 = time.perf_counter()
-            est = make_estimator(params, s).fit(X, y)
+            est = make_estimator(fit_params, s).fit(X, y)
             fit_seconds = time.perf_counter() - t0
             probe = X[: min(len(X), 20000)]
             t0 = time.perf_counter()
             est.predict_proba(probe)
             px_per_s = len(probe) / max(time.perf_counter() - t0, 1e-9)
-            run = {"seed": s, "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"],
+            run = {"seed": s, "selected_params": run_selected,
+                   "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"],
                    "macro_f1": cv["macro_f1"], "cv_seconds": cv_seconds, "fit_seconds": fit_seconds,
                    "predict_pixels_per_second": px_per_s}
             for t in targets:
@@ -219,7 +233,7 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
         frame = pd.DataFrame(runs)
         row = {"model": name, "status": "ok", "repeats": repeats, "tuned": name in grids}
         for col in frame.columns:
-            if col == "seed":
+            if col in ("seed", "selected_params"):
                 continue
             vals = frame[col].dropna().astype(float)
             if len(vals):

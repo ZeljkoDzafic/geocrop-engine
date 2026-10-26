@@ -97,6 +97,16 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--min-clear", type=float, default=0.2, help="minimum clear fraction inside the grid")
     x.add_argument("--max-items", type=int, default=500)
 
+    x = cmd("quicklook", "Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map")
+    x.add_argument("--bbox", nargs=4, type=float, required=True, metavar=("W", "S", "E", "N"),
+                   help="degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija)")
+    x.add_argument("--start", required=True)
+    x.add_argument("--end", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--max-cloud", type=float, default=60)
+    x.add_argument("--min-clear", type=float, default=0.3)
+    x.add_argument("--max-items", type=int, default=60)
+
     x = cmd("s2-composite", "Cloud-masked temporal composite of S2 scene folders")
     x.add_argument("--scenes", nargs="+", required=True)
     x.add_argument("--out", required=True)
@@ -491,6 +501,11 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             key = r["status"].split(":")[0]
             counts[key] = counts.get(key, 0) + 1
         _print({"items": len(res), "status": counts, "out": a.out})
+    elif c == "quicklook":
+        from .quicklook import quicklook
+        r = quicklook(a.bbox, a.start, a.end, a.out, max_cloud=a.max_cloud, min_clear=a.min_clear,
+                      max_items=a.max_items)
+        _print({k: r[k] for k in ("crs", "area_km2", "acquisitions_found", "acquisitions_used", "composites")})
     elif c == "s2-composite":
         from .s2 import composite
         print(composite(a.scenes, a.out, a.reference, a.statistic, cloud_probability_max=a.cloud_prob_max,
@@ -587,7 +602,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                      spatial_block_m=a.block_m if a.block_m is not None else m["spatial_block_m"],
                      seed=a.seed if a.seed is not None else cfg["seed"],
                      spatial_buffer_m=a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"],
-                     calibration_mode=m["calibration_mode"], calibration_fraction=m["calibration_fraction"])
+                     calibration_mode=m["calibration_mode"], calibration_fraction=m["calibration_fraction"],
+                     holdout_fraction=m["holdout_fraction"])
         _print({"status": report["status"], "summary": report["summary"], "note": report["note"]})
         if report["status"] != "complete":
             sys.exit(2)

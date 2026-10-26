@@ -84,6 +84,73 @@ def continuous_layer(path: Path, band: int, name: str, max_px: int = 1024, vmin=
             "legend": [{"label": f"{vmin:g}", "color": low}, {"label": f"{vmax:g}", "color": high}]}
 
 
+def _stretch(bands: list[np.ndarray], low=2, high=98) -> tuple[np.ndarray, np.ndarray]:
+    """Joint percentile stretch of 3 reflectance bands to 0-255; returns RGB and validity."""
+    stack = np.stack(bands)
+    valid = np.isfinite(stack).all(axis=0) & (stack != -9999).all(axis=0)
+    rgb = np.zeros((*valid.shape, 3), dtype="uint8")
+    if valid.any():
+        for i, b in enumerate(stack):
+            lo, hi = np.percentile(b[valid], [low, high])
+            rgb[..., i] = (np.clip((np.where(valid, b, lo) - lo) / max(hi - lo, 1e-6), 0, 1) * 255).astype("uint8")
+    return rgb, valid
+
+
+COMBOS = {"true": (("B04", "B03", "B02"), "True colour"), "false": (("B08", "B04", "B03"), "False colour (NIR)")}
+
+
+def rgb_layer(folder: Path, combo: str, label: str, max_px: int = 1024, visible: bool = False) -> dict:
+    names, title = COMBOS[combo]
+    bands, bounds = [], None
+    for name in names:
+        data, bounds = _warp(folder / f"{name}.tif", 1, max_px, categorical=False)
+        bands.append(data)
+    rgb, valid = _stretch(bands)
+    rgba = np.dstack([rgb, np.where(valid, 255, 0).astype("uint8")])
+    return {"name": f"{title} — {label}", "type": "image", "url": _png(rgba), "bounds": bounds, "visible": visible,
+            "legend": [], "group": "imagery", "product": title, "time": label}
+
+
+def ndvi_layer(folder: Path, label: str, max_px: int = 1024) -> dict:
+    nir, bounds = _warp(folder / "B08.tif", 1, max_px, categorical=False)
+    red, _ = _warp(folder / "B04.tif", 1, max_px, categorical=False)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ndvi = (nir - red) / (nir + red)
+    valid = np.isfinite(ndvi) & (nir != -9999) & (red != -9999)
+    stops = [(-0.1, "#a6611a"), (0.2, "#dfc27d"), (0.4, "#f5f5a0"), (0.6, "#80cdc1"), (0.9, "#1a7837")]
+    xs = np.array([v for v, _ in stops])
+    cols = np.array([_hex(c) for _, c in stops], dtype=float)
+    v = np.clip(np.where(valid, ndvi, 0), xs[0], xs[-1])
+    rgba = np.zeros((*v.shape, 4), dtype="uint8")
+    for ch in range(3):
+        rgba[..., ch] = np.interp(v, xs, cols[:, ch]).astype("uint8")
+    rgba[..., 3] = np.where(valid, 220, 0)
+    return {"name": f"NDVI — {label}", "type": "image", "url": _png(rgba), "bounds": bounds, "visible": False,
+            "group": "imagery", "product": "NDVI", "time": label,
+            "legend": [{"label": f"{x:g}", "color": c} for x, c in stops]}
+
+
+def imagery_folders(files: list[Path], limit: int = 16) -> list[tuple[Path, str]]:
+    """Folders holding a reflectance set (window composites or scene folders), labelled by window or date."""
+    folders = {}
+    for f in files:
+        if f.name == "B04.tif" and all((f.parent / f"{b}.tif").exists() for b in ("B02", "B03", "B08")):
+            folder = f.parent
+            label = folder.name
+            meta = folder / "scene.json"
+            if meta.exists():
+                try:
+                    label = str(json.loads(meta.read_text())["datetime"])[:10]
+                except (ValueError, KeyError):
+                    pass
+            elif (folder / "composite.json").exists():
+                label = f"window {folder.name}"
+            folders[folder] = label
+    # composites first (few, informative), then scenes by date; keep the list bounded
+    ordered = sorted(folders.items(), key=lambda kv: (not kv[1].startswith("window"), kv[1]))
+    return ordered[:limit]
+
+
 def vector_layer(path: Path, name: str | None = None, max_features: int = 20000) -> dict:
     import geopandas as gpd
 
@@ -118,7 +185,7 @@ def job_layers(files: list[Path], max_px: int = 1024) -> dict:
         try:
             layers.append(fn(*args, **kwargs))
         except Exception as exc:  # noqa: BLE001 - a broken artifact must not hide the others
-            skipped.append(f"{args[0].name if args else '?'}: {exc}")
+            skipped.append(f"{getattr(args[0], 'name', '?') if args else '?'}: {exc}")
 
     for f in files:
         if f.name == "classes.tif":
@@ -134,8 +201,17 @@ def job_layers(files: list[Path], max_px: int = 1024) -> dict:
             attempt(continuous_layer, f, 1, "Boundary probability", max_px, 0, 1, "#ffffff", "#000000")
         elif f.suffix.lower() in (".gpkg", ".geojson") and f.stat().st_size < 200 * 1024 * 1024:
             attempt(vector_layer, f, f"{f.parent.name}/{f.stem}")
-    order = {"image": 0, "geojson": 1}
-    layers.sort(key=lambda layer: order[layer["type"]])
+    folders = imagery_folders(files)
+    has_results = any(layer["name"] == "Crop classes" for layer in layers)
+    windows = [k for k, (_, label) in enumerate(folders) if label.startswith("window")]
+    default = windows[-1] if windows else len(folders) - 1   # latest cloud-free composite, else latest scene
+    for k, (folder, label) in enumerate(folders):
+        # without a classification (e.g. quicklook) show one true-colour image by default
+        attempt(rgb_layer, folder, "true", label, max_px, visible=not has_results and k == default)
+        attempt(rgb_layer, folder, "false", label, max_px)
+        attempt(ndvi_layer, folder, label, max_px)
+    order = {"imagery": 0, None: 1}
+    layers.sort(key=lambda layer: (layer["type"] != "image", order.get(layer.get("group"), 1)))
     bounds = None
     for layer in layers:
         (s, w), (n, e) = layer["bounds"]
