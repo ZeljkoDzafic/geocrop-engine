@@ -42,13 +42,14 @@ LAYERS: dict[str, frozenset[str]] = {
         "export",        # COG, GeoParquet, STAC items, HCAT
         "ftw_weights",   # Fields of The World checkpoint download (HTTPS, sha256-pinned)
         "quicklook",     # STAC COG quicklooks
+        "s1_stac",       # Sentinel-1 RTC from Planetary Computer STAC (signed COG reads)
         "snap",          # ESA SNAP gpt runner (subprocess)
         "stac",          # STAC inventory (pystac-client)
         "stac_import",   # STAC COG import
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
-        "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
+        "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
     }),
     # Entry points. Nothing below this layer may import it.
     INTERFACE: frozenset({"cli", "web", "web_jobs", "web_map"}),

@@ -2,6 +2,20 @@
 
 ## Unreleased
 ### Added
+- `geocrop acceptance`: one versioned, automatically executable acceptance run of the whole chain on a ~2 × 2 km
+  real area in Semberija (2023, June–September), with real Sentinel-2 and Sentinel-1 data; 21 pass/fail checks
+  (grid identity, radiometry and backscatter plausibility, S1/S2 co-registration, coverage, no-data leakage,
+  index and probability ranges, reproducibility, parcel schema, held-out recovery of documented pseudo-classes,
+  COG/STAC/GeoParquet validity, run manifest), runtime and memory per stage, and a schema-versioned
+  `acceptance_report.json` + `acceptance_report.md`. `--offline` runs the same chain on synthetic scenes (CI).
+  First published report: `docs/acceptance/acceptance-0.10-dev-2026-10-26.md`.
+- `geocrop.s1_stac`: Sentinel-1 RTC (terrain-flattened γ⁰, linear) import from Microsoft Planetary Computer as
+  windowed COG reads onto the study grid, without SNAP; slices of an overpass are mosaicked; SAS signing via the
+  optional `planetary-computer` package or the public token endpoint; physical plausibility statistics.
+- Sentinel-1 to Sentinel-2 co-registration: `s1_stac.estimate_offsets` (sub-pixel NDVI / VH cross-correlation per
+  acquisition geometry) and `s1_stac.apply_offsets` (corrected copies of scene folders). The acceptance run found
+  systematic, orbit-dependent offsets of the Planetary Computer RTC scenes over Semberija (up to ≈ 50 m).
+
 - `geocrop preflight`: pass/warn/error checks and a ready / ready-with-warnings / blocked verdict (JSON and
   Markdown) before long runs: scenes per window and S1 orbit (scene folders and inventory CSVs), decimated
   clear-observation coverage, class support under the configured spatial blocks, folds and locked holdout,
