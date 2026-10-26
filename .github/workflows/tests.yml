@@ -10,8 +10,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e '.[dev,stac,web]'
@@ -23,7 +23,7 @@ jobs:
       - run: >-
           python -m pytest --cov=geocrop --cov-branch --cov-report=xml --cov-report=term
           --cov-fail-under=77
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-py${{ matrix.python-version }}
@@ -35,8 +35,8 @@ jobs:
     # The audited, pinned dependency set (constraints/py312.txt) must install and pass the suite.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -e '.[dev,all,stac,web]' -c constraints/py312.txt
@@ -45,8 +45,8 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install pip-audit
@@ -61,6 +61,6 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build --pull -t geocrop-engine:ci .
       - run: docker run --rm geocrop-engine:ci --version
