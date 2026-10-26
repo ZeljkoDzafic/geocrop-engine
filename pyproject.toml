@@ -59,7 +59,7 @@ geocrop = "geocrop.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-geocrop = ["web_static/*"]
+geocrop = ["web_static/*", "web_static/vendor/leaflet/*", "web_static/vendor/leaflet/images/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
