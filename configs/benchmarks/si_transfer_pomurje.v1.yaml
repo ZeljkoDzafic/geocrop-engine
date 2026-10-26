@@ -1,0 +1,139 @@
+# Frozen public TRANSFER protocol (European public task, Slovenia; NOT Republic of Srpska data).
+# Changing ANY value changes the protocol hash recorded in results; publish changes as a new version file.
+# Question: how much accuracy, conformal coverage and area of applicability does a crop-type model trained in one
+# region and year lose in geographically separate regions (same year) and in another year (same region)?
+# Labels: farmers' declarations (not field-verified), downloaded at run time, never committed:
+#   2021: EuroCrops Slovenia (CC-BY-SA-4.0, Zenodo, HCAT3 codes);
+#   2025: Slovenian Ministry of Agriculture KMRS crop layer (open: "Javno dostopni podatki, ni omejitve uporabe,
+#         citiranje vira obvezno" = public, no use restriction, citation mandatory), national codes mapped to HCAT3
+#         with the code -> HCAT table of the EuroCrops 2021 harmonisation of the same national code list.
+# Imagery: Sentinel-2 L2A COGs from Element 84 Earth Search (STAC), windowed reads on the study grid.
+schema: geocrop-public-transfer-protocol/1
+protocol: si-transfer-pomurje
+version: 1
+description: >-
+  Train in Pomurje (north-eastern Slovenia, 2021) and test, without retraining, in three geographically separate
+  Slovenian regions in 2021 (Podravje ~35 km, Posavje ~110 km, Gorenjska ~150 km away) and in Pomurje 2025
+  (leave-one-year-out). Five HCAT-defined classes; parcel-level evaluation.
+
+sources:
+  eurocrops_si_2021:
+    kind: eurocrops
+    zenodo_record: "14094196"
+    archive: SI_2021.zip
+    checksum: md5:b2acea403d8372ccb9c5f5276130f23b
+    code_field: EC_hcat_c
+    id_field: ID
+    licence: CC-BY-SA-4.0
+    citation: >-
+      Schneider, M., Schelte, T., Schmitz, F., Koerner, M. (2023). EuroCrops: The Largest Harmonized Open Crop
+      Dataset Across the European Union. Scientific Data 10, 612. Data: doi:10.5281/zenodo.14094196.
+  kmrs_si_2025:
+    kind: url
+    url: https://rkg.gov.si/razno/portal_analysis/KMRS_2025.zip
+    checksum: sha256:2977a4163ce60d7b83e9cbc0a86bdfb5e437e5abde6f37c0e6a061335eb9fa14
+    national_code_field: SIFRA_KMRS
+    id_field: ID
+    code_map: {source: eurocrops_si_2021, national_code_field: SIFRA_KMRS, hcat_field: EC_hcat_c}
+    licence: "MKGP open data: public, no restriction of use, citation of the source mandatory"
+    citation: >-
+      Ministrstvo za kmetijstvo, gozdarstvo in prehrano (MKGP), Sloj kmetijskih rastlin iz zbirnih vlog (KMRS) 2025,
+      https://rkg.gov.si/ (metadata: eprostor.gov.si record 21ecba4a-1214-4617-8bf4-020d2f235a25).
+
+grid: {crs: EPSG:32633, resolution_m: 10}
+tile_size_m: 10000
+
+domains:                       # tile origins = lower-left corner (easting, northing) in grid.crs
+  pomurje_2021:
+    region: pomurje
+    year: 2021
+    source: eurocrops_si_2021
+    tiles: {SI-MS-S: [590000, 5164000], SI-LE-W: [600000, 5160000], SI-LJ: [578000, 5158000]}
+  podravje_2021:
+    region: podravje
+    year: 2021
+    source: eurocrops_si_2021
+    tiles: {SI-PT-E: [570000, 5136000], SI-DP: [550000, 5133000]}     # Ptujsko and Dravsko polje
+  posavje_2021:
+    region: posavje
+    year: 2021
+    source: eurocrops_si_2021
+    tiles: {SI-KK-W: [537000, 5080000], SI-KK-E: [547000, 5080000]}   # Krsko-Brezice plain
+  gorenjska_2021:
+    region: gorenjska
+    year: 2021
+    source: eurocrops_si_2021
+    tiles: {SI-KR-S: [443000, 5111000], SI-KR-N: [448000, 5121000]}   # Kranj / Sorsko polje
+  pomurje_2025:
+    region: pomurje
+    year: 2025
+    source: kmrs_si_2025
+    tiles: {SI-MS-S: [590000, 5164000], SI-LE-W: [600000, 5160000], SI-LJ: [578000, 5158000]}
+
+source_domain: pomurje_2021
+
+classes:                       # HCAT3 codes (as in eurocrops_si_2021_pomurje.v1)
+  maize: {exact: ["3301010600", "3301090400"]}
+  winter_cereals:
+    exact: ["3301010101", "3301010201", "3301010301", "3301010401", "3301010501", "3301010801",
+            "3301011001", "3301011101", "3301011501"]
+  grassland: {exact: ["3302000000", "3301090100"]}
+  oil_pumpkin: {exact: ["3301140400"]}
+  winter_rapeseed: {exact: ["3301060401"]}
+common_classes: [grassland, maize, winter_cereals]   # present in every domain: comparable macro-F1
+
+sampling:
+  min_area_m2: 5000
+  parcels_per_class: 150       # per domain, stratified random draw over the domain's tiles
+  min_parcels_per_class: 20    # a target class with fewer parcels is dropped from that target (reported)
+  seed: 2021
+  inner_buffer_m: 10
+  max_pixels_per_parcel: 60
+
+split:                         # source-domain holdout (in-domain test) and per-target local baselines
+  spatial_block_m: 2000
+  test_fraction: 0.3
+  calibration_fraction: 0.25
+  buffer_m: 200
+  seed: 42
+
+imagery:
+  endpoint: https://earth-search.aws.element84.com/v1
+  collection: sentinel-2-l2a
+  max_cloud: 50
+  scenes_per_window: 3
+  min_clear_fraction: 0.5
+  max_candidates: 12
+
+windows:                       # month-day; applied to each domain's year
+  P1: {start: "03-15", end: "04-30"}
+  P2: {start: "05-01", end: "05-31"}
+  P3: {start: "06-01", end: "06-30"}
+  P4: {start: "07-01", end: "07-31"}
+  P5: {start: "08-01", end: "08-31"}
+  P6: {start: "09-01", end: "10-15"}
+
+compositing: {statistic: median, mask_dilation_px: 2, min_valid_observations: 1}
+
+features:
+  s2_bands: [B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12]
+  s2_indices: [NDVI, EVI, MSAVI2, NDRE, RECI, GCVI, NDMI, BSI]
+  deltas: [NDVI, NDRE, NDMI]
+  seasonal: [NDVI]
+
+model: {algorithm: rf, n_estimators: 300, max_features: sqrt, class_weight: balanced_subsample, n_jobs: -1}
+
+evaluation:
+  unit: parcel                 # parcel class = argmax of the mean pixel probability
+  bootstrap: 1000              # resampling 2 km spatial blocks of the evaluated parcels
+  bootstrap_seed: 7
+  confidence: 0.95
+  conformal_alpha: 0.1         # Mondrian split conformal, calibrated on SOURCE calibration parcels only
+  aoa_folds: 5                 # spatial-block folds of the source training pixels for the AOA threshold
+  aoa_min_fraction: 0.5        # a parcel is inside the AOA when >= this share of its pixels is
+
+transfer_cv:                   # engine's grouped transfer CV (pixel level) on the pooled samples of all domains
+  strategies: [region, year]
+  n_splits: 5
+  spatial_block_m: 2000
+  params: {algorithm: rf, n_estimators: 200, max_features: sqrt, class_weight: balanced_subsample, n_jobs: -1}

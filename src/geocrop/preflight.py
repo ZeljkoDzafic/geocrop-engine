@@ -37,27 +37,37 @@ HEAVY_STAGES = ("composite", "features", "predict")
 
 # Rough single-machine runtime coefficients (seconds), measured with `geocrop run` on synthetic demo scenes
 # (0.6 Mpx grid, 20 S2 + 8 S1 acquisitions, 97 features, ~61k samples, 100 trees) on an 8-core laptop and
-# rounded up. Real runs differ by I/O, reprojection, tree depth and core count: treat results as an order
-# of magnitude and recalibrate from a pilot's stages.json (seconds per stage).
+# rounded up; the prediction/AOA terms were recalibrated on real 25-1000 km2 runs (docs/performance.md). Real
+# runs differ by I/O, reprojection, tree depth and core count: treat results as an order of magnitude and
+# recalibrate from a pilot's stages.json (seconds per stage).
 RUNTIME = {
     "composite_s_per_mpx_scene": 1.0,      # per million grid pixels per S2 acquisition (measured 0.65)
     "composite_s1_s_per_mpx_scene": 0.3,   # per million grid pixels per S1 acquisition
     "features_s_per_mpx_feature": 0.1,     # per million pixels per output feature (measured 0.08)
     "timeseries_s_per_mpx_scene_series": 0.5,
     "train_s_per_msample_tree": 1.5,       # per million samples per tree, per CV fold + final fit (measured 1.2)
-    "predict_s_per_mpx_tree": 0.7,         # per million pixels per tree incl. uncertainty/AOA (measured 0.67)
+    "predict_s_per_mpx_tree": 0.1,         # per million pixels per tree, RF probabilities + uncertainty bands
+    # Area-of-applicability map: nearest-neighbour search of every pixel among up to 20 000 training points
+    # (applicability.fit max_points) on one core. Measured 98-148 s per Mpx with 97 features on real Semberija
+    # stacks (tools/scale_benchmark.py, docs/performance.md); scaled linearly with the feature count.
+    "aoa_s_per_mpx_100_features": 150.0,
 }
+# Python interpreter, GDAL block cache and imported libraries: measured ~1 GB above the per-stage working sets
+# on 25-1000 km2 real runs (docs/performance.md).
+RAM_OVERHEAD_BYTES = 1.0 * GB
 ASSUMPTIONS = [
     "Rasters are written over the full reference-grid extent (pixels outside the AOI included).",
     "Expected on-disk size = uncompressed float32 size x resources.compression_ratio (deflate + "
     "floating-point predictor); the uncompressed size is the upper bound.",
     "Feature count follows the pipeline's naming rules from the config and the sensors found per window.",
     "Peak RAM is the largest per-stage working set from the block sizes (512 px; 256 px for time series) "
-    "plus Random-Forest model size; Python/GDAL overhead and parallel tree building are not included.",
+    "plus Random-Forest model size plus ~1 GB of Python/GDAL/library overhead; parallel tree building is not "
+    "included.",
     "Training samples = sum over polygons of min(area in pixels, model.max_samples_per_polygon).",
     "Random-Forest model size (upper bound; separable data gives far smaller trees) ~ trees x 2 x 0.63 x "
     "samples / min_samples_leaf nodes x (64 + 8 x classes) bytes; aoa.json ~ 2 x the float32 sample matrix.",
-    "Runtime uses rough per-pixel coefficients (see RUNTIME in geocrop.preflight); order of magnitude only.",
+    "Runtime uses rough per-pixel coefficients (see RUNTIME in geocrop.preflight; prediction includes the "
+    "single-core area-of-applicability map); order of magnitude only. Scene import (network) is not estimated.",
     "Class support uses polygon centroids; training uses sampled pixel centres, so buffered folds may differ slightly.",
     "Coverage uses SCL/CLDPRB/CLOUDMASK/SHADOW at reduced resolution without mask dilation or temporal screening.",
 ]
@@ -659,6 +669,7 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
         "train": samples_bytes * 3 + model_bytes,
         "predict": max(1, n_features) * block * 4 * 2 + n_classes * block * 4 * 3 + model_bytes,
     }
+    ram = {k: v + RAM_OVERHEAD_BYTES for k, v in ram.items()}
     out["peak_ram_gb"] = {k: round(v / GB, 2) for k, v in ram.items()}
     out["peak_ram_gb"]["max"] = round(max(ram.values()) / GB, 2)
     mpx = px / 1e6
@@ -672,7 +683,8 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
         "timeseries": mpx * ts["scenes"] * max(1, ts["series"]) * RUNTIME["timeseries_s_per_mpx_scene_series"]
         if ts["features"] else 0.0,
         "train": n_samples / 1e6 * trees * RUNTIME["train_s_per_msample_tree"] * (cfg["model"]["cv_folds"] + 1),
-        "predict": mpx * trees * RUNTIME["predict_s_per_mpx_tree"],
+        "predict": mpx * trees * RUNTIME["predict_s_per_mpx_tree"]
+        + mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100,
     }
     out["runtime_hours_rough"] = {k: round(v / 3600, 3) for k, v in secs.items()}
     out["runtime_hours_rough"]["total"] = round(sum(secs.values()) / 3600, 3)

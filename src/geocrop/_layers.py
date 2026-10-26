@@ -66,6 +66,7 @@ LAYERS: dict[str, frozenset[str]] = {
     APPLICATION: frozenset({
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
+        "public_transfer",   # frozen-protocol public region/year transfer benchmark
         "evidence",      # per-parcel evidence packages (JSON + HTML + PNG) and batch index
         "registry",      # local file-based model and benchmark registry
     }),
