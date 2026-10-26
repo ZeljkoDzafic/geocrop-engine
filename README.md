@@ -56,9 +56,15 @@ custom platforms) can consume the results.
 conda env create -f environment.yml      # Python 3.11, GDAL stack from conda-forge
 conda activate geocrop
 # or: pip install -e '.[all]'   (Python >= 3.10)
-pip install -e '.[deep]'                 # optional: U-Net / TempCNN (PyTorch)
+pip install -e '.[deep]'                 # optional: U-Net / TempCNN / L-TAE / Presto (PyTorch)
+pip install -e '.[ftw]'                  # optional: Fields of The World boundaries (torch + segmentation-models-pytorch)
 pip install -e '.[boost,cloud,parquet]'  # optional: LightGBM/CatBoost, OmniCloudMask, GeoParquet
+pip install -e '.[openeo,cube,plots]'    # optional: openEO back-end, xarray/Zarr/NetCDF cubes, figures
+# reproducible: add  -c constraints/py312.txt  (CPython 3.12; pins every extra)
 ```
+Downloads made at run time (checkpoints, weights, public datasets) are cached under `$GEOCROP_CACHE`
+(default `~/.cache/geocrop`), retried with backoff, resumed and checksum-verified; see
+[docs/licences-and-weights.md](docs/licences-and-weights.md).
 ESA SNAP (for Sentinel-1 preprocessing) is installed separately: <https://step.esa.int/main/download/snap-download/>.
 
 ## Quick start (synthetic data, ~10 s)

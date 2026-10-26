@@ -2,6 +2,27 @@
 
 ## Unreleased
 ### Added
+- Release-gate findings (docs/release-gates/release-gate-c091962.md): `geocrop samples --groups/--feature-names`
+  (`samples.extract(features=...)`) extracts only the selected features, so NaN in other groups (phenology of a
+  season that starts before the series) no longer removes polygons; sample files record the classes of the
+  reference polygons (`reference_classes`) and `train`, `benchmark` and `benchmark-models` refuse a sample set
+  that lost a whole class (`MissingClassError`, non-zero exit) unless `--allow-missing-classes`; pipeline keys
+  `model.feature_groups` and `model.allow_missing_classes` (fingerprint-neutral at their defaults).
+- `geocrop.downloads`: one download helper for every run-time download (FTW, Presto/Galileo/AnySat, OmniCloudMask,
+  AlphaEarth index, EuroCrops, WorldCereal) with retry + exponential backoff, HTTP Range resume and size/checksum
+  verification; one cache root `$GEOCROP_CACHE` with fixed subfolders (`geocrop.cachedirs`).
+- Copernicus attribution (`geocrop.attribution`): "Contains modified Copernicus Sentinel data <year>" as GeoTIFF
+  tag `GEOCROP_ATTRIBUTION` on S2/S1 scene imports (Earth Search, CDSE SAFE, SNAP, Planetary Computer, openEO),
+  carried through composites, stacks and predictions into COG exports and STAC items (`license`, `attribution`,
+  `providers`, licence link).
+- OmniCloudMask weights pinned by Hugging Face revision + SHA-256 (`geocrop cloudmask` downloads them into the
+  cache; `CLOUDMASK.tif` records model, weights checksums, licence and citation); Galileo, AnySat and
+  OmniCloudMask pins checked by `tools/check_weights.py`.
+- `benchmark-models --params '{"ltae": {"epochs": 30}}'` (per-model overrides) and `--epochs` for TempCNN/L-TAE;
+  per-model fold signatures (`fold_signatures_per_model`, `identical_folds_across_models`) computed from the folds
+  each run actually used; `fold_signature` in every cross-validation result.
+- Extras `ftw` (torch + segmentation-models-pytorch), `openeo`, `plots` (matplotlib), `cube` (xarray, odc-stac,
+  zarr, netCDF4); `stac` adds planetary-computer.
 - `plugin-contracts/2`: adds the `feature_providers` registry (entry-point group `geocrop.feature_providers`) and the
   `evidence`/feature-manifest file-contract versions; existing plugin groups are unchanged (no migration needed).
 - `tools/deploy_website.sh`: manual deployment of the presentation site to Cloudflare static assets, with security headers in `website/_headers`.
@@ -219,6 +240,15 @@
 - Docker: job state, `.env` files and virtual environments are excluded from the build context.
 
 ### Changed
+- `constraints/py312.txt` pins every optional extra (156 packages, previous pins kept); the Docker image now uses
+  `python:3.12-slim-bookworm` and installs from the constraints file (`--build-arg EXTRAS=...`), runs as an
+  unprivileged user and keeps `/usr/local/bin/_entrypoint.sh`.
+- `$GEOCROP_FTW_CACHE` and `$GEOCROP_DATA_CACHE` are deprecated aliases (FutureWarning) of `$GEOCROP_CACHE/ftw`
+  and `$GEOCROP_CACHE/public`; with only `$GEOCROP_CACHE` set, public datasets now go to `$GEOCROP_CACHE/public`.
+- Optional backends: a missing or unloadable (native-library OSError) LightGBM, CatBoost or torch is reported the
+  same way everywhere (`estimators.backend_error`): skipped in benchmarks, a `model.backend` error in preflight.
+- `NOTICE` lists Leaflet (BSD-2), the MIT code adapted from Presto/Galileo/AnySat, the CC-BY-SA HCAT tables and
+  the EOX non-commercial basemap; docs/licences-and-weights.md updated.
 - SNAP `gpt` execution moved to the adapter `geocrop.snap` (`geocrop.s1.run_snap` remains); `sha256` moved
   to `geocrop.hashing` (`geocrop.provenance.sha256` remains), so core modules no longer depend on
   subprocess-running code.

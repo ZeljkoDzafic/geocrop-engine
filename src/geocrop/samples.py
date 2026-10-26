@@ -34,6 +34,9 @@ class Samples:
     crs: str
     region: np.ndarray | None = None   # (n,) region id (str) per sample, optional
     year: np.ndarray | None = None     # (n,) season/year id (str) per sample, optional
+    #: every class of the reference polygons that intersect the stack, recorded by `extract`; lets
+    #: `train`/`benchmark-models` refuse a sample set that silently lost a whole class (`check_classes`)
+    reference_classes: np.ndarray | None = None
 
     def __post_init__(self):
         for name in ("region", "year"):
@@ -43,12 +46,20 @@ class Samples:
                 if value.shape != (len(self.y),):
                     raise ValueError(f"{name} metadata must have one value per sample")
                 setattr(self, name, value)
+        if self.reference_classes is not None:
+            self.reference_classes = np.unique(np.asarray(self.reference_classes).astype(str))
+
+    def missing_classes(self) -> list[str]:
+        """Classes of the reference polygons without any sample (empty when unknown, e.g. older sample files)."""
+        if self.reference_classes is None:
+            return []
+        return sorted(map(str, set(self.reference_classes) - set(np.asarray(self.y).astype(str))))
 
     def take(self, index) -> Samples:
         """Row subset (boolean mask or integer index) that keeps the group metadata."""
         meta = {k: None if getattr(self, k) is None else getattr(self, k)[index] for k in ("region", "year")}
         return Samples(self.X[index], self.y[index], self.polygon[index], self.x[index], self.yy[index],
-                       self.features, self.crs, **meta)
+                       self.features, self.crs, **meta, reference_classes=self.reference_classes)
 
     def subset(self, names: list[str]) -> np.ndarray:
         missing = [n for n in names if n not in self.features]
@@ -59,7 +70,7 @@ class Samples:
     def save(self, path: str | Path) -> Path:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        meta = {k: getattr(self, k) for k in ("region", "year") if getattr(self, k) is not None}
+        meta = {k: getattr(self, k) for k in ("region", "year", "reference_classes") if getattr(self, k) is not None}
         np.savez_compressed(path, X=self.X, y=self.y, polygon=self.polygon, x=self.x, yy=self.yy,
                             features=np.array(self.features), crs=np.array(self.crs), **meta)
         return path
@@ -67,7 +78,7 @@ class Samples:
     @classmethod
     def load(cls, path: str | Path) -> Samples:
         z = np.load(path, allow_pickle=False)
-        meta = {k: z[k].astype(str) if k in z.files else None for k in ("region", "year")}
+        meta = {k: z[k].astype(str) if k in z.files else None for k in ("region", "year", "reference_classes")}
         return cls(z["X"], z["y"].astype(str), z["polygon"].astype(str), z["x"], z["yy"],
                    [str(f) for f in z["features"]], str(z["crs"]), **meta)
 
@@ -143,7 +154,9 @@ def combine(parts: list[Samples], years: list | None = None, manifests: list | N
                    np.concatenate([p.x for p in parts]), np.concatenate([p.yy for p in parts]),
                    list(first.features), first.crs,
                    region=np.concatenate([p.region for p in parts]) if all(with_region) else None,
-                   year=np.concatenate(year_ids))
+                   year=np.concatenate(year_ids),
+                   reference_classes=(np.concatenate([p.reference_classes for p in parts])
+                                      if all(p.reference_classes is not None for p in parts) else None))
 
 
 def polygon_window(geom, ds) -> Window | None:
@@ -166,16 +179,46 @@ class SampleCoverageWarning(UserWarning):
     """Reference polygons were skipped because none of their pixels is valid for every feature."""
 
 
+class MissingClassError(ValueError):
+    """A class of the reference polygons has no sample at all (training/benchmarking would silently drop it)."""
+
+
+def check_classes(samples: Samples, allow_missing: bool = False, where: str = "samples") -> list[str]:
+    """Refuse `samples` that lost a whole reference class; returns the missing classes.
+
+    With ``allow_missing=True`` the loss is only warned about (`SampleCoverageWarning`). Sample files written
+    before `reference_classes` was recorded cannot be checked and pass.
+    """
+    missing = samples.missing_classes()
+    if not missing:
+        return []
+    msg = (f"{where}: classes of the reference polygons without any sample: {missing} "
+           f"(present: {sorted(set(map(str, samples.y)))}). Their polygons have no pixel with valid values for "
+           "every stored feature. Extract samples only for the features you use "
+           "(`geocrop samples --groups ts ...`, `extract(features=...)`, config `model.feature_groups`), fix the "
+           "composites, or accept the reduced class set explicitly (--allow-missing-classes, config "
+           "`model.allow_missing_classes: true`).")
+    if not allow_missing:
+        raise MissingClassError(msg)
+    warnings.warn(msg, SampleCoverageWarning, stacklevel=2)
+    return missing
+
+
 def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_field: str = "class_name",
             id_field: str = "polygon_id", max_per_polygon: int | None = 250, inner_buffer_m: float = 0.0,
             seed: int = 42, region_field: str | None = None, year_field: str | None = None,
-            year: str | int | None = None) -> Samples:
+            year: str | int | None = None, features: list[str] | None = None) -> Samples:
     """Sample valid pixels whose centres fall inside each reference polygon.
 
     max_per_polygon caps large polygons so they do not dominate a class; inner_buffer_m
     (e.g. 10-20 m) removes mixed boundary pixels from training. region_field / year_field copy a
     polygon attribute into per-sample group metadata; `year` sets one constant year for all samples
     (a single-season stack). Missing attribute values are refused.
+
+    `features` (band names, e.g. ``features.select(manifest, groups=["ts"])``) reads, validates and stores
+    only those bands: a pixel needs valid values for the selected features only, so NaN in unrelated
+    groups (e.g. phenology metrics of flat series) no longer removes whole polygons. The classes of all
+    polygons intersecting the stack are stored as `Samples.reference_classes` (see `check_classes`).
     """
     if year_field and year is not None:
         raise ValueError("Pass either year_field or a constant year, not both")
@@ -210,6 +253,15 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
         if inner_buffer_m:
             gdf["geometry"] = gdf.geometry.buffer(-abs(inner_buffer_m))
         names = feature_names(ds)
+        indexes = None
+        if features is not None:
+            features = list(dict.fromkeys(map(str, features)))
+            unknown = [f for f in features if f not in names]
+            if unknown or not features:
+                raise ValueError(f"Features not in stack {ds.name}: {unknown[:5] or '(empty selection)'}")
+            indexes = [names.index(f) + 1 for f in features]
+            names = features
+        intersecting_classes: set[str] = set()
         for row in gdf.itertuples():
             geom = row.geometry
             if geom is None or geom.is_empty:
@@ -218,7 +270,8 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             if win is None:
                 continue
             intersecting += 1
-            cube = read_block(ds, window=win)
+            intersecting_classes.add(str(getattr(row, label_field)))
+            cube = read_block(ds, indexes, window=win)
             transform = ds.window_transform(win)
             inside = geometry_mask([geom], out_shape=cube.shape[1:], transform=transform, invert=True)
             rr, cc = np.nonzero(inside & valid_mask(cube, ds.nodata))
@@ -254,14 +307,15 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             f"{sum(emptied.values())} of {intersecting} {source} have no pixel with valid values for every feature "
             f"(nodata/NaN) and were skipped; per class: {dict(sorted(emptied.items()))}"
             + (f". Classes left WITHOUT any sample: {lost}" if lost else "")
-            + ". Check the composites or restrict the stack to feature groups that are valid there.",
+            + ". Check the composites or extract only the feature groups you use (`--groups`/`features=`).",
             SampleCoverageWarning, stacklevel=2)
     if year is not None:
         years = [str(year)] * len(y)
     return Samples(np.concatenate(X).astype("float32"), np.array(y), np.array(pid),
                    np.concatenate(xs), np.concatenate(ys), names, crs,
                    region=np.array(regions) if region_field else None,
-                   year=np.array(years) if years else None)
+                   year=np.array(years) if years else None,
+                   reference_classes=np.array(sorted(intersecting_classes)))
 
 
 def _year_id(value) -> str:

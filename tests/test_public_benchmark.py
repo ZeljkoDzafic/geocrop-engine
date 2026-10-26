@@ -200,7 +200,8 @@ class _Session:
 
 
 def test_fetch_waits_for_staged_file_and_verifies_checksum(tmp_path, monkeypatch):
-    monkeypatch.setattr(public_data.time, "sleep", lambda s: None)
+    from geocrop import downloads
+    monkeypatch.setattr(downloads, "_sleep", lambda s: None)
     body = b"tiff bytes"
     md5 = "md5:" + hashlib.md5(body).hexdigest()
     session = _Session([_Response(503, b"<html>loading from tape</html>", {"retry-after": "1",

@@ -27,7 +27,7 @@ from rasterio.windows import Window
 from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
-from . import applicability, contracts, faultinject, metrics, splits, uncertainty
+from . import applicability, attribution, contracts, faultinject, metrics, splits, uncertainty
 from .estimators import importances, make_estimator, predict_labels, sequence_params
 from .hashing import sha256
 from .raster import (
@@ -40,7 +40,7 @@ from .raster import (
     read_block,
     valid_mask,
 )
-from .samples import Samples
+from .samples import Samples, check_classes
 
 RF_KEYS = ("algorithm", "n_estimators", "max_features", "min_samples_leaf", "max_depth", "class_weight", "n_jobs",
            "max_samples", "learning_rate", "num_leaves", "epochs", "n_channels")
@@ -198,6 +198,22 @@ def _fold_plan(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates
     return out
 
 
+def fold_plan_signature(test_indices) -> str:
+    """Short hash of a fold assignment (the ordered test-index arrays): equal signatures = identical folds.
+
+    Same value as `geocrop.benchmark.fold_signature` for the same samples, block size, folds and seed."""
+    import hashlib
+
+    def digest(values) -> str:
+        values = np.ascontiguousarray(values)
+        h = hashlib.sha256()
+        h.update(str(values.dtype).encode())
+        h.update(str(values.shape).encode())
+        h.update(memoryview(values).cast("B"))
+        return h.hexdigest()
+    return hashlib.sha256(json.dumps([[k, digest(te)] for k, te in enumerate(test_indices)]).encode()).hexdigest()[:16]
+
+
 def folds(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates=None, crs=None,
           spatial_buffer_m: float = 0, strategy: str = "spatial_blocks"):
     """Spatial-group folds; an optional metric buffer purges whole nearby training polygons.
@@ -223,9 +239,9 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
     oof_proba = None
     per_fold = []
     classes = np.unique(y)
-    for k, (tr, te, diagnostics) in enumerate(_fold_plan(
-            y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
-            spatial_buffer_m=spatial_buffer_m, strategy=strategy)):
+    plan = _fold_plan(y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
+                      spatial_buffer_m=spatial_buffer_m, strategy=strategy)
+    for k, (tr, te, diagnostics) in enumerate(plan):
         rf = make_rf(params, seed + k).fit(X[tr], y[tr])
         oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
@@ -245,6 +261,7 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
     if strategy != "spatial_blocks":
         pooled["_evaluated"] = done   # removed before JSON export
     pooled["strategy"] = strategy
+    pooled["fold_signature"] = fold_plan_signature([te for _, te, _ in plan])
     pooled["unevaluated_samples"] = int((~done).sum())
     pooled["folds"] = per_fold
     pooled["spatial_buffer_m"] = spatial_buffer_m
@@ -304,8 +321,9 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
     chosen = []
     xy = None if coordinates is None else np.asarray(coordinates)
     inner_groups = np.asarray(groups if inner_groups is None else inner_groups)
-    for k, (tr, te, diag) in enumerate(_fold_plan(y, groups, n_outer, seed, polygon=polygon, coordinates=xy,
-                                                  crs=crs, spatial_buffer_m=spatial_buffer_m, strategy=strategy)):
+    plan = _fold_plan(y, groups, n_outer, seed, polygon=polygon, coordinates=xy, crs=crs,
+                      spatial_buffer_m=spatial_buffer_m, strategy=strategy)
+    for k, (tr, te, diag) in enumerate(plan):
         inner = tune(X[tr], y[tr], polygon[tr], inner_groups[tr], base, grid, n_inner, seed + k,
                      coordinates=None if xy is None else xy[tr], crs=crs, spatial_buffer_m=spatial_buffer_m)
         params = {**base, **inner["best_params"]}
@@ -317,6 +335,7 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
     done = np.array([v is not None for v in oof])
     s = metrics.summary(y[done], oof[done].astype(str), labels=classes)
     s["selected_params_per_fold"] = chosen
+    s["fold_signature"] = fold_plan_signature([te for _, te, _ in plan])
     s["note"] = "Nested spatial CV: outer-fold scores of the full tuning procedure (not optimistic)."
     if strategy != "spatial_blocks":
         s["strategy"] = strategy
@@ -471,7 +490,8 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
           bootstrap: int = 1000, provenance: dict | None = None, calibrate: bool = True,
           conformal_alphas=(0.05, 0.1, 0.2), spatial_buffer_m: float = 0,
           calibration_mode: str = "oof", calibration_fraction: float = 0.2, holdout_fraction: float = 0.0,
-          refit_all: bool = True, inner_splits: int = 3, cv_strategy: str = "spatial_blocks") -> dict:
+          refit_all: bool = True, inner_splits: int = 3, cv_strategy: str = "spatial_blocks",
+          allow_missing_classes: bool = False) -> dict:
     """Spatial CV (optionally after tuning), then fit the mapping model on its proper-training samples.
 
     From the out-of-fold probabilities it also fits a temperature (calibration), empirical
@@ -494,6 +514,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
       outputs are unchanged.
     """
     splits.check_strategy(cv_strategy)
+    missing_classes = check_classes(samples, allow_missing_classes, "train")
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     features = features or samples.features
@@ -514,6 +535,8 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
                     "spatial_groups": int(len(np.unique(groups))), "spatial_block_m": spatial_block_m,
                     "class_counts": pd.Series(y).value_counts().to_dict(),
                     "polygon_counts": pd.Series(samples.polygon).groupby(y).nunique().to_dict()}
+    if missing_classes:
+        report["reference_classes_without_samples"] = missing_classes
     spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
                "spatial_buffer_m": spatial_buffer_m}
     report["spatial_buffer_m"] = spatial_buffer_m
@@ -774,6 +797,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
             for destination in (c_dst, u_dst):
                 destination.update_tags(model_sha256=model_sha256)
             describe(p_dst)
+            for destination in (c_dst, p_dst, u_dst):    # Copernicus attribution of the feature stack, if any
+                attribution.propagate([stack], destination)
             if smooth is not None:
                 for destination in (c_dst, p_dst, u_dst):
                     destination.update_tags(smoothing=json.dumps(smooth))

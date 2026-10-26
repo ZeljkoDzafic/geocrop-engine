@@ -19,6 +19,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling
 
+from . import attribution
 from . import scenes as scene_meta
 from .indices import S1_POLARISATIONS
 from .raster import NODATA, blocks, float_profile, read_aligned
@@ -113,6 +114,7 @@ def import_geotiff(geotiff: str | Path, out: str | Path, product_name: str, orbi
             with rasterio.open(out / f"{pol}.tif", "w", **float_profile(src)) as dst:
                 dst.write(data, 1)
                 dst.set_band_description(1, f"{backscatter}_{pol}_linear")
+                dst.update_tags(**attribution.tags([scene_meta.parse_product_name(product_name).get("datetime")]))
     meta = scene_meta.parse_product_name(product_name)
     scene_meta.write(out, **meta, orbit_direction=orbit_direction, backscatter=backscatter, source=product_name)
     return out
@@ -147,6 +149,7 @@ def composite(scene_dirs, out_dir, reference: str | Path, separate_orbits: bool 
             try:
                 for pol in S1_POLARISATIONS:
                     with rasterio.open(out_dir / f"{prefix}{pol}.tif", "w", **profile) as dst:
+                        attribution.propagate([m["path"] / f"{pol}.tif" for m in members], dst)
                         for w in blocks(ref.width, ref.height, block_size):
                             shape = (int(w.height), int(w.width))
                             layers = []

@@ -268,3 +268,14 @@ def test_cli_preflight_and_clean(study, tmp_path, capsys):
     cli.main(["clean", "--config", str(cfg_path), "--dry-run"])
     out = json.loads(capsys.readouterr().out)
     assert out["dry_run"] is True and "would_remove" in out
+
+
+def test_unloadable_estimator_backend_blocks_preflight(study, monkeypatch):
+    """Same rule as train/benchmark: a missing or unloadable optional backend is reported, never a crash."""
+    from geocrop import estimators
+    monkeypatch.setattr(estimators, "backend_error",
+                        lambda algo: "lightgbm is installed but cannot load its native library (dlopen)"
+                        if algo == "lightgbm" else None)
+    report = preflight.run(_cfg(study, model={"algorithm": "lightgbm"}))
+    assert "model.backend" in codes(report, "error") and report["verdict"] == "blocked"
+    assert "model.backend" in codes(preflight.run(_cfg(study)), "pass")

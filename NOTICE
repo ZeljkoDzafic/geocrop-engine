@@ -2,5 +2,53 @@ GeoCrop Engine
 Copyright 2026 Željko Džafić and Dragutin Adžić
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-Copernicus Sentinel data, ESA SNAP and third-party Python libraries retain
-their own licences and terms of use; none are redistributed here.
+
+Third-party material included in this repository and/or the distributed package
+-------------------------------------------------------------------------------
+
+* Leaflet 1.9.4 (src/geocrop/web_static/vendor/leaflet/, shipped in the package)
+  BSD 2-Clause License. Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade.
+  The full licence text is in src/geocrop/web_static/vendor/leaflet/LICENSE.
+
+* Code adapted from Presto (src/geocrop/presto_encoder.py), nasaharvest/presto at commit 11e207a6.
+  MIT License. Copyright (c) 2024 Presto Authors.
+
+* Code adapted from Galileo (src/geocrop/galileo_encoder.py), nasaharvest/galileo at commit 0f0b5b95.
+  MIT License. Copyright (c) 2024 Presto Authors.
+
+* Code adapted from AnySat (src/geocrop/anysat_encoder.py), gastruc/AnySat at commit 5f6f475e, including the
+  relative position encoding of iRPE (microsoft/Cream, MIT License, Copyright (c) Microsoft Corporation) as
+  modified by the AnySat authors. MIT License. Copyright (c) 2023 Damien ROBERT.
+
+  For the three adapted modules above: Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute,
+  sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do
+  so, subject to the following conditions: The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+  WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+* HCAT mapping tables (configs/hcat/*.csv; repository only, not in the wheel)
+  Adapted from the Hierarchical Crop and Agriculture Taxonomy HCAT3 of EuroCrops (Schneider et al., 2023;
+  Zenodo doi:10.5281/zenodo.14094196). Licensed under CC-BY-SA-4.0, NOT under Apache-2.0; see
+  configs/hcat/LICENSE-HCAT.md for the attribution and the changes made.
+
+Data, models and services used at run time (never bundled; downloaded or accessed by the user)
+-----------------------------------------------------------------------------------------------
+
+* Copernicus Sentinel-1/-2 data: free, full and open under the Copernicus Sentinel data terms. Rasters derived
+  from them carry "Contains modified Copernicus Sentinel data <year>" (GeoTIFF tag GEOCROP_ATTRIBUTION, COG
+  exports and STAC items).
+* Model checkpoints and weights (Fields of The World, Presto, Galileo, AnySat, OmniCloudMask) and public
+  datasets (EuroCrops, WorldCereal crop calendars, AlphaEarth, TESSERA) keep their own licences; see
+  docs/licences-and-weights.md. ShareAlike (CC-BY-SA) data and labels derived from them must be shared under the
+  same terms; non-commercial FTW checkpoints are refused unless explicitly allowed.
+* Optional web-map basemaps: OpenStreetMap tiles (data ODbL, "© OpenStreetMap contributors"; OSMF tile usage
+  policy) and EOX Sentinel-2 cloudless (CC-BY-NC-SA-4.0, NON-COMMERCIAL use only: commercial deployments must
+  disable it or obtain a licence from EOX IT Services GmbH). Both are off by default.
+* ESA SNAP and the third-party Python libraries installed as dependencies retain their own licences; none is
+  redistributed in this repository. A binary bundle such as a Docker image additionally contains those
+  libraries (e.g. GEOS, LGPL-2.1, inside the shapely wheel) and must carry their notices.

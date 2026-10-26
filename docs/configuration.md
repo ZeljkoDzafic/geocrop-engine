@@ -43,6 +43,8 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `cv_folds`, `spatial_block_m` | 5, 5000 | spatial CV |
 | | `spatial_buffer_m` | 0 | per-fold distance exclusion: purge entire training polygons near held-out sampled pixels; 0 disables |
 | | `tune_grid` | null | e.g. `{max_features: [sqrt, 0.3], min_samples_leaf: [1, 3]}` |
+| | `feature_groups` | null | train on these feature groups only (e.g. `[s2_band, s2_index, ts, harmonic]`); the samples stage then extracts only their features, so NaN in other groups does not remove polygons |
+| | `allow_missing_classes` | false | train although a class of the reference polygons has no sample left; by default the run fails (`MissingClassError`) |
 | | `params` | `{}` | estimator-specific hyperparameters passed to the estimator unchanged (e.g. a plugin's own settings); overrides the shared keys above; validated against the estimator's constructor (see below) |
 | `cv` | `strategy` | `spatial_blocks` | `region`, `year`, `region_year` add leave-one-group-out transfer validation ([protocols](validation-protocols.md)); used by `geocrop run` (train, experiments) and `geocrop ablation --config` |
 | | `region_field`, `year_field`, `year` | null | polygon attributes (or a constant year) to store as sample group ids (samples stage of `geocrop run`); CLI `geocrop samples --region-field/--year-field/--year` |

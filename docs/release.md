@@ -60,25 +60,31 @@ job at the end of `.github/workflows/release.yml`. No API token is stored in the
 
 ## Reproducible installs
 
-`constraints/py312.txt` pins every runtime dependency of the `all`, `stac` and `web` extras to the set that
-passed the test suite and `pip-audit`:
+`constraints/py312.txt` pins every runtime dependency of **every** optional extra (`all`, `boost`, `cloud`,
+`cube`, `deep`, `dev`, `ftw`, `openeo`, `parquet`, `plots`, `segmentation`, `stac`, `web`) to the set that
+passed the test suite and `pip-audit`; any subset of extras can be installed against it:
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
-python -m pip install -e '.[all,stac,web]' -c constraints/py312.txt   # add dev for tests
+python -m pip install -e '.[all,stac,web]' -c constraints/py312.txt   # add dev for tests, deep/ftw for torch ...
 ```
 
-Regenerate it in a clean environment (never from a development venv):
+Regenerate it in a clean environment (never from a development venv). Installing with the previous file as
+constraints keeps the existing pins and only resolves packages that are new; drop `-c` to move every pin:
 
 ```bash
+EXTRAS=all,boost,cloud,cube,deep,dev,ftw,openeo,parquet,plots,segmentation,stac,web
 python3.12 -m venv /tmp/geocrop-pins && /tmp/geocrop-pins/bin/python -m pip install --upgrade pip
-/tmp/geocrop-pins/bin/python -m pip install -e '.[all,stac,web]'
+/tmp/geocrop-pins/bin/python -m pip install -c constraints/py312.txt -e ".[$EXTRAS]"
 /tmp/geocrop-pins/bin/python -m pip freeze --exclude-editable   # replace the pins below the header
-pip-audit -r constraints/py312.txt
+/tmp/geocrop-pins/bin/pip-audit -r constraints/py312.txt --no-deps --disable-pip
 ```
 
-The conda `environment.yml` and the Docker image resolve current conda-forge packages; for an exact rebuild use
-an image built from a tag (or its digest) rather than rebuilding later.
+The Docker image installs the engine with CPython 3.12 from this file (`docker build --build-arg
+EXTRAS=all,stac,web,deep .` selects the extras), so a rebuild reproduces the same Python packages; the base
+image (`python:3.12-slim-bookworm`) and its Debian packages are not pinned by digest. The conda
+`environment.yml` resolves current conda-forge packages; for an exact rebuild use an image built from a tag
+(or its digest) rather than rebuilding later.
 
 ## Rollback
 

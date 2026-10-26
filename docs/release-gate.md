@@ -69,11 +69,12 @@ then add `plugin-contracts/<new version>` with a short migration note to `CHANGE
 
 ## Clean machine: Docker proxy and the real VM
 
-The Docker checks are a **proxy** for a clean machine: the image starts from `mambaorg/micromamba` and installs
-the engine from `environment.yml`, so they prove that a machine with nothing but Docker can install and run the
-engine and recover from a crash. They do not replace a real VM: the container shares the host kernel and CPU
-architecture (arm64 on a Mac workstation), resolves unpinned conda-forge packages (Python 3.11) instead of
-`constraints/py312.txt`, and does not exercise `deploy/setup_ubuntu.sh`, systemd units or the target network.
+The Docker checks are a **proxy** for a clean machine: the image starts from `python:3.12-slim-bookworm` and
+installs the engine (extras `all,stac,web`) from the pinned `constraints/py312.txt`, so they prove that a machine
+with nothing but Docker can install and run the engine and recover from a crash. They do not replace a real VM:
+the container shares the host kernel and CPU architecture (arm64 on a Mac workstation), does not install the
+torch/boost/cloud extras (the clean venv does), and does not exercise `deploy/setup_ubuntu.sh` (conda path),
+systemd units or the target network.
 
 On the target Ubuntu 24.04 VM (for example the Telelink research VM provisioned with `deploy/setup_ubuntu.sh`):
 

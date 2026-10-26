@@ -232,6 +232,9 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--region-field", help="polygon attribute stored as sample region id (leave-one-region-out)")
     x.add_argument("--year-field", help="polygon attribute stored as sample year id (leave-one-year-out)")
     x.add_argument("--year", help="constant year id for all samples of this single-season stack")
+    x.add_argument("--groups", nargs="*", help="extract only these feature groups of the stack manifest (e.g. ts); "
+                   "a pixel then needs valid values for these features only")
+    x.add_argument("--feature-names", nargs="*", help="extract only these features (combined with --groups: AND)")
 
     x = cmd("train", "Spatial CV + final Random Forest")
     x.add_argument("--samples", required=True)
@@ -251,6 +254,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--calibration-fraction", type=float, default=0.2, help="fraction of spatial groups held out")
     x.add_argument("--cv-strategy", choices=["spatial_blocks", "region", "year", "region_year"],
                    default="spatial_blocks", help="add leave-one-region/year-out transfer validation to the report")
+    x.add_argument("--allow-missing-classes", action="store_true",
+                   help="train although a class of the reference polygons has no sample (default: refuse)")
 
     x = cmd("benchmark", "Compare classifiers on identical spatial folds; internal model selection only")
     x.add_argument("--samples", required=True)
@@ -263,6 +268,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--buffer-m", type=float)
     x.add_argument("--folds", type=int)
     x.add_argument("--seed", type=int)
+    x.add_argument("--allow-missing-classes", action="store_true",
+                   help="benchmark although a class of the reference polygons has no sample (default: refuse)")
 
     x = cmd("predict", "Blockwise prediction: classes, probabilities, uncertainty")
     x.add_argument("--features", required=True)
@@ -529,6 +536,10 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
 
     x = cmd("cloudmask", "Write CLOUDMASK.tif for S2 scene folders with OmniCloudMask (optional dependency)")
     x.add_argument("--scenes", nargs="+", required=True)
+    x.add_argument("--weights-dir", help="pinned OmniCloudMask weights (default $GEOCROP_CACHE/omnicloudmask/"
+                   "<revision>; downloaded and SHA-256 verified on first use)")
+    x.add_argument("--unpinned-weights", action="store_true",
+                   help="let the omnicloudmask package pick and download its own weights (not reproducible)")
 
     x = cmd("export", "Publish a prediction directory: COGs, STAC item, optional GeoParquet parcels")
     x.add_argument("--prediction", required=True)
@@ -552,6 +563,11 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--repeats", type=int, default=3)
     x.add_argument("--holdout", type=float, default=0.0)
     x.add_argument("--targets", nargs="*", default=[])
+    x.add_argument("--params", type=_json_arg,
+                   help='per-model parameter overrides as JSON, e.g. {"ltae": {"epochs": 30}, "rf": {"n_estimators": 200}}')
+    x.add_argument("--epochs", type=int, help="training epochs of the temporal deep models (tempcnn, ltae)")
+    x.add_argument("--allow-missing-classes", action="store_true",
+                   help="benchmark although a class of the reference polygons has no sample (default: refuse)")
 
     x = cmd("benchmark-segmentation", "OBIA (with/without seam merging) vs U-Net against reference parcels")
     x.add_argument("--raster", required=True)
@@ -576,7 +592,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--checkpoint", help="local checkpoint file instead of a registry download")
     x.add_argument("--allow-noncommercial", action="store_true",
                    help="permit FULL (non-commercial training data) checkpoints; prints a licence warning")
-    x.add_argument("--cache-dir", help="checkpoint cache (default $GEOCROP_FTW_CACHE or ~/.cache/geocrop/ftw)")
+    x.add_argument("--cache-dir", help="checkpoint cache (default $GEOCROP_CACHE/ftw, i.e. ~/.cache/geocrop/ftw)")
     x.add_argument("--no-download", action="store_true", help="fail if the checkpoint is not cached")
     x.add_argument("--download-only", action="store_true")
     x.add_argument("--list-models", action="store_true")
@@ -594,7 +610,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x = cmd("benchmark-public", "Run a frozen public benchmark protocol (EuroCrops parcels + Sentinel-2 from STAC)")
     x.add_argument("--protocol", required=True, help="versioned protocol YAML, e.g. configs/benchmarks/*.yaml")
     x.add_argument("--work", required=True, help="working directory (scenes, composites, results.json/.md)")
-    x.add_argument("--cache", help="download cache; default $GEOCROP_DATA_CACHE or ~/.cache/geocrop/public")
+    x.add_argument("--cache", help="download cache; default $GEOCROP_CACHE/public, i.e. ~/.cache/geocrop/public")
     x.add_argument("--models", nargs="*", help="subset of the protocol's models (default all)")
     x.add_argument("--workers", type=int, default=4, help="parallel scene imports")
     x.add_argument("--layer", help="local copy of the EuroCrops layer instead of the pinned download")
@@ -1151,8 +1167,14 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             sys.exit(2)
     elif c == "samples":
         from .samples import extract
+        selected = None
+        if a.groups:
+            from .features import load_manifest, select
+            selected = select(load_manifest(a.features), groups=a.groups, names=a.feature_names or None)
+        elif a.feature_names:
+            selected = list(a.feature_names)
         s = extract(a.features, a.polygons, a.label_field, a.id_field, a.max_per_polygon, a.inner_buffer_m,
-                    region_field=a.region_field, year_field=a.year_field, year=a.year)
+                    region_field=a.region_field, year_field=a.year_field, year=a.year, features=selected)
         print(s.save(a.out))
     elif c == "train":
         from .features import load_manifest, select
@@ -1166,7 +1188,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             params["algorithm"] = a.algorithm
         r = train(s, a.out, feats, params, a.folds, a.block_m, tune_grid=a.tune, calibrate=not a.no_calibrate,
                   holdout_fraction=a.holdout, spatial_buffer_m=a.buffer_m, calibration_mode=a.calibration_mode,
-                  calibration_fraction=a.calibration_fraction, cv_strategy=a.cv_strategy)
+                  calibration_fraction=a.calibration_fraction, cv_strategy=a.cv_strategy,
+                  allow_missing_classes=a.allow_missing_classes)
         _print({k: r["cross_validation"][k] for k in ("overall_accuracy", "kappa", "macro_f1", "fold_macro_f1_std")})
         if "transfer_validation" in r:
             _print({"transfer_gap": r["transfer_validation"]["transfer_gap"],
@@ -1190,7 +1213,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                      seed=a.seed if a.seed is not None else cfg["seed"],
                      spatial_buffer_m=a.buffer_m if a.buffer_m is not None else m["spatial_buffer_m"],
                      calibration_mode=m["calibration_mode"], calibration_fraction=m["calibration_fraction"],
-                     holdout_fraction=m["holdout_fraction"])
+                     holdout_fraction=m["holdout_fraction"], allow_missing_classes=a.allow_missing_classes)
         _print({"status": report["status"], "summary": report["summary"], "note": report["note"]})
         if report["status"] != "complete":
             sys.exit(2)
@@ -1406,9 +1429,16 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         r = rank(a.parcels, a.out, a.n, a.min_spacing_m, a.per_class)
         _print({"selected": len(r), "out": a.out})
     elif c == "cloudmask":
-        from .clouds import omnicloudmask_scene
+        from .clouds import OMNICLOUDMASK_REVISION, omnicloudmask_files, omnicloudmask_scene
+        weights_dir = None
+        if not a.unpinned_weights:
+            from .cachedirs import cache_dir
+            from .downloads import fetch
+            weights_dir = Path(a.weights_dir or cache_dir("omnicloudmask") / OMNICLOUDMASK_REVISION[:12])
+            for f in omnicloudmask_files():
+                fetch(f["url"], weights_dir / f["name"], f"sha256:{f['sha256']}", size=f["size"])
         for sdir in a.scenes:
-            print(omnicloudmask_scene(sdir))
+            print(omnicloudmask_scene(sdir, model_dir=weights_dir))
     elif c == "export":
         from .export import read_hcat, stac_item, to_cog, to_geoparquet
         out = Path(a.out)
@@ -1432,9 +1462,20 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         if a.groups:
             from .features import load_manifest, select
             feats = select([f for f in load_manifest(a.features) if f.name in s.features], groups=a.groups)
-        cands = {m: benchmark.candidate(m) for m in a.models}
+        overrides = a.params or {}
+        if not isinstance(overrides, dict) or not all(isinstance(v, dict) for v in overrides.values()):
+            raise ValueError('--params must map model names to parameter objects, e.g. {"ltae": {"epochs": 30}}')
+        unknown = sorted(set(overrides) - set(a.models))
+        if unknown:
+            raise ValueError(f"--params names models that are not benchmarked: {unknown}")
+        cands = {}
+        for m in a.models:
+            cands[m] = {**benchmark.candidate(m), **overrides.get(m, {})}
+            if a.epochs is not None and m in benchmark.SEQUENCE_MODELS and "epochs" not in overrides.get(m, {}):
+                cands[m]["epochs"] = a.epochs
         t = benchmark.models(s, a.out, feats, cands, a.grids, a.folds, a.block_m, repeats=a.repeats,
-                             holdout_fraction=a.holdout, targets=a.targets)
+                             holdout_fraction=a.holdout, targets=a.targets,
+                             allow_missing_classes=a.allow_missing_classes)
         print(t.to_string(index=False))
     elif c == "benchmark-segmentation":
         from . import benchmark

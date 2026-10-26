@@ -70,14 +70,42 @@ def _first_line(exc: BaseException) -> str:
     return (str(exc).splitlines() or [type(exc).__name__])[0][:200]
 
 
-def _lightgbm(p: dict, seed: int):
+#: Optional third-party module behind each built-in algorithm and the install hint for a missing one (extras:
+#: `boost` for lightgbm/catboost, `deep` for torch). The hint text is recorded in published benchmark results.
+BACKENDS = {"lightgbm": ("lightgbm", "pip install lightgbm"), "catboost": ("catboost", "pip install catboost"),
+            "tempcnn": ("torch", "pip install torch"), "ltae": ("torch", "pip install torch")}
+
+
+def backend_error(algorithm: str) -> str | None:
+    """Why the optional backend of `algorithm` cannot be used (None when it loads or none is needed).
+
+    One rule for every caller (train, benchmark, benchmark-models, benchmark-public, preflight): a missing
+    package and an installed package whose native library cannot be loaded (OSError, e.g. LightGBM without
+    libomp on macOS, a torch wheel for another CPU) are both reported as unavailable, never as a crash."""
+    import importlib
+
+    module, hint = BACKENDS.get(algorithm, (None, None))
+    if module is None:
+        return None
     try:
-        from lightgbm import LGBMClassifier
-    except ImportError as exc:
-        raise RuntimeError("pip install lightgbm") from exc
-    except OSError as exc:  # installed, but its native library (libomp on macOS) cannot be loaded
-        raise RuntimeError(f"lightgbm is installed but cannot load its native library ({_first_line(exc)}); "
-                           "on macOS install OpenMP with `brew install libomp`") from exc
+        importlib.import_module(module)
+    except ImportError:
+        return hint
+    except OSError as exc:  # installed, but its native library cannot be loaded
+        mac = "; on macOS install OpenMP with `brew install libomp`" if module == "lightgbm" else ""
+        return f"{module} is installed but cannot load its native library ({_first_line(exc)}){mac}"
+    return None
+
+
+def _require(algorithm: str) -> None:
+    reason = backend_error(algorithm)
+    if reason:
+        raise RuntimeError(reason)
+
+
+def _lightgbm(p: dict, seed: int):
+    _require("lightgbm")
+    from lightgbm import LGBMClassifier
     if p.get("class_weight") == "balanced_subsample":
         p["class_weight"] = "balanced"
     p.setdefault("verbosity", -1)
@@ -87,12 +115,8 @@ def _lightgbm(p: dict, seed: int):
 
 
 def _catboost(p: dict, seed: int):
-    try:
-        from catboost import CatBoostClassifier
-    except ImportError as exc:
-        raise RuntimeError("pip install catboost") from exc
-    except OSError as exc:
-        raise RuntimeError(f"catboost is installed but cannot load its native library ({_first_line(exc)})") from exc
+    _require("catboost")
+    from catboost import CatBoostClassifier
     kw = {"iterations": p.get("n_estimators", 500), "depth": p.get("max_depth") or 6,
           "learning_rate": p.get("learning_rate"), "auto_class_weights": "Balanced" if p.get("class_weight") else None,
           "thread_count": p.get("n_jobs", -1), "verbose": False, "random_seed": seed,

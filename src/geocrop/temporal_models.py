@@ -35,7 +35,9 @@ def _torch():
         import torch
     except ImportError as exc:  # optional dependency
         raise RuntimeError("Temporal deep-learning classifiers need PyTorch: pip install torch "
-                           "(or the geocrop 'dl' extra)") from exc
+                           '(extra: pip install -e ".[deep]")') from exc
+    except OSError as exc:      # installed, but its native library cannot be loaded
+        raise RuntimeError(f"torch is installed but cannot load its native library ({exc})") from exc
     return torch
 
 

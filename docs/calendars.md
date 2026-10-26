@@ -56,7 +56,7 @@ and record the command in the study's provenance. A calendar derived from parcel
 geocrop calendar worldcereal --lon 16.17 --lat 46.62 --out outputs/calendars/worldcereal_pomurje.json
 ```
 
-Downloads (once, into `$GEOCROP_DATA_CACHE` or `~/.cache/geocrop/public`) the four 0.5° GeoTIFFs
+Downloads (once, into `$GEOCROP_CACHE/public`, default `~/.cache/geocrop/public`) the four 0.5° GeoTIFFs
 `M1_SOS/M1_EOS` (maize, first season) and `WW_SOS/WW_EOS` (winter wheat) and samples them at the location. The files
 are SHA-256-pinned in `geocrop.public_data.WORLDCEREAL_CHECKSUMS`. PANGAEA keeps them on tape: the first request
 answers HTTP 503 while the file is staged, and the download waits (up to 15 minutes) until it is available.

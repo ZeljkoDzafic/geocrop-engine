@@ -266,7 +266,7 @@ def test_cli_galileo_with_local_weights(tmp_path, monthly):
 
 def test_fetch_weights_verifies_every_file(tmp_path, monkeypatch):
     calls = []
-    monkeypatch.setattr(embedding_sources, "download", lambda url, target, sha256=None, session=None:
+    monkeypatch.setattr(embedding_sources, "download", lambda url, target, sha256=None, session=None, size=None:
                         calls.append((url, target.name, sha256)) or target)
     paths = embedding_sources.fetch_weights(feature_providers.get("galileo"), tmp_path)
     assert [c[1] for c in calls] == [w.name for w in feature_providers.get("galileo").weights]

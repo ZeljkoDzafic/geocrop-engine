@@ -387,14 +387,30 @@ torch.save({{f"encoder.{{k}}": v for k, v in m.state_dict().items()}}, {str(stan
         if not n_ts:
             raise StepError("ts-features wrote no `ts` group")
         samples = self.work / "ts" / "samples_ts.npz"
-        self.cli("samples", "--features", ts, "--polygons", st["training"], "--out", samples, "--max-per-polygon", "30")
+        # extract only the `ts` features the temporal models use: phenology metrics are NaN where no season is
+        # detected (winter crops whose season starts before the series), which used to drop the whole class
+        self.cli("samples", "--features", ts, "--polygons", st["training"], "--out", samples, "--max-per-polygon", "30",
+                 "--groups", "ts")
         coverage = polygon_coverage(samples, st["training"])
+        # the guard: the same path on every feature must refuse to benchmark a reduced class set (exit != 0)
+        all_feats = self.work / "ts" / "samples_all.npz"
+        self.cli("samples", "--features", ts, "--polygons", st["training"], "--out", all_feats, "--max-per-polygon",
+                 "30")
+        guard_cov = polygon_coverage(all_feats, st["training"])
+        guard = None
+        if guard_cov["missing_classes"]:
+            self.cli("benchmark-models", "--samples", all_feats, "--out", self.work / "bench" / "guard", "--models", "rf",
+                     "--block-m", BLOCK_M, "--folds", FOLDS, "--repeats", "1", expect=(1,))
+            guard = {"missing_classes": guard_cov["missing_classes"], "exit_code": 1,
+                     "message": (self._last_stderr.strip().splitlines() or [""])[-1][:300]}
+            if "MissingClassError" not in self._last_stderr:
+                raise StepError(f"benchmark-models accepted samples that lost classes {guard_cov['missing_classes']}")
         common = ["--samples", samples, "--features", ts, "--groups", "ts", "--block-m", BLOCK_M, "--folds", FOLDS,
                   "--repeats", "1"]
         models = ["ltae", "rf", "catboost"]
         missing = has_module("torch", "catboost")
         if missing:
-            raise Skip(f"optional model dependencies missing: {missing} (pip install -e '.[deep,boosting]')")
+            raise Skip(f"optional model dependencies missing: {missing} (pip install -e '.[deep,boost]')")
         joint = self.work / "bench" / "joint"
         self.cli("benchmark-models", "--out", joint, "--models", *models, *common, timeout=1800)
         import pandas as pd
@@ -405,6 +421,10 @@ torch.save({{f"encoder.{{k}}": v for k, v in m.state_dict().items()}}, {str(stan
             raise StepError(f"benchmark-models statuses: {status}")
         report = json.loads((joint / "benchmark_models.json").read_text())
         sig = report["fold_signature"]
+        per_model = report.get("fold_signatures_per_model") or {}
+        if set(per_model) != set(models) or len({tuple(v) for v in per_model.values()}) != 1 \
+                or any(v[0] != sig for v in per_model.values()):
+            raise StepError(f"per-model fold signatures differ: {per_model} (run signature {sig})")
         # fold identity: (a) separate single-model runs must reproduce the same fold signature,
         # (b) the signature must match an independent recomputation from the samples.
         sigs = {"joint": sig}
@@ -431,19 +451,13 @@ torch.save({{f"encoder.{{k}}": v for k, v in m.state_dict().items()}}, {str(stan
                               for r in table.itertuples()},
                    "metrics_note": "SYNTHETIC data", "reference_model": report["reference_model"],
                    "fold_signature": sig, "fold_signatures_per_run": sigs, "fold_signature_recomputed": recomputed,
+                   "fold_signatures_per_model": per_model, "lost_class_guard": guard,
                    "mcnemar_p_vs_reference": mc, "outputs": [str(joint / "benchmark_models.csv"),
                                                              str(joint / "benchmark_models.json")],
-                   "limitation": "benchmark_models.json stores one fold signature per run, not per model; "
-                                 "identity across models is shown by identical signatures of separate "
-                                 "single-model runs and an independent recomputation",
                    "reference_coverage": coverage})
-        if coverage["dropped_polygons_per_class"]:
-            raise StepError(
-                "samples from the ts-features stack silently dropped reference polygons "
-                f"{coverage['dropped_polygons_per_class']} (classes without any sample: {coverage['missing_classes']}); "
-                "phenology features are NaN when the seasonal amplitude is < 0.1 and `samples` skips every pixel "
-                "with a nodata feature, so the documented `ts-features -> samples -> benchmark-models --groups ts` "
-                "path benchmarks on a reduced class set without warning")
+        if coverage["missing_classes"]:
+            raise StepError(f"samples --groups ts lost classes {coverage['missing_classes']} "
+                            f"(dropped polygons per class: {coverage['dropped_polygons_per_class']})")
 
     # ------------------------------------------------------------------ 4. active learning
     def s4_active_learning(self, ev):

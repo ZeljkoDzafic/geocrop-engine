@@ -107,11 +107,18 @@ spatial CV stays the accuracy estimate. `estimators.sequence_params(params, feat
 PyTorch is optional (`pip install torch`). Without it, the models fail with a message naming the package, and
 `benchmark-models` reports them as skipped.
 
+Extract the samples for the `ts` group only (`--groups ts`): phenology metrics are NaN where no season is
+detected (e.g. winter crops whose season starts before the series), and a sample needs valid values for every
+feature it stores, so extracting all groups can remove a whole class. `train` and `benchmark-models` refuse such
+a sample set (exit status 1, `MissingClassError` naming the lost classes) unless `--allow-missing-classes`.
+
 ```bash
 # pixel level, on a time-series stack (geocrop ts-features)
+geocrop samples --features ts_stack.tif --polygons training.gpkg --groups ts --out ts_samples.npz
 geocrop train --samples ts_samples.npz --manifest ts_stack.tif --groups ts --algorithm ltae --out m_ltae
 geocrop benchmark-models --samples ts_samples.npz --features ts_stack.tif --groups ts \
-  --models rf tempcnn ltae --out bench_ts
+  --models rf tempcnn ltae --epochs 30 --out bench_ts        # or --params '{"ltae": {"epochs": 30}}'
+# benchmark_models.json: fold_signatures_per_model (one per repeat) proves identical folds for every model
 # parcel level (temporal models automatically use only the ts_ block)
 geocrop parcel-classify ... --algorithm ltae --params '{"epochs": 150, "patience": 15}'
 ```
