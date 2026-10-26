@@ -25,8 +25,17 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-from . import indices
-from .raster import NODATA, blocks, ensure_parent, float_profile
+from . import faultinject, indices
+from .raster import (
+    NODATA,
+    RasterInputError,
+    blocks,
+    check_grid,
+    ensure_parent,
+    float_profile,
+    open_input,
+    read_block,
+)
 
 GROUPS = ("s2_band", "s2_index", "s1", "delta", "seasonal", "ts", "phenology", "harmonic")
 SEASON_GROUPS = ("seasonal", "ts", "phenology", "harmonic")   # span the whole season
@@ -151,16 +160,16 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
         for p in periods:
             if layout["s2"]:
                 for b in indices.S2_BANDS:
-                    sources[p, b] = stack.enter_context(rasterio.open(root / p / f"{b}.tif"))
+                    sources[p, b] = stack.enter_context(open_input(root / p / f"{b}.tif", "Composite"))
             for pre in layout["s1_prefixes"]:
                 for pol in indices.S1_POLARISATIONS:
-                    sources[p, pre + pol] = stack.enter_context(rasterio.open(root / p / f"{pre}{pol}.tif"))
+                    sources[p, pre + pol] = stack.enter_context(open_input(root / p / f"{pre}{pol}.tif", "Composite"))
         first = next(iter(sources.values()))
         if first.crs is None:
-            raise ValueError("Composites need a CRS")
+            raise RasterInputError(f"Composite {first.name} has no CRS")
         for key, ds in sources.items():
-            if (ds.shape, ds.crs) != (first.shape, first.crs) or not ds.transform.almost_equals(first.transform):
-                raise ValueError(f"Grid mismatch for {key}; composite all windows on one reference grid")
+            check_grid(ds, first, f"window {key[0]}, band {key[1]}")
+        has_data = dict.fromkeys(sources, False)    # an input without a single valid pixel is a broken composite
         out = ensure_parent(output)
         with rasterio.open(out, "w", **float_profile(first, count=len(names))) as sink:
             for i, n in enumerate(names, 1):
@@ -171,9 +180,11 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
                     raw = {}
                     for key in [k for k in sources if k[0] == p]:
                         ds = sources[key]
-                        v = ds.read(1, window=w).astype("float32")
+                        v = read_block(ds, 1, window=w).astype("float32")
                         if ds.nodata is not None:
                             v[v == ds.nodata] = np.nan
+                        v[~np.isfinite(v)] = np.nan        # +-inf is as invalid as NaN
+                        has_data[key] = has_data[key] or bool(np.isfinite(v).any())
                         raw[key[1]] = v
                     if layout["s2"]:
                         for b in s2_bands:
@@ -207,6 +218,12 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
                 for i, n in enumerate(names, 1):
                     v = values[n]
                     sink.write(np.where(np.isfinite(v), v, NODATA).astype("float32"), i, window=w)
+                faultinject.point("features")
+        empty = [sources[k].name for k, ok in has_data.items() if not ok]
+        if empty:
+            out.unlink(missing_ok=True)
+            raise RasterInputError(f"Composite bands without a single valid pixel (all nodata/NaN/inf): {empty[:10]}. "
+                                   "Check the window's scenes, cloud masks and min_valid_observations.")
     manifest_path(out).write_text(json.dumps({
         "stack": out.name, "periods": periods, "nodata": NODATA,
         "features": [asdict(f) for f in features]}, indent=2), encoding="utf8")

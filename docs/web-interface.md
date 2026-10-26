@@ -52,7 +52,8 @@ commands are removed by installing the interface.
 `GEOCROP_WEB_THREADS` sets OpenMP/OpenBLAS threads per job (default 2); the model's `n_jobs` setting remains
 independent. The server access token is removed from child-job environments. The UI holds it only in
 page memory, not URLs or browser local storage. Every API request requires Bearer authentication;
-cross-origin browser requests are rejected. Artifact downloads are attachments, and listings are
+cross-origin browser requests are rejected and every response carries a strict content-security policy and
+related headers (see [security](security.md)). Artifact downloads are attachments, and listings are
 limited to the first 200 files within a job's declared output locations. Use local filesystem tools
 for larger output inventories.
 
@@ -123,30 +124,46 @@ See the runnable [example notebook](../examples/web_notebook.ipynb); it contains
 
 ## HTTP API
 
+**`/api/v1` is the stable REST contract.** Its paths, parameters, response fields and status codes follow the
+[versioning policy](release.md): within 1.x they only gain optional parameters, fields and endpoints. Every
+endpoint is also served without the version segment (`/api/health`, `/api/jobs`, ...) as a **compatibility
+alias** with identical behaviour, used by the bundled UI and older clients; new integrations should use
+`/api/v1`. The OpenAPI schema lists the `/api/v1` paths only. `EngineClient` uses `/api/v1` and falls back to
+the unversioned paths when talking to a server older than this contract (`EngineClient(api_prefix="/api")`
+pins a prefix).
+
 All endpoints below require `Authorization: Bearer <token>`:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | version, workspace and worker count |
-| GET | `/api/commands` | actual parser command/argument catalogue |
-| POST | `/api/jobs` | submit `{"argv": ["indices", "--format", "json"]}` or `{"command": "geocrop indices"}` |
-| GET | `/api/jobs` | newest jobs; `limit` defaults to 50, maximum 200 |
-| GET | `/api/jobs/{id}` | status, times, args, outputs and exit code |
-| GET | `/api/jobs/{id}/logs` | byte `offset` and bounded `limit` (up to 262144) |
-| POST | `/api/jobs/{id}/cancel` | stop a queued/running job |
-| GET | `/api/jobs/{id}/artifacts` | up to 200 local output files |
-| GET | `/api/jobs/{id}/artifact?path=...` | download a listed artifact |
-| GET | `/api/files?prefix=...` | up to 200 workspace entries for path completion (relative prefix only) |
-| GET | `/api/openapi.json` | machine-readable API description |
+| GET | `/api/v1/health` | version, workspace and worker count |
+| GET | `/api/v1/commands` | actual parser command/argument catalogue |
+| POST | `/api/v1/jobs` | submit `{"argv": ["indices", "--format", "json"]}` or `{"command": "geocrop indices"}` |
+| GET | `/api/v1/jobs` | newest jobs; `limit` defaults to 50, maximum 200 |
+| GET | `/api/v1/jobs/{id}` | status, times, args, outputs and exit code |
+| GET | `/api/v1/jobs/{id}/logs` | byte `offset` and bounded `limit` (up to 262144) |
+| POST | `/api/v1/jobs/{id}/cancel` | stop a queued/running job |
+| GET | `/api/v1/jobs/{id}/artifacts` | up to 200 local output files |
+| GET | `/api/v1/jobs/{id}/artifact?path=...` | download a listed artifact |
+| GET | `/api/v1/files?prefix=...` | up to 200 workspace entries for path completion (relative prefix only) |
+| GET | `/api/v1/jobs/{id}/map` | map-ready previews of the job's outputs (see below) |
+| GET | `/api/v1/openapi.json` | machine-readable API description |
 
-Submission returns HTTP 202 and a job ID, not the final engine result. HTTP 400 reports invalid commands
-or output locations, 401 missing/incorrect authentication, 403 cross-origin requests and 404 unknown
-jobs/artifacts. Typed request validation can return 422. A job with engine exit code 0 succeeds; any
-other code is recorded as failed, including audit/readiness commands that intentionally use nonzero
-exit codes to report data problems. Use the logs to distinguish those outcomes.
+Submission returns HTTP 202 and a job ID, not the final engine result. HTTP 400 reports invalid commands,
+output locations or a full job queue (32 queued jobs), 401 missing/incorrect authentication, 403 cross-origin
+requests, 404 unknown jobs/artifacts/paths and 413 request bodies over 1 MiB. Typed request validation can
+return 422. Job arguments are limited to 256 items, 64 KiB each and 128 KiB in total. A job with engine exit
+code 0 succeeds; any other code is recorded as failed, including audit/readiness commands that intentionally
+use nonzero exit codes to report data problems. Use the logs to distinguish those outcomes.
+
+For developers: routes are registered once under `/api/...` in `geocrop.web.create_app`; the final
+`add_versioned_aliases(app)` call adds the `/api/v1/...` twin of every route registered before it, so a new
+endpoint needs no separate versioned definition. Authentication is enforced for every `/api` path by
+middleware as well as by the per-route dependency. The protections, their limits and the threat model are
+described in [security](security.md).
 
 ## Results map
-Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /api/jobs/{id}/map`):
+Selecting a succeeded job loads its spatial outputs on the **Map** card (`GET /api/v1/jobs/{id}/map`):
 
 | Layer | Source | Default |
 |---|---|---|

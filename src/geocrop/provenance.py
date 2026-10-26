@@ -1,7 +1,6 @@
 """Input quality gates and reproducible run manifests."""
 from __future__ import annotations
 
-import hashlib
 import json
 import platform
 import shutil
@@ -14,16 +13,11 @@ from pathlib import Path
 import geopandas as gpd
 import rasterio
 
+from .contracts import SCHEMA_VERSIONS, check
+from .hashing import sha256  # also re-exported: `geocrop.provenance.sha256` stays public
+
 PACKAGES = ("geocrop-engine", "numpy", "pandas", "scikit-learn", "rasterio", "geopandas", "shapely", "pyproj",
             "scipy", "scikit-image", "torch", "pystac-client")
-
-
-def sha256(path: str | Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for block in iter(lambda: fh.read(4 * 1024 * 1024), b""):
-            h.update(block)
-    return h.hexdigest()
 
 
 def check_raster(path: str | Path) -> dict:
@@ -96,7 +90,7 @@ def run_manifest(destination: str | Path, config: dict | None = None, inputs=(),
         if p.is_file():
             files.append({"path": str(p), "bytes": p.stat().st_size, "sha256": sha256(p)})
     body = {
-        "schema": "geocrop-run/1",
+        "schema": "geocrop-run/1", "schema_version": SCHEMA_VERSIONS["run_manifest"],
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "python": sys.version.split()[0], "platform": platform.platform(),
         "packages": _versions(),
@@ -113,3 +107,9 @@ def run_manifest(destination: str | Path, config: dict | None = None, inputs=(),
     path = root / "run_manifest.json"
     path.write_text(json.dumps(body, indent=2, ensure_ascii=False, default=str), encoding="utf8")
     return path
+
+
+def read_run_manifest(path: str | Path) -> dict:
+    """Load a run manifest, validating its schema version (unversioned manifests are accepted)."""
+    path = Path(path)
+    return check("run_manifest", json.loads(path.read_text(encoding="utf8")), path)

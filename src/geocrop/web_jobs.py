@@ -19,6 +19,14 @@ from pathlib import Path
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
 BLOCKED_COMMANDS = {"serve", "snap"}
+#: Parsed destinations that would run an external executable chosen by the request.
+BLOCKED_OPTIONS = {"snap_gpt"}
+MAX_ARGS = 256
+MAX_ARG_BYTES = 65536
+#: Total UTF-8 size of one job's arguments (well below the operating system's ARG_MAX).
+MAX_ARGV_BYTES = 131072
+#: Queued jobs waiting for the single worker.
+MAX_QUEUED_JOBS = 32
 
 
 class CommandParser(argparse.ArgumentParser):
@@ -60,13 +68,19 @@ def validated_command(argv=None, command=None) -> list[str]:
     args = shlex.split(command) if command is not None else list(argv)
     if args and args[0] == "geocrop":
         args = args[1:]
-    if not args or len(args) > 256 or any(not isinstance(a, str) or len(a) > 65536 or "\x00" in a for a in args):
+    if (not args or len(args) > MAX_ARGS
+            or any(not isinstance(a, str) or "\x00" in a or len(a.encode("utf8", "surrogatepass")) > MAX_ARG_BYTES
+                   for a in args)
+            or sum(len(a.encode("utf8", "surrogatepass")) for a in args) > MAX_ARGV_BYTES):
         raise ValueError("Expected a bounded list of engine command arguments")
     allowed = {c["name"] for c in command_catalogue()}
     if args[0] not in allowed or any(a.split("=", 1)[0] == "--snap-gpt" for a in args):
         raise ValueError("This command is not available through the web API")
     from .cli import build_parser
-    build_parser(CommandParser).parse_args(args)
+    parsed = build_parser(CommandParser).parse_args(args)
+    # argparse accepts unambiguous prefixes (``--snap-g``), so check the parsed value, not just the spelling.
+    if any(getattr(parsed, dest, None) is not None for dest in BLOCKED_OPTIONS):
+        raise ValueError("This command is not available through the web API")
     return args
 
 
@@ -98,7 +112,7 @@ class JobManager:
         self.db_path = self.state_dir / "jobs.sqlite3"
         self.token_env = token_env
         self._lock = threading.RLock()
-        self._queue = queue.Queue(maxsize=32)
+        self._queue = queue.Queue(maxsize=MAX_QUEUED_JOBS)
         self._stopping = threading.Event()
         self._process = None
         self._active = None
@@ -125,7 +139,11 @@ class JobManager:
         if ns.cmd == "run":
             from .config import load
             cfg_path = Path(ns.config)
-            cfg = load(cfg_path if cfg_path.is_absolute() else self.workspace / cfg_path)
+            try:
+                cfg = load(cfg_path if cfg_path.is_absolute() else self.workspace / cfg_path)
+            except Exception as exc:
+                # The parser's message could quote the file's content; report only the failure type.
+                raise ValueError(f"Could not read the run configuration ({type(exc).__name__})") from None
             roots += [cfg["paths"][key] for key in ("output", "features", "composites")]
         resolved = []
         for raw in roots:

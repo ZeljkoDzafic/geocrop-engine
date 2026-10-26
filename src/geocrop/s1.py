@@ -11,7 +11,6 @@ feature-generation time (averaging dB values biases the mean).
 from __future__ import annotations
 
 import json
-import subprocess
 import warnings
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -88,14 +87,9 @@ def write_snap_graph(path, backscatter: str = "sigma0", dem: str = "Copernicus 3
 
 def run_snap(gpt: str, graph: str | Path, product: str | Path, output: str | Path, cache: str = "8G",
              threads: int | None = None) -> int:
-    graph = Path(graph)
-    if not graph.is_file():
-        raise FileNotFoundError(graph)
-    Path(output).parent.mkdir(parents=True, exist_ok=True)
-    command = [str(gpt), str(graph), f"-Pinput={product}", f"-Poutput={output}", "-c", cache]
-    if threads:
-        command += ["-q", str(threads)]
-    return subprocess.run(command, check=True).returncode
+    """Run SNAP `gpt` on one product. Backward-compatible alias of `geocrop.snap.run_snap` (adapter)."""
+    from .snap import run_snap as _run_snap
+    return _run_snap(gpt, graph, product, output, cache, threads)
 
 
 # --------------------------------------------------------------------------- import

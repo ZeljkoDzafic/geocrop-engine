@@ -81,7 +81,9 @@ geocrop stac-import --reference data/reference/grid.tif --start 2023-03-15 --end
 geocrop snap-graph --out configs/s1_sigma0.xml --crs EPSG:32634            # then: geocrop snap / s1-import
 geocrop inventory --scenes data/interim --config configs/example.yaml      # check availability per window
 geocrop check --training data/reference/training.gpkg --parcels data/reference/parcels.gpkg
+geocrop preflight --config configs/example.yaml --markdown preflight.md   # can the run succeed? rough cost
 geocrop run --config configs/example.yaml                                  # resumable full pipeline
+geocrop clean --config configs/example.yaml --dry-run                      # temp files, partial outputs, intermediates
 ```
 See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
 
@@ -99,6 +101,8 @@ whole training polygons near held-out sampled pixels and reports exclusions and 
 Set `model.spatial_buffer_m` in YAML to apply the same policy to pipeline training and ablations.
 These are study-design safeguards; independent real-data validation remains necessary. See
 [classification and validation](docs/classification-validation.md) for assumptions and limits.
+`geocrop preflight` runs the same audit on the configured layers together with scene, coverage, class-support,
+CRS and resource checks before a long run; see [preflight](docs/preflight.md).
 
 ## Documentation
 
@@ -166,6 +170,8 @@ empirical OOF calibration; independent field evaluation is required for both mod
 | [Reproducibility & privacy](docs/reproducibility.md) | manifests, caching, data protection |
 | [Deployment](docs/deployment.md) | hardware sizing, server layout |
 | [Scope & limitations](docs/limitations.md) | what is and is not validated |
+| [Security model](docs/security.md) | web API threat model, protections, dependency audits ([reporting](SECURITY.md)) |
+| [Releases & rollback](docs/release.md) | SemVer policy, pinned installs (`constraints/`), release checklist, rollback |
 
 ## Status
 
