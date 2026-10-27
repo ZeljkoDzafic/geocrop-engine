@@ -2,6 +2,9 @@
 
 ## Unreleased
 ### Validation fixes
+- Web jobs use a separate POSIX process group when the Python/libc build cannot provide `posix_spawn(setsid)`;
+  cancellation remains group-scoped and the worker never falls back to unsafe fork handlers.
+- Fresh-user checks restore host ownership of their reports, and distinguish skipped steps from a full PASS.
 - Optical E2 ablations now use `sensors: [S2]` so radar-derived delta features cannot enter the optical baseline.
   The selector, default ladder and both 2023 study configurations enforce this separation; recorded feature lists
   and spatial fold signatures are regression-tested.

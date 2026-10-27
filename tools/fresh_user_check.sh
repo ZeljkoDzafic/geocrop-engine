@@ -153,7 +153,12 @@ CONTAINER
 {
   echo "# Fresh-user check: $IMAGE, --cpus $CPUS --memory $MEMORY"
   echo
-  echo "Source: $SOURCE; $(date -u +%Y-%m-%dT%H:%MZ); result: $([[ $status == 0 ]] && echo PASS || echo FAIL)"
+  result=FAIL
+  if [[ $status == 0 ]]; then
+    result=PASS
+    [[ -z $SKIP ]] || result="PARTIAL (requested steps passed; skipped:$SKIP)"
+  fi
+  echo "Source: $SOURCE; $(date -u +%Y-%m-%dT%H:%MZ); result: $result"
   echo
   echo "| Step | Exit status | Seconds |"
   echo "|---|---|---|"
