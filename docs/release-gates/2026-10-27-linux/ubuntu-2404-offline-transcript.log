@@ -1,0 +1,688 @@
+debconf: delaying package configuration, since apt-utils is not installed
+== Ubuntu 24.04.5 LTS x86_64, 3 CPUs, 9968 MiB,
+== image ubuntu:24.04, source: git archive of local commit 13118dfe3580b72672a11bfa609d416c0f94291c, user alice
+### [apt] sudo apt-get update && sudo apt-get install -y --no-install-recommends git curl ca-certificates libgomp1 libexpat1
+Hit:1 http://archive.ubuntu.com/ubuntu noble InRelease
+Hit:2 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:3 http://archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:4 http://archive.ubuntu.com/ubuntu noble-backports InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  git-man libbrotli1 libcurl3t64-gnutls libcurl4t64 liberror-perl
+  libgdbm-compat4t64 libgdbm6t64 libgssapi-krb5-2 libk5crypto3 libkeyutils1
+  libkrb5-3 libkrb5support0 libldap2 libnghttp2-14 libperl5.38t64 libpsl5t64
+  librtmp1 libsasl2-2 libsasl2-modules-db libssh-4 openssl perl
+  perl-modules-5.38
+Suggested packages:
+  gettext-base git-daemon-run | git-daemon-sysvinit git-doc git-email git-gui
+  gitk gitweb git-cvs git-mediawiki git-svn gdbm-l10n krb5-doc krb5-user
+  perl-doc libterm-readline-gnu-perl | libterm-readline-perl-perl make
+  libtap-harness-archive-perl
+Recommended packages:
+  patch less ssh-client krb5-locales libldap-common publicsuffix
+  libsasl2-modules netbase
+The following NEW packages will be installed:
+  ca-certificates curl git git-man libbrotli1 libcurl3t64-gnutls libcurl4t64
+  liberror-perl libexpat1 libgdbm-compat4t64 libgdbm6t64 libgomp1
+  libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0
+  libldap2 libnghttp2-14 libperl5.38t64 libpsl5t64 librtmp1 libsasl2-2
+  libsasl2-modules-db libssh-4 openssl perl perl-modules-5.38
+0 upgraded, 28 newly installed, 0 to remove and 0 not upgraded.
+Need to get 16.9 MB of archives.
+After this operation, 85.0 MB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 perl-modules-5.38 all 5.38.2-3.2ubuntu0.6 [3110 kB]
+Get:2 http://archive.ubuntu.com/ubuntu noble/main amd64 libgdbm6t64 amd64 1.23-5.1build1 [34.4 kB]
+Get:3 http://archive.ubuntu.com/ubuntu noble/main amd64 libgdbm-compat4t64 amd64 1.23-5.1build1 [6710 B]
+Get:4 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libperl5.38t64 amd64 5.38.2-3.2ubuntu0.6 [4864 kB]
+Get:5 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 perl amd64 5.38.2-3.2ubuntu0.6 [231 kB]
+Get:6 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 openssl amd64 3.0.13-0ubuntu3.16 [1004 kB]
+Get:7 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 ca-certificates all 20260816ubuntu0.24.04.1 [139 kB]
+Get:8 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libexpat1 amd64 2.6.1-2ubuntu0.6 [98.9 kB]
+Get:9 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libkrb5support0 amd64 1.20.1-6ubuntu2.10 [34.9 kB]
+Get:10 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libk5crypto3 amd64 1.20.1-6ubuntu2.10 [81.9 kB]
+Get:11 http://archive.ubuntu.com/ubuntu noble/main amd64 libkeyutils1 amd64 1.6.3-3build1 [9490 B]
+Get:12 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libkrb5-3 amd64 1.20.1-6ubuntu2.10 [348 kB]
+Get:13 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libgssapi-krb5-2 amd64 1.20.1-6ubuntu2.10 [143 kB]
+Get:14 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libnghttp2-14 amd64 1.59.0-1ubuntu0.4 [74.6 kB]
+Get:15 http://archive.ubuntu.com/ubuntu noble/main amd64 libpsl5t64 amd64 0.21.2-1.1build1 [57.1 kB]
+Get:16 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libbrotli1 amd64 1.1.0-2ubuntu0.1 [331 kB]
+Ign:17 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg1-5ubuntu3.1
+Get:18 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libsasl2-2 amd64 2.1.28+dfsg1-5ubuntu3.1 [53.2 kB]
+Get:19 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libldap2 amd64 2.6.10+dfsg-0ubuntu0.24.04.1 [198 kB]
+Get:20 http://archive.ubuntu.com/ubuntu noble/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2build7 [56.3 kB]
+Get:21 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libssh-4 amd64 0.10.6-2ubuntu0.5 [191 kB]
+Get:22 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libcurl4t64 amd64 8.5.0-2ubuntu10.16 [344 kB]
+Get:23 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 curl amd64 8.5.0-2ubuntu10.16 [226 kB]
+Get:24 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libcurl3t64-gnutls amd64 8.5.0-2ubuntu10.16 [337 kB]
+Get:25 http://archive.ubuntu.com/ubuntu noble/main amd64 liberror-perl all 0.17029-2 [25.6 kB]
+Get:26 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 git-man all 1:2.43.0-1ubuntu7.4 [1101 kB]
+Get:27 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 git amd64 1:2.43.0-1ubuntu7.4 [3681 kB]
+Get:28 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libgomp1 amd64 14.2.0-4ubuntu2~24.04.1 [148 kB]
+Get:17 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg1-5ubuntu3.1 [20.4 kB]
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 16.9 MB in 13s (1322 kB/s)
+Selecting previously unselected package perl-modules-5.38.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 4454 files and directories currently installed.)
+Preparing to unpack .../00-perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb ...
+Unpacking perl-modules-5.38 (5.38.2-3.2ubuntu0.6) ...
+Selecting previously unselected package libgdbm6t64:amd64.
+Preparing to unpack .../01-libgdbm6t64_1.23-5.1build1_amd64.deb ...
+Unpacking libgdbm6t64:amd64 (1.23-5.1build1) ...
+Selecting previously unselected package libgdbm-compat4t64:amd64.
+Preparing to unpack .../02-libgdbm-compat4t64_1.23-5.1build1_amd64.deb ...
+Unpacking libgdbm-compat4t64:amd64 (1.23-5.1build1) ...
+Selecting previously unselected package libperl5.38t64:amd64.
+Preparing to unpack .../03-libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb ...
+Unpacking libperl5.38t64:amd64 (5.38.2-3.2ubuntu0.6) ...
+Selecting previously unselected package perl.
+Preparing to unpack .../04-perl_5.38.2-3.2ubuntu0.6_amd64.deb ...
+Unpacking perl (5.38.2-3.2ubuntu0.6) ...
+Selecting previously unselected package openssl.
+Preparing to unpack .../05-openssl_3.0.13-0ubuntu3.16_amd64.deb ...
+Unpacking openssl (3.0.13-0ubuntu3.16) ...
+Selecting previously unselected package ca-certificates.
+Preparing to unpack .../06-ca-certificates_20260816ubuntu0.24.04.1_all.deb ...
+Unpacking ca-certificates (20260816ubuntu0.24.04.1) ...
+Selecting previously unselected package libexpat1:amd64.
+Preparing to unpack .../07-libexpat1_2.6.1-2ubuntu0.6_amd64.deb ...
+Unpacking libexpat1:amd64 (2.6.1-2ubuntu0.6) ...
+Selecting previously unselected package libkrb5support0:amd64.
+Preparing to unpack .../08-libkrb5support0_1.20.1-6ubuntu2.10_amd64.deb ...
+Unpacking libkrb5support0:amd64 (1.20.1-6ubuntu2.10) ...
+Selecting previously unselected package libk5crypto3:amd64.
+Preparing to unpack .../09-libk5crypto3_1.20.1-6ubuntu2.10_amd64.deb ...
+Unpacking libk5crypto3:amd64 (1.20.1-6ubuntu2.10) ...
+Selecting previously unselected package libkeyutils1:amd64.
+Preparing to unpack .../10-libkeyutils1_1.6.3-3build1_amd64.deb ...
+Unpacking libkeyutils1:amd64 (1.6.3-3build1) ...
+Selecting previously unselected package libkrb5-3:amd64.
+Preparing to unpack .../11-libkrb5-3_1.20.1-6ubuntu2.10_amd64.deb ...
+Unpacking libkrb5-3:amd64 (1.20.1-6ubuntu2.10) ...
+Selecting previously unselected package libgssapi-krb5-2:amd64.
+Preparing to unpack .../12-libgssapi-krb5-2_1.20.1-6ubuntu2.10_amd64.deb ...
+Unpacking libgssapi-krb5-2:amd64 (1.20.1-6ubuntu2.10) ...
+Selecting previously unselected package libnghttp2-14:amd64.
+Preparing to unpack .../13-libnghttp2-14_1.59.0-1ubuntu0.4_amd64.deb ...
+Unpacking libnghttp2-14:amd64 (1.59.0-1ubuntu0.4) ...
+Selecting previously unselected package libpsl5t64:amd64.
+Preparing to unpack .../14-libpsl5t64_0.21.2-1.1build1_amd64.deb ...
+Unpacking libpsl5t64:amd64 (0.21.2-1.1build1) ...
+Selecting previously unselected package libbrotli1:amd64.
+Preparing to unpack .../15-libbrotli1_1.1.0-2ubuntu0.1_amd64.deb ...
+Unpacking libbrotli1:amd64 (1.1.0-2ubuntu0.1) ...
+Selecting previously unselected package libsasl2-modules-db:amd64.
+Preparing to unpack .../16-libsasl2-modules-db_2.1.28+dfsg1-5ubuntu3.1_amd64.deb ...
+Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg1-5ubuntu3.1) ...
+Selecting previously unselected package libsasl2-2:amd64.
+Preparing to unpack .../17-libsasl2-2_2.1.28+dfsg1-5ubuntu3.1_amd64.deb ...
+Unpacking libsasl2-2:amd64 (2.1.28+dfsg1-5ubuntu3.1) ...
+Selecting previously unselected package libldap2:amd64.
+Preparing to unpack .../18-libldap2_2.6.10+dfsg-0ubuntu0.24.04.1_amd64.deb ...
+Unpacking libldap2:amd64 (2.6.10+dfsg-0ubuntu0.24.04.1) ...
+Selecting previously unselected package librtmp1:amd64.
+Preparing to unpack .../19-librtmp1_2.4+20151223.gitfa8646d.1-2build7_amd64.deb ...
+Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2build7) ...
+Selecting previously unselected package libssh-4:amd64.
+Preparing to unpack .../20-libssh-4_0.10.6-2ubuntu0.5_amd64.deb ...
+Unpacking libssh-4:amd64 (0.10.6-2ubuntu0.5) ...
+Selecting previously unselected package libcurl4t64:amd64.
+Preparing to unpack .../21-libcurl4t64_8.5.0-2ubuntu10.16_amd64.deb ...
+Unpacking libcurl4t64:amd64 (8.5.0-2ubuntu10.16) ...
+Selecting previously unselected package curl.
+Preparing to unpack .../22-curl_8.5.0-2ubuntu10.16_amd64.deb ...
+Unpacking curl (8.5.0-2ubuntu10.16) ...
+Selecting previously unselected package libcurl3t64-gnutls:amd64.
+Preparing to unpack .../23-libcurl3t64-gnutls_8.5.0-2ubuntu10.16_amd64.deb ...
+Unpacking libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.16) ...
+Selecting previously unselected package liberror-perl.
+Preparing to unpack .../24-liberror-perl_0.17029-2_all.deb ...
+Unpacking liberror-perl (0.17029-2) ...
+Selecting previously unselected package git-man.
+Preparing to unpack .../25-git-man_1%3a2.43.0-1ubuntu7.4_all.deb ...
+Unpacking git-man (1:2.43.0-1ubuntu7.4) ...
+Selecting previously unselected package git.
+Preparing to unpack .../26-git_1%3a2.43.0-1ubuntu7.4_amd64.deb ...
+Unpacking git (1:2.43.0-1ubuntu7.4) ...
+Selecting previously unselected package libgomp1:amd64.
+Preparing to unpack .../27-libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb ...
+Unpacking libgomp1:amd64 (14.2.0-4ubuntu2~24.04.1) ...
+Setting up libexpat1:amd64 (2.6.1-2ubuntu0.6) ...
+Setting up libkeyutils1:amd64 (1.6.3-3build1) ...
+Setting up libgdbm6t64:amd64 (1.23-5.1build1) ...
+Setting up libgdbm-compat4t64:amd64 (1.23-5.1build1) ...
+Setting up libbrotli1:amd64 (1.1.0-2ubuntu0.1) ...
+Setting up libpsl5t64:amd64 (0.21.2-1.1build1) ...
+Setting up libnghttp2-14:amd64 (1.59.0-1ubuntu0.4) ...
+Setting up libgomp1:amd64 (14.2.0-4ubuntu2~24.04.1) ...
+Setting up libkrb5support0:amd64 (1.20.1-6ubuntu2.10) ...
+Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg1-5ubuntu3.1) ...
+Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2build7) ...
+Setting up perl-modules-5.38 (5.38.2-3.2ubuntu0.6) ...
+Setting up libk5crypto3:amd64 (1.20.1-6ubuntu2.10) ...
+Setting up libsasl2-2:amd64 (2.1.28+dfsg1-5ubuntu3.1) ...
+Setting up git-man (1:2.43.0-1ubuntu7.4) ...
+Setting up libkrb5-3:amd64 (1.20.1-6ubuntu2.10) ...
+Setting up libperl5.38t64:amd64 (5.38.2-3.2ubuntu0.6) ...
+Setting up openssl (3.0.13-0ubuntu3.16) ...
+Setting up libldap2:amd64 (2.6.10+dfsg-0ubuntu0.24.04.1) ...
+Setting up ca-certificates (20260816ubuntu0.24.04.1) ...
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+Updating certificates in /etc/ssl/certs...
+120 added, 0 removed; done.
+Setting up perl (5.38.2-3.2ubuntu0.6) ...
+Setting up libgssapi-krb5-2:amd64 (1.20.1-6ubuntu2.10) ...
+Setting up libssh-4:amd64 (0.10.6-2ubuntu0.5) ...
+Setting up libcurl4t64:amd64 (8.5.0-2ubuntu10.16) ...
+Setting up libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.16) ...
+Setting up liberror-perl (0.17029-2) ...
+Setting up git (1:2.43.0-1ubuntu7.4) ...
+Setting up curl (8.5.0-2ubuntu10.16) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.9) ...
+Processing triggers for ca-certificates (20260816ubuntu0.24.04.1) ...
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+done.
+### [apt] exit 0 after 19 s
+### [python312] if apt-cache show python3.12-venv >/dev/null 2>&1; then
+    sudo apt-get install -y --no-install-recommends python3.12 python3.12-venv
+  else
+    curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH" && uv python install 3.12
+  fi && python3.12 --version
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  libpython3.12-minimal libpython3.12-stdlib libreadline8t64 libsqlite3-0
+  media-types netbase python3-pip-whl python3-setuptools-whl
+  python3.12-minimal readline-common tzdata
+Suggested packages:
+  python3.12-doc binutils binfmt-support readline-doc
+The following NEW packages will be installed:
+  libpython3.12-minimal libpython3.12-stdlib libreadline8t64 libsqlite3-0
+  media-types netbase python3-pip-whl python3-setuptools-whl python3.12
+  python3.12-minimal python3.12-venv readline-common tzdata
+0 upgraded, 13 newly installed, 0 to remove and 0 not upgraded.
+Need to get 9557 kB of archives.
+After this operation, 30.1 MB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libpython3.12-minimal amd64 3.12.3-1ubuntu0.17 [839 kB]
+Get:2 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3.12-minimal amd64 3.12.3-1ubuntu0.17 [2335 kB]
+Get:3 http://archive.ubuntu.com/ubuntu noble/main amd64 media-types all 10.1.0 [27.5 kB]
+Get:4 http://archive.ubuntu.com/ubuntu noble/main amd64 netbase all 6.4 [13.1 kB]
+Get:5 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 tzdata all 2026e-0ubuntu0.24.04.1 [282 kB]
+Get:6 http://archive.ubuntu.com/ubuntu noble/main amd64 readline-common all 8.2-4build1 [56.5 kB]
+Get:7 http://archive.ubuntu.com/ubuntu noble/main amd64 libreadline8t64 amd64 8.2-4build1 [153 kB]
+Get:8 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libsqlite3-0 amd64 3.45.1-1ubuntu2.8 [702 kB]
+Get:9 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libpython3.12-stdlib amd64 3.12.3-1ubuntu0.17 [2071 kB]
+Get:10 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3.12 amd64 3.12.3-1ubuntu0.17 [651 kB]
+Get:11 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3-pip-whl all 24.0+dfsg-1ubuntu1.3 [1707 kB]
+Get:12 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3-setuptools-whl all 68.1.2-2ubuntu1.2 [716 kB]
+Get:13 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3.12-venv amd64 3.12.3-1ubuntu0.17 [5684 B]
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 9557 kB in 9s (1060 kB/s)
+Selecting previously unselected package libpython3.12-minimal:amd64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 8132 files and directories currently installed.)
+Preparing to unpack .../00-libpython3.12-minimal_3.12.3-1ubuntu0.17_amd64.deb ...
+Unpacking libpython3.12-minimal:amd64 (3.12.3-1ubuntu0.17) ...
+Selecting previously unselected package python3.12-minimal.
+Preparing to unpack .../01-python3.12-minimal_3.12.3-1ubuntu0.17_amd64.deb ...
+Unpacking python3.12-minimal (3.12.3-1ubuntu0.17) ...
+Selecting previously unselected package media-types.
+Preparing to unpack .../02-media-types_10.1.0_all.deb ...
+Unpacking media-types (10.1.0) ...
+Selecting previously unselected package netbase.
+Preparing to unpack .../03-netbase_6.4_all.deb ...
+Unpacking netbase (6.4) ...
+Selecting previously unselected package tzdata.
+Preparing to unpack .../04-tzdata_2026e-0ubuntu0.24.04.1_all.deb ...
+Unpacking tzdata (2026e-0ubuntu0.24.04.1) ...
+Selecting previously unselected package readline-common.
+Preparing to unpack .../05-readline-common_8.2-4build1_all.deb ...
+Unpacking readline-common (8.2-4build1) ...
+Selecting previously unselected package libreadline8t64:amd64.
+Preparing to unpack .../06-libreadline8t64_8.2-4build1_amd64.deb ...
+Adding 'diversion of /lib/x86_64-linux-gnu/libhistory.so.8 to /lib/x86_64-linux-gnu/libhistory.so.8.usr-is-merged by libreadline8t64'
+Adding 'diversion of /lib/x86_64-linux-gnu/libhistory.so.8.2 to /lib/x86_64-linux-gnu/libhistory.so.8.2.usr-is-merged by libreadline8t64'
+Adding 'diversion of /lib/x86_64-linux-gnu/libreadline.so.8 to /lib/x86_64-linux-gnu/libreadline.so.8.usr-is-merged by libreadline8t64'
+Adding 'diversion of /lib/x86_64-linux-gnu/libreadline.so.8.2 to /lib/x86_64-linux-gnu/libreadline.so.8.2.usr-is-merged by libreadline8t64'
+Unpacking libreadline8t64:amd64 (8.2-4build1) ...
+Selecting previously unselected package libsqlite3-0:amd64.
+Preparing to unpack .../07-libsqlite3-0_3.45.1-1ubuntu2.8_amd64.deb ...
+Unpacking libsqlite3-0:amd64 (3.45.1-1ubuntu2.8) ...
+Selecting previously unselected package libpython3.12-stdlib:amd64.
+Preparing to unpack .../08-libpython3.12-stdlib_3.12.3-1ubuntu0.17_amd64.deb ...
+Unpacking libpython3.12-stdlib:amd64 (3.12.3-1ubuntu0.17) ...
+Selecting previously unselected package python3.12.
+Preparing to unpack .../09-python3.12_3.12.3-1ubuntu0.17_amd64.deb ...
+Unpacking python3.12 (3.12.3-1ubuntu0.17) ...
+Selecting previously unselected package python3-pip-whl.
+Preparing to unpack .../10-python3-pip-whl_24.0+dfsg-1ubuntu1.3_all.deb ...
+Unpacking python3-pip-whl (24.0+dfsg-1ubuntu1.3) ...
+Selecting previously unselected package python3-setuptools-whl.
+Preparing to unpack .../11-python3-setuptools-whl_68.1.2-2ubuntu1.2_all.deb ...
+Unpacking python3-setuptools-whl (68.1.2-2ubuntu1.2) ...
+Selecting previously unselected package python3.12-venv.
+Preparing to unpack .../12-python3.12-venv_3.12.3-1ubuntu0.17_amd64.deb ...
+Unpacking python3.12-venv (3.12.3-1ubuntu0.17) ...
+Setting up media-types (10.1.0) ...
+Setting up python3-setuptools-whl (68.1.2-2ubuntu1.2) ...
+Setting up python3-pip-whl (24.0+dfsg-1ubuntu1.3) ...
+Setting up libsqlite3-0:amd64 (3.45.1-1ubuntu2.8) ...
+Setting up libpython3.12-minimal:amd64 (3.12.3-1ubuntu0.17) ...
+Setting up tzdata (2026e-0ubuntu0.24.04.1) ...
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+Configuring tzdata
+------------------
+
+Please select the geographic area in which you live. Subsequent configuration
+questions will narrow this down by presenting a list of cities, representing
+the time zones in which they are located.
+
+  1. Africa      4. Arctic    7. Australia  10. Pacific
+  2. America     5. Asia      8. Europe     11. Etc
+  3. Antarctica  6. Atlantic  9. Indian     12. Legacy
+Geographic area: 
+Use of uninitialized value $_[1] in join or string at /usr/share/perl5/Debconf/DbDriver/Stack.pm line 112.
+
+Current default time zone: '/UTC'
+Local time is now:      Tue Oct 27 08:58:42 UTC 2026.
+Universal Time is now:  Tue Oct 27 08:58:42 UTC 2026.
+Run 'dpkg-reconfigure tzdata' if you wish to change it.
+
+Use of uninitialized value $val in substitution (s///) at /usr/share/perl5/Debconf/Format/822.pm line 84, <GEN6> line 4.
+Use of uninitialized value $val in concatenation (.) or string at /usr/share/perl5/Debconf/Format/822.pm line 85, <GEN6> line 4.
+Setting up netbase (6.4) ...
+Setting up readline-common (8.2-4build1) ...
+Setting up python3.12-minimal (3.12.3-1ubuntu0.17) ...
+Setting up libreadline8t64:amd64 (8.2-4build1) ...
+Setting up libpython3.12-stdlib:amd64 (3.12.3-1ubuntu0.17) ...
+Setting up python3.12 (3.12.3-1ubuntu0.17) ...
+Setting up python3.12-venv (3.12.3-1ubuntu0.17) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.9) ...
+Python 3.12.3
+### [python312] exit 0 after 14 s
+### [source] tar -xf ~/source.tar && cd geocrop-engine
+### [source] exit 0 after 0 s
+### [venv] python3.12 -m venv .venv && source .venv/bin/activate && python --version
+Python 3.12.3
+### [venv] exit 0 after 3 s
+### [install] python -m pip install -c constraints/py312.txt -e '.[all,web]'
+Obtaining file:///home/alice/geocrop-engine
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Collecting numpy<3,>=1.26 (from geocrop-engine==0.9.0)
+  Downloading numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Collecting pandas>=2.0 (from geocrop-engine==0.9.0)
+  Downloading pandas-3.1.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (18 kB)
+Collecting scikit-learn>=1.3 (from geocrop-engine==0.9.0)
+  Downloading scikit_learn-1.9.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.3 kB)
+Collecting rasterio>=1.3 (from geocrop-engine==0.9.0)
+  Downloading rasterio-1.5.2-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (8.6 kB)
+Collecting geopandas>=0.14 (from geocrop-engine==0.9.0)
+  Downloading geopandas-1.2.0-py3-none-any.whl.metadata (2.0 kB)
+Collecting shapely>=2 (from geocrop-engine==0.9.0)
+  Downloading shapely-2.2.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (6.7 kB)
+Collecting pyproj>=3.5 (from geocrop-engine==0.9.0)
+  Downloading pyproj-3.8.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (40 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 40.6/40.6 kB 10.8 MB/s eta 0:00:00
+Collecting scipy>=1.11 (from geocrop-engine==0.9.0)
+  Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.4/62.4 kB 2.5 MB/s eta 0:00:00
+Collecting requests>=2.31 (from geocrop-engine==0.9.0)
+  Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting PyYAML>=6 (from geocrop-engine==0.9.0)
+  Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting joblib>=1.3 (from geocrop-engine==0.9.0)
+  Downloading joblib-1.6.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting fastapi>=0.115 (from geocrop-engine==0.9.0)
+  Downloading fastapi-0.162.0-py3-none-any.whl.metadata (26 kB)
+Collecting uvicorn>=0.30 (from geocrop-engine==0.9.0)
+  Downloading uvicorn-0.54.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting httpx>=0.27 (from geocrop-engine==0.9.0)
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting scikit-image>=0.21 (from geocrop-engine==0.9.0)
+  Downloading scikit_image-0.26.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (15 kB)
+Collecting pystac-client>=0.8 (from geocrop-engine==0.9.0)
+  Downloading pystac_client-0.9.1-py3-none-any.whl.metadata (3.1 kB)
+Collecting pyarrow>=14 (from geocrop-engine==0.9.0)
+  Downloading pyarrow-26.0.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+Collecting starlette>=0.46.0 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading starlette-1.10.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting pydantic>=2.9.0 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 133.0/133.0 kB 3.3 MB/s eta 0:00:00
+Collecting typing-extensions>=4.8.0 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting opentelemetry-api>=1.44.0 (from fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading opentelemetry_api-1.45.1-py3-none-any.whl.metadata (1.4 kB)
+Collecting packaging (from geopandas>=0.14->geocrop-engine==0.9.0)
+  Using cached packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pyogrio>=0.8 (from geopandas>=0.14->geocrop-engine==0.9.0)
+  Downloading pyogrio-0.13.0-cp311-abi3-manylinux_2_28_x86_64.whl.metadata (5.8 kB)
+Collecting anyio (from httpx>=0.27->geocrop-engine==0.9.0)
+  Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting certifi (from httpx>=0.27->geocrop-engine==0.9.0)
+  Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx>=0.27->geocrop-engine==0.9.0)
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx>=0.27->geocrop-engine==0.9.0)
+  Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.27->geocrop-engine==0.9.0)
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting cloudpickle>=3.0 (from joblib>=1.3->geocrop-engine==0.9.0)
+  Downloading cloudpickle-3.1.2-py3-none-any.whl.metadata (7.1 kB)
+Collecting python-dateutil>=2.9.0 (from pandas>=2.0->geocrop-engine==0.9.0)
+  Downloading python_dateutil-3.0.0-py2.py3-none-any.whl.metadata (8.2 kB)
+Collecting pystac>=1.10.0 (from pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac-1.15.2-py3-none-any.whl.metadata (6.3 kB)
+Collecting affine (from rasterio>=1.3->geocrop-engine==0.9.0)
+  Downloading affine-3.0.1-py3-none-any.whl.metadata (4.5 kB)
+Collecting attrs (from rasterio>=1.3->geocrop-engine==0.9.0)
+  Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+Collecting click!=8.2.*,>=4.0 (from rasterio>=1.3->geocrop-engine==0.9.0)
+  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting pyparsing>=3.0 (from rasterio>=1.3->geocrop-engine==0.9.0)
+  Downloading pyparsing-3.3.3-py3-none-any.whl.metadata (5.9 kB)
+Collecting charset_normalizer<4,>=2 (from requests>=2.31->geocrop-engine==0.9.0)
+  Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 46.4/46.4 kB 11.9 MB/s eta 0:00:00
+Collecting urllib3<3,>=1.26 (from requests>=2.31->geocrop-engine==0.9.0)
+  Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting networkx>=3.0 (from scikit-image>=0.21->geocrop-engine==0.9.0)
+  Downloading networkx-3.7-py3-none-any.whl.metadata (6.7 kB)
+Collecting pillow>=10.1 (from scikit-image>=0.21->geocrop-engine==0.9.0)
+  Downloading pillow-13.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+Collecting imageio!=2.35.0,>=2.33 (from scikit-image>=0.21->geocrop-engine==0.9.0)
+  Downloading imageio-2.38.1-py3-none-any.whl.metadata (9.7 kB)
+Collecting tifffile>=2022.8.12 (from scikit-image>=0.21->geocrop-engine==0.9.0)
+  Downloading tifffile-2026.10.15-py3-none-any.whl.metadata (34 kB)
+Collecting lazy-loader>=0.4 (from scikit-image>=0.21->geocrop-engine==0.9.0)
+  Downloading lazy_loader-0.6-py3-none-any.whl.metadata (6.0 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn>=1.3->geocrop-engine==0.9.0)
+  Downloading narwhals-2.27.1-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn>=1.3->geocrop-engine==0.9.0)
+  Downloading threadpoolctl-3.7.0-py3-none-any.whl.metadata (24 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.9.0->fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.1 (from pydantic>=2.9.0->fastapi>=0.115->geocrop-engine==0.9.0)
+  Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+Collecting pystac-core<2,>=1.15.0 (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_core-1.15.2-py3-none-any.whl.metadata (1.3 kB)
+Collecting pystac-ext-classification (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_classification-2.0.1-py3-none-any.whl.metadata (2.1 kB)
+Collecting pystac-ext-datacube (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_datacube-2.2.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-eo (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_eo-1.1.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-file (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_file-2.1.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-grid (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_grid-1.1.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-item-assets (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_item_assets-1.0.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-label (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_label-1.0.2-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-mgrs (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_mgrs-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-mlm (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_mlm-1.4.1-py3-none-any.whl.metadata (2.2 kB)
+Collecting pystac-ext-pointcloud (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_pointcloud-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-projection (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_projection-2.0.1-py3-none-any.whl.metadata (2.1 kB)
+Collecting pystac-ext-raster (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_raster-1.1.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-render (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_render-2.0.0-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-sar (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_sar-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-sat (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_sat-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-scientific (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_scientific-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-storage (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_storage-2.0.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-table (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_table-1.2.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-timestamps (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_timestamps-1.1.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-version (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_version-1.2.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting pystac-ext-view (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_view-1.0.1-py3-none-any.whl.metadata (1.8 kB)
+Collecting pystac-ext-xarray-assets (from pystac>=1.10.0->pystac-client>=0.8->geocrop-engine==0.9.0)
+  Downloading pystac_ext_xarray_assets-1.0.1-py3-none-any.whl.metadata (1.9 kB)
+Collecting six>=1.6 (from python-dateutil>=2.9.0->pandas>=2.0->geocrop-engine==0.9.0)
+  Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting tzdata (from python-dateutil>=2.9.0->pandas>=2.0->geocrop-engine==0.9.0)
+  Downloading tzdata-2026.5-py2.py3-none-any.whl.metadata (1.4 kB)
+Downloading fastapi-0.162.0-py3-none-any.whl (148 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 148.9/148.9 kB 10.2 MB/s eta 0:00:00
+Downloading geopandas-1.2.0-py3-none-any.whl (368 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 368.1/368.1 kB 7.3 MB/s eta 0:00:00
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 11.8 MB/s eta 0:00:00
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 12.1 MB/s eta 0:00:00
+Downloading joblib-1.6.0-py3-none-any.whl (306 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 306.1/306.1 kB 25.5 MB/s eta 0:00:00
+Downloading numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 29.5 MB/s eta 0:00:00
+Downloading pandas-3.1.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 29.8 MB/s eta 0:00:00
+Downloading pyarrow-26.0.0-cp312-cp312-manylinux_2_28_x86_64.whl (53.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.9/53.9 MB 33.3 MB/s eta 0:00:00
+Downloading pyproj-3.8.0-cp312-cp312-manylinux_2_28_x86_64.whl (10.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.0/10.0 MB 27.8 MB/s eta 0:00:00
+Downloading pystac_client-0.9.1-py3-none-any.whl (43 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 43.6/43.6 kB 9.6 MB/s eta 0:00:00
+Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 42.7 MB/s eta 0:00:00
+Downloading rasterio-1.5.2-cp312-cp312-manylinux_2_28_x86_64.whl (39.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 39.2/39.2 MB 33.1 MB/s eta 0:00:00
+Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.1/73.1 kB 15.3 MB/s eta 0:00:00
+Downloading scikit_image-0.26.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (13.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.6/13.6 MB 26.9 MB/s eta 0:00:00
+Downloading scikit_learn-1.9.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.2/9.2 MB 26.1 MB/s eta 0:00:00
+Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 31.5 MB/s eta 0:00:00
+Downloading shapely-2.2.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (2.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.3/2.3 MB 27.1 MB/s eta 0:00:00
+Downloading uvicorn-0.54.0-py3-none-any.whl (87 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 87.4/87.4 kB 18.2 MB/s eta 0:00:00
+Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 22.1 MB/s eta 0:00:00
+Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 257.6/257.6 kB 37.9 MB/s eta 0:00:00
+Downloading click-8.5.0-py3-none-any.whl (125 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 125.3/125.3 kB 30.9 MB/s eta 0:00:00
+Downloading cloudpickle-3.1.2-py3-none-any.whl (22 kB)
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading idna-3.20-py3-none-any.whl (69 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 15.9 MB/s eta 0:00:00
+Downloading imageio-2.38.1-py3-none-any.whl (328 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 328.4/328.4 kB 39.8 MB/s eta 0:00:00
+Downloading lazy_loader-0.6-py3-none-any.whl (8.8 kB)
+Downloading narwhals-2.27.1-py3-none-any.whl (483 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 483.2/483.2 kB 41.7 MB/s eta 0:00:00
+Downloading networkx-3.7-py3-none-any.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 26.9 MB/s eta 0:00:00
+Downloading opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.3/60.3 kB 18.9 MB/s eta 0:00:00
+Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Downloading pillow-13.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 24.4 MB/s eta 0:00:00
+Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 488.1/488.1 kB 78.7 MB/s eta 0:00:00
+Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 29.6 MB/s eta 0:00:00
+Downloading pyogrio-0.13.0-cp311-abi3-manylinux_2_28_x86_64.whl (33.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 33.3/33.3 MB 35.4 MB/s eta 0:00:00
+Downloading pyparsing-3.3.3-py3-none-any.whl (126 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 126.4/126.4 kB 23.4 MB/s eta 0:00:00
+Downloading pystac-1.15.2-py3-none-any.whl (5.7 kB)
+Downloading python_dateutil-3.0.0-py2.py3-none-any.whl (94 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 94.7/94.7 kB 20.2 MB/s eta 0:00:00
+Downloading starlette-1.10.0-py3-none-any.whl (80 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.6/80.6 kB 10.5 MB/s eta 0:00:00
+Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 132.1/132.1 kB 29.8 MB/s eta 0:00:00
+Downloading threadpoolctl-3.7.0-py3-none-any.whl (26 kB)
+Downloading tifffile-2026.10.15-py3-none-any.whl (276 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 277.0/277.0 kB 29.9 MB/s eta 0:00:00
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 10.4 MB/s eta 0:00:00
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.7/135.7 kB 30.1 MB/s eta 0:00:00
+Downloading affine-3.0.1-py3-none-any.whl (10 kB)
+Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 17.1 MB/s eta 0:00:00
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading pystac_core-1.15.2-py3-none-any.whl (117 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.3/117.3 kB 29.6 MB/s eta 0:00:00
+Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Downloading pystac_ext_classification-2.0.1-py3-none-any.whl (7.4 kB)
+Downloading pystac_ext_datacube-2.2.1-py3-none-any.whl (7.1 kB)
+Downloading pystac_ext_eo-1.1.1-py3-none-any.whl (7.7 kB)
+Downloading pystac_ext_file-2.1.1-py3-none-any.whl (5.8 kB)
+Downloading pystac_ext_grid-1.1.1-py3-none-any.whl (3.6 kB)
+Downloading pystac_ext_item_assets-1.0.1-py3-none-any.whl (3.7 kB)
+Downloading pystac_ext_label-1.0.2-py3-none-any.whl (8.2 kB)
+Downloading pystac_ext_mgrs-1.0.1-py3-none-any.whl (4.1 kB)
+Downloading pystac_ext_mlm-1.4.1-py3-none-any.whl (13 kB)
+Downloading pystac_ext_pointcloud-1.0.1-py3-none-any.whl (6.5 kB)
+Downloading pystac_ext_projection-2.0.1-py3-none-any.whl (7.4 kB)
+Downloading pystac_ext_raster-1.1.1-py3-none-any.whl (6.8 kB)
+Downloading pystac_ext_render-2.0.0-py3-none-any.whl (5.0 kB)
+Downloading pystac_ext_sar-1.0.1-py3-none-any.whl (6.5 kB)
+Downloading pystac_ext_sat-1.0.1-py3-none-any.whl (4.9 kB)
+Downloading pystac_ext_scientific-1.0.1-py3-none-any.whl (5.5 kB)
+Downloading pystac_ext_storage-2.0.1-py3-none-any.whl (7.6 kB)
+Downloading pystac_ext_table-1.2.1-py3-none-any.whl (4.7 kB)
+Downloading pystac_ext_timestamps-1.1.1-py3-none-any.whl (4.6 kB)
+Downloading pystac_ext_version-1.2.1-py3-none-any.whl (5.8 kB)
+Downloading pystac_ext_view-1.0.1-py3-none-any.whl (4.8 kB)
+Downloading pystac_ext_xarray_assets-1.0.1-py3-none-any.whl (3.9 kB)
+Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 348.0/348.0 kB 36.9 MB/s eta 0:00:00
+Checking if build backend supports build_editable: started
+Checking if build backend supports build_editable: finished with status 'done'
+Building wheels for collected packages: geocrop-engine
+  Building editable for geocrop-engine (pyproject.toml): started
+  Building editable for geocrop-engine (pyproject.toml): finished with status 'done'
+  Created wheel for geocrop-engine: filename=geocrop_engine-0.9.0-0.editable-py3-none-any.whl size=16270 sha256=b6003b680bd31cc895023003202086f260e0d14f1cf2f98e51698837ec1fbba2
+  Stored in directory: /tmp/pip-ephem-wheel-cache-ppik3dz_/wheels/fc/c0/1b/0688c704b5dfc2a1293be0fd354568783f30d3dc1ac6aa7114
+Successfully built geocrop-engine
+Installing collected packages: urllib3, tzdata, typing-extensions, threadpoolctl, six, PyYAML, pyparsing, pyarrow, pillow, packaging, numpy, networkx, narwhals, idna, h11, cloudpickle, click, charset_normalizer, certifi, attrs, annotated-types, annotated-doc, uvicorn, typing-inspection, tifffile, shapely, scipy, requests, python-dateutil, pyproj, pyogrio, pydantic-core, opentelemetry-api, lazy-loader, joblib, imageio, httpcore, anyio, affine, starlette, scikit-learn, scikit-image, rasterio, pystac-core, pydantic, pandas, httpx, pystac-ext-xarray-assets, pystac-ext-view, pystac-ext-version, pystac-ext-timestamps, pystac-ext-table, pystac-ext-storage, pystac-ext-scientific, pystac-ext-sat, pystac-ext-sar, pystac-ext-render, pystac-ext-raster, pystac-ext-projection, pystac-ext-pointcloud, pystac-ext-mgrs, pystac-ext-label, pystac-ext-item-assets, pystac-ext-grid, pystac-ext-file, pystac-ext-datacube, geopandas, fastapi, pystac-ext-eo, pystac-ext-classification, geocrop-engine, pystac-ext-mlm, pystac, pystac-client
+Successfully installed PyYAML-6.0.3 affine-3.0.1 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 attrs-26.1.0 certifi-2026.10.23 charset_normalizer-3.5.2 click-8.5.0 cloudpickle-3.1.2 fastapi-0.162.0 geocrop-engine-0.9.0 geopandas-1.2.0 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.20 imageio-2.38.1 joblib-1.6.0 lazy-loader-0.6 narwhals-2.27.1 networkx-3.7 numpy-2.5.4 opentelemetry-api-1.45.1 packaging-26.3 pandas-3.1.0 pillow-13.0.0 pyarrow-26.0.0 pydantic-2.14.1 pydantic-core-2.50.1 pyogrio-0.13.0 pyparsing-3.3.3 pyproj-3.8.0 pystac-1.15.2 pystac-client-0.9.1 pystac-core-1.15.2 pystac-ext-classification-2.0.1 pystac-ext-datacube-2.2.1 pystac-ext-eo-1.1.1 pystac-ext-file-2.1.1 pystac-ext-grid-1.1.1 pystac-ext-item-assets-1.0.1 pystac-ext-label-1.0.2 pystac-ext-mgrs-1.0.1 pystac-ext-mlm-1.4.1 pystac-ext-pointcloud-1.0.1 pystac-ext-projection-2.0.1 pystac-ext-raster-1.1.1 pystac-ext-render-2.0.0 pystac-ext-sar-1.0.1 pystac-ext-sat-1.0.1 pystac-ext-scientific-1.0.1 pystac-ext-storage-2.0.1 pystac-ext-table-1.2.1 pystac-ext-timestamps-1.1.1 pystac-ext-version-1.2.1 pystac-ext-view-1.0.1 pystac-ext-xarray-assets-1.0.1 python-dateutil-3.0.0 rasterio-1.5.2 requests-2.34.2 scikit-image-0.26.0 scikit-learn-1.9.1 scipy-1.18.1 shapely-2.2.0 six-1.17.0 starlette-1.10.0 threadpoolctl-3.7.0 tifffile-2026.10.15 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.5 urllib3-2.8.0 uvicorn-0.54.0
+### [install] exit 0 after 72 s
+### [help] geocrop --version && geocrop --help | head -5
+geocrop-engine 0.9.0
+usage: geocrop [-h] [--version] command ...
+
+GeoCrop Engine: open Sentinel-1/2 crop classification and parcel-level
+declaration verification.
+
+### [help] exit 0 after 0 s
+### [demo] geocrop demo --root outputs/demo && ls outputs/demo/prediction outputs/demo/parcels
+{
+  "mode": "SYNTHETIC ONLY - software verification, not scientific accuracy",
+  "cv_macro_f1": 0.965,
+  "field_points_oa": 1.0,
+  "declaration_status": {
+    "agreement": 133,
+    "discrepancy": 11
+  },
+  "traffic_light": {
+    "green": 127,
+    "red": 11,
+    "yellow": 6
+  },
+  "ablation": [
+    {
+      "experiment": "E0_S2_bands",
+      "macro_f1": 0.968
+    },
+    {
+      "experiment": "E1_S2_bands_indices",
+      "macro_f1": 0.965
+    },
+    {
+      "experiment": "E2_S2_full_temporal",
+      "macro_f1": 0.963
+    },
+    {
+      "experiment": "E3_S1_only",
+      "macro_f1": 0.683
+    },
+    {
+      "experiment": "E4_S1_S2_fusion",
+      "macro_f1": 0.965
+    }
+  ],
+  "outputs": "outputs/demo"
+}
+outputs/demo/parcels:
+parcels.csv
+parcels.gpkg
+parcels.summary.json
+
+outputs/demo/prediction:
+aoa.tif
+class_legend.json
+classes.tif
+prediction_manifest.json
+probabilities.tif
+uncertainty.tif
+### [demo] exit 0 after 66 s
+### [acceptance_offline] geocrop acceptance --offline --out outputs/acceptance
+acceptance: 46 Sentinel-2 and 20 Sentinel-1 acquisitions
+acceptance: PASS (21/21 checks)
+{
+  "verdict": "PASS",
+  "checks": {
+    "checks": 21,
+    "passed": 21,
+    "failed": []
+  },
+  "runtime_s": 44.8,
+  "error": null,
+  "report": "outputs/acceptance/acceptance_report.md"
+}
+### [acceptance_offline] exit 0 after 45 s
+### [serve] export GEOCROP_WEB_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+  geocrop serve --workspace . --port 8765 > /report/serve.log 2>&1 & SERVE_PID=$!
+  for i in $(seq 60); do curl -s -o /dev/null http://127.0.0.1:8765/ && break; sleep 1; done
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/api/v1/health); echo "without token: HTTP $code"
+  curl -fsS -H "Authorization: Bearer $GEOCROP_WEB_TOKEN" http://127.0.0.1:8765/api/v1/health; rc=$?; echo
+  kill $SERVE_PID; wait $SERVE_PID 2>/dev/null; [[ $rc == 0 && $code == 401 ]]
+without token: HTTP 401
+{"status":"ok","version":"0.9.0","workspace":"/home/alice/geocrop-engine","workers":1}
+### [serve] exit 0 after 2 s

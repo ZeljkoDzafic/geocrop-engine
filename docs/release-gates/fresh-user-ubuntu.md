@@ -68,3 +68,28 @@ Linux benchmark and was not available again before this branch was submitted. Re
 Side observations (no change): the distribution's Python 3.14 on 26.04 also installed the pinned set and ran the
 demo, but 3.14 is not in the CI matrix, so 3.12 stays the documented interpreter. The check ran on aarch64; x86_64
 (emulated or on a VM) was not run.
+
+## Follow-up in the managed Linux environment (27 October 2026)
+
+The historical aarch64 result above is not a fresh validation of every later commit. The follow-up below
+uses x86_64 Ubuntu containers, `--cpus 2 --memory 4g`, on a shared managed host, through an enforced outbound
+proxy. Raw transcripts, per-step status/timing files and their SHA-256 index are retained in
+[2026-10-27-linux/evidence.json](2026-10-27-linux/evidence.json). These are software checks on synthetic data,
+not observational crop results; their timings are not a new scale benchmark.
+
+| Image / source | Result | Details |
+|---|---|---|
+| Ubuntu 24.04.5 / `88ed027` | incomplete | installation, help, demo and offline acceptance passed; Earth Search quicklook failed with proxy CONNECT 403; serve was not run after that failure |
+| Ubuntu 24.04.5 / `13118df` | **PARTIAL: 9 passed, 1 explicitly skipped** | fresh installation, demo, offline acceptance and serve passed; quicklook explicitly skipped after the confirmed network denial |
+| Ubuntu 26.04.1 / `e815448` | blocked at interpreter setup | apt prerequisites passed; proxy returned HTTP 403 for the astral.sh uv installer; later steps were not run |
+
+In the 24.04 subset, demo took 66 s and offline acceptance 45 s. The API returned HTTP 401 without the token
+and `status: ok`, version 0.9.0, with the token. The earlier complete-network attempt passed offline acceptance
+in 43 s before its quicklook denial. Do not describe the subset as a full 10/10 PASS, or the 26.04 attempt as a
+completed installation. Repeat the denied external-data and interpreter-download steps in an environment that
+permits the documented providers before making an unrestricted fresh-user release claim.
+
+The harness now preserves proxy settings through both the login shell and sudo, restores report ownership to
+the calling user and labels skips explicitly. A combined trust bundle can be mounted read-only with
+`--ca-bundle /path/to/ca-bundle.pem`; this is infrastructure trust configuration, not a way to grant access to
+blocked destinations. TLS verification stays enabled.

@@ -1,0 +1,11 @@
+step	status	seconds
+apt	0	33
+python312	22	1
+source	not-run	0
+venv	not-run	0
+install	not-run	0
+help	not-run	0
+demo	not-run	0
+acceptance_offline	not-run	0
+quicklook	skipped	0
+serve	not-run	0

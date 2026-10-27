@@ -1,0 +1,11 @@
+step	status	seconds
+apt	0	19
+python312	0	14
+source	0	0
+venv	0	3
+install	0	72
+help	0	0
+demo	0	66
+acceptance_offline	0	45
+quicklook	skipped	0
+serve	0	2

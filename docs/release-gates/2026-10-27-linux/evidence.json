@@ -1,0 +1,37 @@
+{
+  "schema": "geocrop-installation-evidence/1",
+  "date": "2026-10-27",
+  "scope": "Software installation and synthetic acceptance only; not crop accuracy or field validation.",
+  "files": [
+    {
+      "file": "ubuntu-2404-network-steps.tsv",
+      "source_commit": "88ed027795b44066a4177be1504473748f8d6ada",
+      "sha256": "c028efa5e055b02fbe4ebe0746a5878d81ede1148c5d3a79ea7a01b7e004d4a0"
+    },
+    {
+      "file": "ubuntu-2404-network-transcript.log",
+      "source_commit": "88ed027795b44066a4177be1504473748f8d6ada",
+      "sha256": "aa1605b992d17f68a548fe9c689c16ebea5ace21d47fd16b64307de04f707f81"
+    },
+    {
+      "file": "ubuntu-2404-offline-steps.tsv",
+      "source_commit": "13118dfe3580b72672a11bfa609d416c0f94291c",
+      "sha256": "301ccf5fcd720bfab2487ebaa0c278848ff482060a5959277272e900c9647c45"
+    },
+    {
+      "file": "ubuntu-2404-offline-transcript.log",
+      "source_commit": "13118dfe3580b72672a11bfa609d416c0f94291c",
+      "sha256": "4f9d67c619fa272b9aedb71a4840a049857b1794b0cd169bdd59cc3d4040f61f"
+    },
+    {
+      "file": "ubuntu-2604-steps.tsv",
+      "source_commit": "e8154486e55f9f29bbc8fc0be9f5217683031958",
+      "sha256": "d4ab9713a25418ea3e79c1a54e78852f738369bdcdd7ab177d4529cb24021bd1"
+    },
+    {
+      "file": "ubuntu-2604-transcript.log",
+      "source_commit": "e8154486e55f9f29bbc8fc0be9f5217683031958",
+      "sha256": "20261dda9658883f366d303bef01d95a4dcc4f65b3b730d636829e6fffdeffa0"
+    }
+  ]
+}
