@@ -2,6 +2,11 @@
 
 ## Unreleased
 ### Validation fixes
+- Ablation and model-benchmark McNemar comparisons use one majority-vote prediction per reference polygon, not per pixel; reports
+  retain unit counts, deterministic tie handling and raw/Holm-adjusted p-values for separate OOF/holdout families.
+- Independent validation supports `--group-field` / `validation.group_field` for cluster bootstrap. Window-majority
+  reject curves use the window vote share, while central-pixel probability calibration is explicitly separate.
+  Probability grids/band names are checked and invalid probabilities are excluded from calibration with counts.
 - Web jobs use a separate POSIX process group when the Python/libc build cannot provide `posix_spawn(setsid)`;
   cancellation remains group-scoped and the worker never falls back to unsafe fork handlers.
 - Fresh-user checks restore host ownership of their reports, and distinguish skipped steps from a full PASS.

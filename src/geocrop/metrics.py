@@ -187,3 +187,44 @@ def mcnemar(y_true, pred_a, pred_b) -> dict:
     stat = (abs(n01 - n10) - 1) ** 2 / (n01 + n10)
     return {"a_only_correct": n01, "b_only_correct": n10, "statistic": float(stat),
             "p_value": float(chi2.sf(stat, 1)), "test": "chi-square (continuity corrected)"}
+
+
+def grouped_mcnemar(y_true, pred_a, pred_b, groups) -> dict:
+    """One majority-vote comparison per reference polygon, with deterministic lexical ties.
+
+    Repeated pixels in a polygon are not independent trials. Distinct polygons can still be spatially
+    dependent; grouping alone does not establish independence or make internal CV an external assessment.
+    """
+    y, a, b, g = (np.asarray(v).astype(str) for v in (y_true, pred_a, pred_b, groups))
+    if y.ndim != 1 or not (y.shape == a.shape == b.shape == g.shape) or not len(y):
+        raise ValueError("Grouped McNemar needs equally sized, non-empty one-dimensional arrays")
+
+    def majority(values):
+        labels, counts = np.unique(values, return_counts=True)
+        return labels[counts.argmax()]
+
+    truth, vote_a, vote_b = [], [], []
+    order = np.argsort(g, kind="stable")
+    sorted_groups = g[order]
+    boundaries = np.r_[0, np.flatnonzero(sorted_groups[1:] != sorted_groups[:-1]) + 1, len(g)]
+    for start, end in zip(boundaries[:-1], boundaries[1:]):
+        members = order[start:end]  # group once; never scan all pixels once per polygon
+        labels = np.unique(y[members])
+        if len(labels) != 1:
+            raise ValueError(f"Reference group {sorted_groups[start]!r} has conflicting labels")
+        truth.append(labels[0])
+        vote_a.append(majority(a[members]))
+        vote_b.append(majority(b[members]))
+    return {**mcnemar(truth, vote_a, vote_b), "n_units": len(truth), "unit": "reference_polygon",
+            "aggregation": "majority_vote", "tie_rule": "lexicographic"}
+
+
+def holm_adjust(p_values) -> list[float]:
+    """Holm step-down family-wise adjustment, returned in the original comparison order."""
+    p = np.asarray(p_values, dtype=float)
+    if p.ndim != 1 or not np.isfinite(p).all() or ((p < 0) | (p > 1)).any():
+        raise ValueError("P-values must be a one-dimensional sequence of finite numbers in [0, 1]")
+    order = np.argsort(p, kind="stable")
+    adjusted = np.empty_like(p)
+    adjusted[order] = np.minimum(1, np.maximum.accumulate(p[order] * np.arange(len(p), 0, -1)))
+    return adjusted.tolist()

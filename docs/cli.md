@@ -512,6 +512,8 @@ Independent validation with field observations
 | `--training` |  |  |  |
 | `--exclusion-m` |  |  |  |
 | `--window-px` |  |  |  |
+| `--group-field` |  |  | parcel/block identifier for cluster bootstrap of repeated observations |
+| `--bootstrap` |  | `1000` | bootstrap replicates; 0 reports descriptive accuracy only |
 | `--label-mapping` |  |  | CSV source,class_name |
 
 ## `geocrop area`

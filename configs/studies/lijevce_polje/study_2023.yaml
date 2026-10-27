@@ -92,6 +92,8 @@ parcels:
   min_valid_pixels: 4
 
 validation:
+  # For repeated observations within parcels, set group_field to the actual field/block identifier.
+  # Leave null only when individual points are justified as independent resampling units.
   year: 2023
   training_exclusion_m: 50
   window_px: 1

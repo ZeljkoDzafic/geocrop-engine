@@ -826,7 +826,7 @@ class Runner:
             self.log("[skip] validate (no independent observations)")
             return None
         target = self.out / "validation" / "validation_report.json"
-        fp = _fp(v, self.cfg["seed"], self.paths["observations"], self.paths["training"],
+        fp = _fp(self._section("validation"), self.cfg["seed"], self.paths["observations"], self.paths["training"],
                  [self.out / "prediction" / name for name in
                   ("classes.tif", "probabilities.tif", "class_legend.json", "prediction_manifest.json")])
 
@@ -836,7 +836,7 @@ class Runner:
                 label_field=v["label_field"], date_field=v["date_field"], year=v["year"],
                 training=self.paths["training"] if self.paths["training"].exists() else None,
                 training_exclusion_m=v["training_exclusion_m"], window_px=v["window_px"],
-                bootstrap=v["bootstrap"], seed=self.cfg["seed"])
+                bootstrap=v["bootstrap"], seed=self.cfg["seed"], group_field=v["group_field"])
             return {"oa": r["accuracy"]["overall_accuracy"], "macro_f1": r["accuracy"]["macro_f1"],
                     "selection": r["selection"]}
         return self.stage("validate", fp, [target, target.with_name("observations_evaluated.csv"),

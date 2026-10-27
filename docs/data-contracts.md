@@ -14,7 +14,7 @@ explicit nodata (`-9999` for float, `255` for class indices) and band descriptio
 | Composite folder | `<window>/<B..>.tif`, `<window>/[ASC_|DESC_]VV.tif`, `valid_count.tif` | one folder per window, same grid |
 | Training polygons | GeoPackage/GeoJSON | `polygon_id` (unique), `class_name`; projected CRS recommended |
 | Parcels | GeoPackage/GeoJSON | `parcel_id` (unique), optional `declared_crop`; map external fields with `normalize-parcels` |
-| Field observations | GeoPackage/GeoJSON points | `class_name`, `observed_at` (ISO date/time); never used for training |
+| Field observations | GeoPackage/GeoJSON points | `class_name`, `observed_at` (ISO date/time); optional non-empty parcel/block field selected by `validation.group_field`; never used for training |
 | Crop / label mapping | CSV | `source,class_name` (declaration or field codes → model classes) |
 | U-Net patches | `.npy` | images `[N, C, H, W]`, boundary masks `[N, H, W]` (1 = boundary) |
 
@@ -40,8 +40,8 @@ with an upgrade hint. See [ADR 0003](adr/0003-file-contracts-and-schema-versions
 | `uncertainty.tif` | GeoTIFF float32 | `max_probability`, `margin`, `entropy` (normalised to [0, 1]) |
 | `parcels.gpkg` / `.csv` / `.summary.json` | vector + table | see [parcels.md](parcels.md) |
 | `train_report.json`, `cv_confusion.csv` | JSON/CSV | spatial CV results |
-| `validation_report.json`, `confusion_matrix.csv`, `observations_evaluated.csv` | JSON/CSV | independent validation |
-| `ablation.csv` / `.json` | CSV/JSON | experiment comparison |
+| `validation_report.json`, `confusion_matrix.csv`, `observations_evaluated.csv` | JSON/CSV | independent validation; protocol, bootstrap grouping and confidence support are recorded |
+| `ablation.csv` / `.json` | CSV/JSON | experiment comparison; reference-polygon McNemar units, raw and Holm-adjusted p-values |
 | `run_manifest.json`, `stages.json` | JSON | provenance and stage cache |
 
 Confusion matrices use rows = reference, columns = prediction.

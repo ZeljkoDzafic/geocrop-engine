@@ -389,6 +389,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--training")
     x.add_argument("--exclusion-m", type=float, default=0)
     x.add_argument("--window-px", type=int, default=0)
+    x.add_argument("--group-field", help="parcel/block identifier for cluster bootstrap of repeated observations")
+    x.add_argument("--bootstrap", type=int, default=1000, help="bootstrap replicates; 0 reports descriptive accuracy only")
     x.add_argument("--label-mapping", help="CSV source,class_name")
 
     x = cmd("area", "Mapped area per class and Olofsson et al. (2014) error-adjusted estimates")
@@ -1310,7 +1312,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .adapters import read_mapping
         from .validation import evaluate_points
         r = evaluate_points(a.prediction, a.observations, a.out, a.label_field, a.date_field, a.year, a.training,
-                            a.exclusion_m, a.window_px, read_mapping(a.label_mapping) or None)
+                            a.exclusion_m, a.window_px, read_mapping(a.label_mapping) or None,
+                            bootstrap=a.bootstrap, group_field=a.group_field)
         _print({"selection": r["selection"], "overall_accuracy": r["accuracy"]["overall_accuracy"],
                 "macro_f1": r["accuracy"]["macro_f1"], "bootstrap": r.get("bootstrap")})
     elif c == "area":

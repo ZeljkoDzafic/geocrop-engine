@@ -92,11 +92,12 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
         cv.pop("_oof_proba"), cv.pop("_classes")
         if reference_oof is None:
             reference_name, reference_oof = name, oof
-        test_p = metrics.mcnemar(samples.y, oof, reference_oof)
+        test_p = metrics.grouped_mcnemar(samples.y, oof, reference_oof, samples.polygon)
         row = {"experiment": name, "status": "ok", "n_features": len(names),
                "overall_accuracy": cv["overall_accuracy"], "kappa": cv["kappa"], "macro_f1": cv["macro_f1"],
                "macro_f1_fold_std": cv["fold_macro_f1_std"], "ece": cv["calibration"]["ece"],
-               "vs": reference_name, "mcnemar_p": test_p["p_value"]}
+               "vs": reference_name, "mcnemar_p": test_p["p_value"],
+               "mcnemar_n_units": test_p["n_units"], "mcnemar_unit": test_p["unit"]}
         for t in targets or []:
             row[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
         if tv is not None:
@@ -110,17 +111,34 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
             h = metrics.summary(test.y, pred, labels=np.unique(np.concatenate([samples.y, test.y])))
             if ref_hold is None:
                 ref_hold = pred
+            hold_test = metrics.grouped_mcnemar(test.y, pred, ref_hold, test.polygon)
             row.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"],
-                        "holdout_mcnemar_p": metrics.mcnemar(test.y, pred, ref_hold)["p_value"]})
+                        "holdout_mcnemar_p": hold_test["p_value"], "holdout_mcnemar_n_units": hold_test["n_units"]})
         rows.append(row)
-        full[name] = {"spec": spec, "features": names, "cv": cv}
+        full[name] = {"spec": spec, "features": names, "cv": cv, "paired_test": test_p}
+        if test is not None:
+            full[name]["holdout_paired_test"] = hold_test
         if tv is not None:
             full[name]["transfer_validation"] = tv
+    for column in ("mcnemar_p", "holdout_mcnemar_p"):
+        report_key = "holdout_paired_test" if column.startswith("holdout") else "paired_test"
+        comparisons = [row for row in rows if column in row and row["experiment"] != reference_name]
+        for row, adjusted in zip(comparisons, metrics.holm_adjust([row[column] for row in comparisons])):
+            row[column + "_holm"] = adjusted
+            full[row["experiment"]][report_key]["p_value_holm"] = adjusted
+        for row in rows:
+            if row.get("experiment") == reference_name and column in row:
+                row[column + "_holm"] = 1.0
+                full[reference_name][report_key]["p_value_holm"] = 1.0
     table = pd.DataFrame(rows)
     table.to_csv(out / "ablation.csv", index=False)
     (out / "ablation.json").write_text(json.dumps({
         "spatial_block_m": spatial_block_m, "spatial_buffer_m": spatial_buffer_m, "n_splits": n_splits, "seed": seed,
         "cv_strategy": cv_strategy,
+        "paired_comparison": {"unit": "reference_polygon", "aggregation": "majority_vote",
+                              "tie_rule": "lexicographic", "baseline": reference_name,
+                              "adjustment": "Holm against baseline, excluding self; OOF and holdout families separate",
+                              "assumption": "Distinct reference polygons must be independent sampling units"},
         "params": params, "calibration_mode": calibration_mode, "calibration_split": calibration_split,
         "holdout_fraction": holdout_fraction, "holdout_samples": 0 if test is None else int(len(test.y)),
         "n_samples": int(len(samples.y)), "n_groups": int(len(np.unique(groups))), "experiments": full},
@@ -130,7 +148,8 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
                                    spatial_block_m=spatial_block_m, spatial_buffer_m=spatial_buffer_m, holdout=test,
                                    strategies=() if cv_strategy == "spatial_blocks" else (cv_strategy,),
                                    candidate_key="experiment", started=t_run,
-                                   protocol={"params": params, "calibration_mode": calibration_mode})
+                                   protocol={"params": params, "calibration_mode": calibration_mode,
+                                             "paired_unit": "reference_polygon", "p_adjustment": "Holm"})
     return table
 
 

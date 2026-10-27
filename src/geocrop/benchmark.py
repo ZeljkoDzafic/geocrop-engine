@@ -267,7 +267,9 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 run[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
             if r == 0 and oof is not None:
                 reference.setdefault("oof", (name, oof))
-                run["mcnemar_p_vs_reference"] = metrics.mcnemar(y, oof, reference["oof"][1])["p_value"]
+                paired = metrics.grouped_mcnemar(y, oof, reference["oof"][1], poly)
+                run["mcnemar_p_vs_reference"] = paired["p_value"]
+                run["mcnemar_n_units"] = paired["n_units"]
             if hold:
                 Xt = test.subset(features) if features else test.X
                 pred = predict_labels(est, Xt).astype(str)
@@ -275,8 +277,9 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 run.update({"holdout_overall_accuracy": h["overall_accuracy"], "holdout_macro_f1": h["macro_f1"]})
                 if r == 0:
                     reference.setdefault("hold", (name, pred))
-                    run["holdout_mcnemar_p_vs_reference"] = metrics.mcnemar(test.y, pred,
-                                                                            reference["hold"][1])["p_value"]
+                    paired = metrics.grouped_mcnemar(test.y, pred, reference["hold"][1], test.polygon)
+                    run["holdout_mcnemar_p_vs_reference"] = paired["p_value"]
+                    run["holdout_mcnemar_n_units"] = paired["n_units"]
             runs.append(run)
         frame = pd.DataFrame(runs).drop(columns=["fold_signature"])
         row = {"model": name, "status": "ok", "repeats": repeats, "tuned": name in grids}
@@ -288,13 +291,27 @@ def models(samples: Samples, output_dir: str | Path, features: list[str] | None 
                 row[col] = vals.mean()
                 if col in ("overall_accuracy", "macro_f1", "holdout_macro_f1") and len(vals) > 1:
                     row[f"{col}_sd"] = vals.std(ddof=1)
+        row["mcnemar_unit"] = "reference_polygon"
         rows.append(row)
         details[name] = {"params": params, "grid": grids.get(name), "runs": runs,
                          "fold_signatures": [r["fold_signature"] for r in runs]}
+    for column, ref_key in (("mcnemar_p_vs_reference", "oof"), ("holdout_mcnemar_p_vs_reference", "hold")):
+        baseline = reference.get(ref_key, (None,))[0]
+        comparisons = [row for row in rows if column in row and row["model"] != baseline]
+        for row, adjusted in zip(comparisons, metrics.holm_adjust([row[column] for row in comparisons])):
+            row[column + "_holm"] = adjusted
+            details[row["model"]]["runs"][0][column + "_holm"] = adjusted
+        if baseline in details:
+            details[baseline]["runs"][0][column + "_holm"] = 1.0
+            next(row for row in rows if row["model"] == baseline)[column + "_holm"] = 1.0
     table = pd.DataFrame(rows)
     table.to_csv(out / "benchmark_models.csv", index=False)
     (out / "benchmark_models.json").write_text(json.dumps({
         "reference_model": reference.get("oof", (None,))[0], "n_splits": n_splits, "spatial_block_m": spatial_block_m,
+        "holdout_reference_model": reference.get("hold", (None,))[0],
+        "paired_comparison": {"unit": "reference_polygon", "aggregation": "majority_vote",
+                              "tie_rule": "lexicographic", "repeat": "first repeat only",
+                              "adjustment": "Holm against baseline, excluding self; OOF and holdout families separate"},
         "holdout_fraction": holdout_fraction, "samples": int(len(y)), "details": details,
         "spatial_buffer_m": spatial_buffer_m, "calibration_mode": calibration_mode,
         "calibration_split": calibration_split,

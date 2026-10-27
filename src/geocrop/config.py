@@ -39,6 +39,7 @@ FINGERPRINT_NEUTRAL: dict[tuple[str, ...], Any] = {
     ("model", "params"): {},
     ("cbm", "event_markers"): False,
     ("parcel_classify",): PARCEL_CLASSIFY_DEFAULTS,
+    ("validation", "group_field"): None,
 }
 
 DEFAULTS: dict[str, Any] = {
@@ -165,6 +166,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "validation": {
         "label_field": "class_name",
+        "group_field": None,
         "date_field": "observed_at",
         "year": None,
         "training_exclusion_m": 0,
@@ -385,6 +387,13 @@ def validate(cfg: dict) -> dict:
         raise ConfigError("openeo.s1_coefficient must be sigma0-ellipsoid or gamma0-terrain")
     _validate_resources(cfg["resources"], cfg["preflight"])
     _validate_data(cfg["data"])
+    group_field = cfg["validation"]["group_field"]
+    if group_field is not None and (not isinstance(group_field, str) or not group_field.strip()):
+        raise ConfigError("validation.group_field must be a non-empty field name or null")
+    for key in ("window_px", "bootstrap"):
+        value = cfg["validation"][key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ConfigError(f"validation.{key} must be a non-negative integer")
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")

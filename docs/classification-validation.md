@@ -94,8 +94,12 @@ probabilities.
 
 ## Experiments
 `geocrop ablation` evaluates each feature subset on the *same* samples and folds and adds a McNemar test
-against the first experiment (out-of-fold predictions; pixels are autocorrelated, so treat p-values as
-indicative and confirm with point- or parcel-level comparisons). Default ladder (`experiments.DEFAULT_EXPERIMENTS`,
+against the first successful experiment. Each reference polygon contributes one majority-vote prediction,
+with lexical tie-breaking, rather than one trial per pixel. The CSV/JSON record the unit count, raw p-values
+and Holm-adjusted p-values (`mcnemar_p_holm`); the baseline self-comparison is excluded from the correction
+family, and OOF and holdout comparisons form separate families. Distinct polygons may still be spatially
+correlated: these internal diagnostics require independent-unit justification and do not replace external
+field validation. Old pixel-level p-values are not directly comparable to these polygon-level results. Default ladder (`experiments.DEFAULT_EXPERIMENTS`,
 used when the configuration has no `experiments:` section):
 
 | ID | Features |
@@ -123,6 +127,27 @@ feature group or window.
 4. maps field labels with `--label-mapping` and lists observed classes the model does not know;
 5. reports the confusion matrix, OA, κ, macro-F1, per-class UA/PA/F1, bootstrap CIs, reliability bins and a
    **reject curve** (accuracy vs. share of points sent to review as the confidence threshold rises).
+
+Use `--group-field parcel_id` (YAML `validation.group_field`) when multiple observations belong to the same
+parcel, or provide a suitable spatial-block identifier. The bootstrap resamples whole groups and records the
+field name and independent-unit count. At least two evaluated groups are required for cluster bootstrap;
+`--bootstrap 0` (YAML `bootstrap: 0`) permits descriptive accuracy for smaller samples. The default resamples individual points and
+therefore assumes independent observations. Grouping does not repair convenience sampling or establish that
+neighbouring groups are independent. Accuracy remains weighted per evaluated observation; grouping changes
+resampling, not the target metric to equal-weight parcel accuracy.
+
+For a majority window, `decision_confidence` is the winning class's share of valid window votes; it is a spatial
+agreement diagnostic, not a calibrated probability. The reject curve uses that confidence and that majority
+decision. With `window_px: 0`, confidence is the probability of the predicted class. Central-pixel probability
+calibration is explicitly reported as a separate diagnostic; invalid central probabilities are counted and
+excluded from it without discarding a valid majority decision. Probability rasters must share the class grid
+and have uniquely named bands matching the legend. The protocol and confidence support count are retained in
+`validation_report.json`, with grouping identifiers in `observations_evaluated.csv` when configured.
+
+`geocrop benchmark-models` uses the same polygon-majority comparisons and separate OOF/holdout Holm families.
+Paired tests use the first repeat only; repeated seeds summarize accuracy variation rather than create additional
+independent trials. Nested-tuned candidates without OOF predictions have no OOF paired test; the report records
+the actual OOF and held-out reference model names separately.
 
 ## Area estimation
 Pixel counting is biased by classification errors. When the validation sample is a probability sample

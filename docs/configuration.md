@@ -65,6 +65,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `min_confidence`, `min_majority_share`, `min_margin` | null | review thresholds (choose on validation data) |
 | | `conformal_alpha`, `min_aoa_fraction` | 0.1, 0.5 | conformal level for parcel sets; AOA share required for acceptance |
 | `validation` | `label_field`, `date_field`, `year` | `class_name`, `observed_at`, null | observation schema and season |
+| | `group_field` | null | optional parcel/block identifier for cluster bootstrap; null resamples individual observations |
 | | `training_exclusion_m`, `window_px`, `bootstrap` | 0, 1, 1000 | leakage buffer, GNSS window, bootstrap replicates |
 | `openeo` | `url`, `products`, `s2_collection`, `s1_collection`, `s1_coefficient`, `s1_card4l`, `max_cloud_cover`, `signature_indices`, `start`, `end`, `job_options`, `work_dir` | CDSE openEO, `[s2_composites]`, … | optional openEO back-end of `geocrop openeo-graph` / `openeo-extract`; not read by `geocrop run`; defaults and meaning in [openEO](openeo.md#configuration) |
 | `data` | `source` | `local` | `local` or `odc-stac`; read by `geocrop cube load --config`, not by `geocrop run` (the pipeline always reads `paths.s2_scenes`), see [datacube](datacube.md) |
