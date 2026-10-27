@@ -41,7 +41,7 @@ custom platforms) can consume the results.
 
 ## Status
 
-Version 0.9.0, research software. The whole chain is tested on synthetic data and runs on real
+Version 1.0.0rc1 (release candidate), research software. The whole chain is tested on synthetic data and runs on real
 Sentinel-2 L2A and Sentinel-1 RTC data from public STAC services. Crop-type accuracy has been measured only on
 public Slovenian data with declared labels (parcel OA 86.9–88.5 %, [public benchmarks](docs/benchmarks/README.md));
 **field-verified accuracy in the study region (northern Bosnia and Herzegovina) is not yet established**, and
@@ -218,7 +218,7 @@ Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 If you use GeoCrop Engine, please cite it via [CITATION.cff](CITATION.cff):
 
 > Džafić, Ž.; Adžić, D. *GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and
-> parcel-level declaration verification* (version 0.9.0) [Software]. 2026.
+> parcel-level declaration verification* (version 1.0.0rc1) [Software]. 2026.
 > https://github.com/ZeljkoDzafic/geocrop-engine
 
 ## License

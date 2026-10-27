@@ -14,7 +14,7 @@
 # Requires Docker and network access (apt, PyPI, GitHub or the local repository, Earth Search STAC/COGs).
 #
 #   tools/fresh_user_check.sh                                  # local HEAD (git archive), ubuntu:26.04
-#   tools/fresh_user_check.sh --ref v0.9.0 --clone             # a tag or branch cloned from GitHub
+#   tools/fresh_user_check.sh --ref v1.0.0rc1 --clone             # a tag or branch cloned from GitHub
 #   tools/fresh_user_check.sh --image ubuntu:24.04 --cpus 2 --memory 4g --out /tmp/fresh
 #   tools/fresh_user_check.sh --skip quicklook                 # skip steps by name (offline machines)
 #
