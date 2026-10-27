@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+
+## 1.0.0rc1 — 2026-10-27
+Release candidate for 1.0. Highlights: layered architecture with plugin registries and file contracts, reliability and
+release gate, preflight and disk guard, web workspace redesign with terminal and parcel review, S1+S2 acceptance run,
+foundation-model feature providers, FTW boundaries, active learning, domain-shift safeguards, model/benchmark
+registry, data-cube and openEO adapters, Lijevče polje study configuration. Field-verified accuracy in the Republic of
+Srpska is still open; see docs/limitations.md.
 ### Validation fixes
 - Ablation and model-benchmark McNemar comparisons use one majority-vote prediction per reference polygon, not per pixel; reports
   retain unit counts, deterministic tie handling and raw/Holm-adjusted p-values for separate OOF/holdout families.
