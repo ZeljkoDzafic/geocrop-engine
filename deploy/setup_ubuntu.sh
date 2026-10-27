@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # GeoCrop Engine — one-time setup of an Ubuntu 26.04/24.04 research VM (no GPU needed).
-#   sudo bash deploy/setup_ubuntu.sh            # system packages, directories
+#   sudo bash deploy/setup_ubuntu.sh            # system packages, directories owned by the sudo user
+#   sudo GEOCROP_USER=geocrop bash deploy/setup_ubuntu.sh   # ... owned by another run user
 #   bash deploy/setup_ubuntu.sh --user          # Miniforge, conda env, engine (as the run user)
 #   SNAP_VERSION=11.0 bash deploy/setup_ubuntu.sh --snap   # optional ESA SNAP (Sentinel-1)
 set -euo pipefail
@@ -45,6 +46,14 @@ fi
 apt-get update
 apt-get install -y --no-install-recommends git tmux unzip curl ca-certificates htop iotop
 mkdir -p "$DATA"/{raw,interim,processed,reference,outputs} "$SCRATCH"
+# The run user (GEOCROP_USER, default: the user who called sudo) owns the data and scratch trees; root-owned
+# mode-750 directories would make every pilot command of the runbook fail with "Permission denied".
+OWNER=${GEOCROP_USER:-${SUDO_USER:-}}
+if [[ -n "$OWNER" && "$OWNER" != root ]]; then
+  chown -R "$OWNER": "$DATA" "$SCRATCH"
+else
+  echo "Warning: no run user (set GEOCROP_USER=<user> or run via sudo); $DATA and $SCRATCH stay owned by root." >&2
+fi
 chmod 750 "$DATA" "$SCRATCH"
 echo "Directories: $DATA (archive), $SCRATCH (fast local disk for SNAP and temporary files)"
 echo "Next, as the run user: bash deploy/setup_ubuntu.sh --user"

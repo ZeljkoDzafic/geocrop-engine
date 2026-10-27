@@ -23,7 +23,9 @@ PYTHON=${PYTHON:-python3.12}
 
 if [[ "${1:-}" == "--system" ]]; then
   apt-get update
-  apt-get install -y --no-install-recommends git curl ca-certificates build-essential libgomp1
+  # libexpat1: needed by the GDAL inside the rasterio wheel (uv's standalone Python does not pull it in; today
+  # only git's dependencies do); libgomp1: OpenMP runtime of the LightGBM wheel.
+  apt-get install -y --no-install-recommends git curl ca-certificates build-essential libgomp1 libexpat1
   # Ubuntu 24.04 ships Python 3.12; Ubuntu 26.04 ships a newer default, so 3.12 (the pinned constraints'
   # interpreter) comes from uv's standalone builds when the distribution has no python3.12 package.
   if apt-cache show python3.12-venv >/dev/null 2>&1; then

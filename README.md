@@ -61,8 +61,24 @@ python3.12 -m venv .venv && source .venv/bin/activate     # or python3.10 / pyth
 python -m pip install -e '.[all,web]'                      # add -c constraints/py312.txt for pinned versions
 ```
 
-Ubuntu 26.04 ships a system Python newer than 3.12: use a 3.12 interpreter (for example from uv), conda or
-Docker there; Ubuntu 24.04 has `python3.12`. `.[all,web]` adds scikit-image (segmentation), pystac-client (STAC search/import), pyarrow (GeoParquet) and the
+On a fresh Ubuntu 26.04 or 24.04 machine, as an ordinary user with `sudo` (this sequence and the quick start
+below are checked end to end by `tools/fresh_user_check.sh`, see
+[fresh-user check](docs/release-gates/fresh-user-ubuntu.md)):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends git curl ca-certificates libgomp1 libexpat1
+# Python 3.12, the interpreter of constraints/py312.txt:
+sudo apt-get install -y --no-install-recommends python3.12 python3.12-venv      # Ubuntu 24.04
+# Ubuntu 26.04 ships Python 3.14 and no python3.12 package; install 3.12 with uv instead (no root needed):
+curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH="$HOME/.local/bin:$PATH" && uv python install 3.12
+git clone https://github.com/ZeljkoDzafic/geocrop-engine.git && cd geocrop-engine
+python3.12 -m venv .venv && source .venv/bin/activate
+python -m pip install -c constraints/py312.txt -e '.[all,web]'
+```
+`libexpat1` is needed by the GDAL inside the rasterio wheel (minimal images lack it when Python does not come from
+the distribution, e.g. with uv: `ImportError: libexpat.so.1`); `libgomp1` by the LightGBM wheel of `boost`.
+Activate the environment (`source .venv/bin/activate`) in every new shell. `.[all,web]` adds scikit-image (segmentation), pystac-client (STAC search/import), pyarrow (GeoParquet) and the
 local web workspace. The core install (`pip install -e .`) already runs `geocrop demo`. Further optional extras:
 
 | Extra | Adds |
@@ -109,6 +125,8 @@ geocrop quicklook --bbox 19.10 44.72 19.16 44.76 --start 2023-06-01 --end 2023-0
 # 4. Browse everything in the local web workspace (http://127.0.0.1:8765, token-protected)
 export GEOCROP_WEB_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 geocrop serve --workspace . --port 8765
+#    from a second shell with the same GEOCROP_WEB_TOKEN: the API answers only with the token
+curl -H "Authorization: Bearer $GEOCROP_WEB_TOKEN" http://127.0.0.1:8765/api/v1/health
 ```
 
 **Synthetic metrics verify the software only; they say nothing about real-world accuracy.** Open

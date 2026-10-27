@@ -295,3 +295,45 @@ def test_estimate_is_calibrated_against_the_measured_500_km2_run(study):
     assert est["peak_ram_gb"]["max"] >= 6.1
     small = preflight.estimate(cfg, {**layout, "pixels": 250_000}, n_samples=28_600, n_classes=4)
     assert small["peak_ram_gb"]["max"] >= 1.0          # interpreter + GDAL overhead is always included
+
+
+def test_memory_limit_honours_cgroup_limits(tmp_path):
+    installed, source = preflight.memory_limit_bytes(cgroup_files=())
+    assert source == "installed"
+    v2 = tmp_path / "memory.max"
+    v2.write_text("max\n")                                    # cgroup v2 without a limit
+    assert preflight.memory_limit_bytes(cgroup_files=(str(v2),)) == (installed, "installed")
+    v2.write_text(f"{2**30}\n")                               # docker run --memory 1g
+    assert preflight.memory_limit_bytes(cgroup_files=(str(v2),)) == (2**30, str(v2))
+    v1 = tmp_path / "memory.limit_in_bytes"
+    v1.write_text("9223372036854771712\n")                    # cgroup v1 "unlimited" sentinel
+    assert preflight.memory_limit_bytes(cgroup_files=(str(tmp_path / "absent"), str(v1))) == (installed, "installed")
+
+
+def test_ram_check_uses_the_container_limit(study, monkeypatch):
+    monkeypatch.setattr(preflight, "memory_limit_bytes", lambda *a, **k: (10**6, "/sys/fs/cgroup/memory.max"))
+    rep = preflight.run(_cfg(study))
+    ram = next(c for c in rep["checks"] if c["code"] == "resources.ram")
+    assert ram["status"] == "error" and "cgroup" in ram["message"]
+    assert ram["details"]["memory_source"].endswith("memory.max") and rep["verdict"] == "blocked"
+
+
+def test_available_cpus_honours_cgroup_quota(tmp_path):
+    base, _ = preflight.available_cpus(cgroup_files=())
+    v2 = tmp_path / "cpu.max"
+    v2.write_text("max 100000\n")
+    assert preflight.available_cpus(cgroup_files=(str(v2),))[0] == base
+    v2.write_text("50000 100000\n")                              # docker run --cpus 0.5
+    assert preflight.available_cpus(cgroup_files=(str(v2),)) == (0.5, str(v2))
+    quota, period = tmp_path / "cfs_quota_us", tmp_path / "cfs_period_us"
+    quota.write_text("-1\n")                                      # cgroup v1 without quota
+    period.write_text("100000\n")
+    assert preflight.available_cpus(cgroup_files=((str(quota), str(period)),))[0] == base
+
+
+def test_training_estimate_scales_with_usable_cpus(study):
+    cfg = _cfg(study, model={"n_estimators": 100, "cv_folds": 3})
+    layout = preflight.plan(cfg)
+    train = {c: preflight.estimate(cfg, layout, n_samples=5_000_000, cpus=c)["runtime_hours_rough"]["train"]
+             for c in (2, 8, 32)}
+    assert train[8] == train[32] and train[2] == pytest.approx(4 * train[8], rel=0.01)

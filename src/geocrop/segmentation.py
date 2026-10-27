@@ -17,6 +17,7 @@ import geopandas as gpd
 import numpy as np
 import rasterio
 from rasterio.features import shapes
+from rasterio.windows import Window
 from shapely.geometry import shape
 
 from .raster import blocks, expand, float_profile, valid_mask
@@ -42,13 +43,31 @@ def _write(frame: gpd.GeoDataFrame, output: str | Path) -> Path:
 
 
 def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 98) -> np.ndarray:
-    """Per-band percentiles from a decimated read of the whole raster, so every tile is normalised identically."""
+    """Per-band percentiles of a regular subsample of the whole raster, so every tile is normalised identically.
+
+    Every f-th row and column (f = longest side / `sample`, rounded up) is taken, reading window by window along
+    the file's own blocks. A single decimated read (`out_shape`) of a pixel-interleaved multi-band stack makes GDAL
+    decompress each row of tiles again for every output row once that row of tiles no longer fits the block cache
+    (GDAL_CACHEMAX defaults to 5 % of RAM or of the container limit): on a 5 Mpx, 97-band stack in a 4 GB container
+    it had not finished after 39 min; read block by block it takes ~10 s.
+    """
     f = max(1, int(np.ceil(max(src.width, src.height) / sample)))
-    arr = src.read(idx, out_shape=(len(idx), max(1, src.height // f), max(1, src.width // f))).astype("float32")
-    ok = valid_mask(arr, src.nodata)
-    if not ok.any():
+    bh, bw = src.block_shapes[0]
+    wh, ww = -(-256 // bh) * bh, -(-256 // bw) * bw          # whole blocks, at least 256 px a side
+    values = [[] for _ in idx]
+    for top in range(0, src.height, wh):
+        for left in range(0, src.width, ww):
+            r0, c0 = (f // 2 - top) % f, (f // 2 - left) % f      # global rows/cols with index % f == f // 2
+            h, w = min(wh, src.height - top), min(ww, src.width - left)
+            if r0 >= h or c0 >= w:
+                continue
+            arr = src.read(idx, window=Window(left, top, w, h))[:, r0::f, c0::f].astype("float32")
+            ok = valid_mask(arr, src.nodata)
+            for b in range(len(idx)):
+                values[b].append(arr[b][ok])
+    if not any(v.size for v in values[0]):
         raise ValueError("No valid pixels")
-    return np.array([np.percentile(arr[b][ok], [low, high]) for b in range(len(idx))])
+    return np.array([np.percentile(np.concatenate(v), [low, high]) for v in values])
 
 
 def _stretch(arr, ok, ranges):

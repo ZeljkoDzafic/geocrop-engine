@@ -197,6 +197,31 @@ def test_obia_merges_fields_across_tile_seams(tmp_path):
     assert list(seg.segment_id) == list(range(1, len(seg) + 1))
 
 
+def test_global_stretch_reads_a_regular_subsample_block_by_block(tmp_path):
+    """Percentiles of every f-th row/column, read along the file's tiles (no decimated whole-raster read, which
+    thrashes GDAL's block cache on pixel-interleaved stacks)."""
+    import rasterio
+    from rasterio.transform import from_origin
+
+    from geocrop.segmentation import global_stretch
+
+    rng = np.random.default_rng(0)
+    data = rng.random((5, 700, 650)).astype("float32")
+    data[:, :40, :] = -9999                                   # nodata rows are ignored
+    path = tmp_path / "stack.tif"
+    with rasterio.open(path, "w", driver="GTiff", width=650, height=700, count=5, dtype="float32", nodata=-9999,
+                       crs="EPSG:32634", transform=from_origin(0, 7000, 10, 10), tiled=True, blockxsize=128,
+                       blockysize=128, interleave="pixel", compress="deflate") as dst:
+        dst.write(data)
+    with rasterio.Env(GDAL_CACHEMAX=1), rasterio.open(path) as src:
+        got = global_stretch(src, [2, 4], sample=100)
+    f = 7                                                     # ceil(700 / 100)
+    sub = data[[1, 3], f // 2::f, f // 2::f]
+    ok = (sub != -9999).all(axis=0)
+    want = np.array([np.percentile(sub[b][ok], [2, 98]) for b in range(2)])
+    np.testing.assert_allclose(got, want, rtol=1e-6)
+
+
 def test_missing_scikit_image_names_the_extra(monkeypatch, tmp_path):
     import sys
 

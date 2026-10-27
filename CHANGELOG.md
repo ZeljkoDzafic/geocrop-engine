@@ -13,6 +13,11 @@
   (re-import) instead of crashing with `AttributeError`.
 
 ### Added
+- `tools/fresh_user_check.sh`: independent-user installation check in a pristine Ubuntu container (ordinary sudo
+  user, README steps only: apt packages, Python 3.12 via apt or uv, pinned pip install, demo, offline acceptance,
+  real Sentinel-2 quicklook, `serve` + `/api/v1/health` with a token); record in
+  docs/release-gates/fresh-user-ubuntu.md. `tools/linux_benchmark.sh`: `tools/scale_benchmark.py` in an Ubuntu
+  image with explicit `--cpus/--memory`; Linux (container) measurements in docs/performance.md.
 - Domain-shift safeguards (`geocrop.shift`, docs/domain-shift.md). Training writes `model/domain_reference.npz`.
   Prediction writes `prediction/shift_report.json` with the verdict `in-domain | mild | severe` and its reasons:
   AOA share and dissimilarity shift, class-mix adjusted domain-classifier AUC with grouped folds, standardised
@@ -299,6 +304,18 @@
   subprocess-running code.
 
 ### Fixed
+- OBIA segmentation: the global 2–98 % stretch is computed from a block-wise regular subsample; the former
+  decimated whole-raster read of the pixel-interleaved feature stack thrashed GDAL's block cache (5 % of the
+  container's memory) and had not finished after 39 min at 500 km² in a 4 GB Ubuntu container (now ~10 s).
+- `geocrop preflight`: the RAM check uses the cgroup memory limit when it is below installed RAM (Docker
+  `--memory`, systemd `MemoryMax`, Kubernetes); the training runtime estimate grows by 8 / usable CPUs below 8
+  (CPU affinity or cgroup quota), after training ran 2.1x the 8-core estimate on 2 CPUs.
+- README: the exact commands for a fresh Ubuntu 24.04/26.04 (system packages incl. `libexpat1`, without which
+  rasterio fails with uv's Python, Python 3.12 via uv on 26.04, pinned pip install) and an authenticated
+  `/api/v1/health` request after `geocrop serve`.
+- `deploy/vm_acceptance.sh --system` installs `libexpat1` explicitly (rasterio's GDAL needs it with uv's Python);
+  `deploy/setup_ubuntu.sh` gives the data/scratch directories to the run user (`GEOCROP_USER`, default the sudo
+  user) instead of leaving them root-owned with mode 750.
 - Documentation matches the code (docs/limitations.md, docs/testing.md and README rewritten): OBIA seam
   reconciliation was described as missing in limitations/segmentation; limitations now separate synthetic,
   real-data and public-benchmark evidence (field accuracy in the study region open; conformal coverage below

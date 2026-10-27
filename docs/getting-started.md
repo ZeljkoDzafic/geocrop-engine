@@ -12,7 +12,9 @@ pytest                                                     # default test tier, 
 Alternatives: `conda env create -f environment.yml && conda activate geocrop` (Python 3.11, GDAL stack from
 conda-forge), or the Docker image (see the [README](../README.md#install)). `pip install -e '.[deep]'` adds
 PyTorch for the U-Net segmentation path; the extras are listed in the README. On Ubuntu 26.04 the system
-`python3` is newer than 3.12; use conda, Docker or a 3.12 interpreter (e.g. from uv).
+`python3` is newer than 3.12: follow the README's [Ubuntu commands](../README.md#install) (system packages
+including `libexpat1`, Python 3.12 from uv, pinned `pip install -c constraints/py312.txt`), which
+`tools/fresh_user_check.sh` verifies in a pristine container.
 
 For Sentinel-1 install [ESA SNAP](https://step.esa.int/main/download/snap-download/) (9 or newer) and note the
 path of its `gpt` executable. Put SNAP's cache/temp directories on a local SSD.
