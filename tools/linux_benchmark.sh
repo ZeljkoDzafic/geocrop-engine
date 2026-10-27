@@ -20,7 +20,7 @@ MEMORY=4g
 SIZES=(100)
 MAX_HOURS=2
 OUT=""
-VOLUME=geocrop-linux-benchmark
+VOLUME=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +35,10 @@ while [[ $# -gt 0 ]]; do
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
+done
+[[ ${#SIZES[@]} -gt 0 ]] || { echo "--sizes needs at least one positive number" >&2; exit 2; }
+for size in "${SIZES[@]}"; do
+  [[ $size =~ ^[0-9]+([.][0-9]+)?$ && $size =~ [1-9] ]] || { echo "invalid area: $size" >&2; exit 2; }
 done
 [[ -n $OUT ]] || { echo "--out is required" >&2; exit 2; }
 mkdir -p "$OUT"
@@ -65,18 +69,35 @@ EOF
 echo "== building $TAG from $IMAGE at $COMMIT"
 docker build -q -t "$TAG" -f "$ctx/Dockerfile.bench" "$ctx"
 
-docker volume create "$VOLUME" >/dev/null
+if [[ -n $VOLUME ]]; then
+  docker volume create "$VOLUME" >/dev/null
+else
+  VOLUME=$(docker volume create)  # fresh results; --volume explicitly opts into resumption
+fi
 echo "== running sizes ${SIZES[*]} km2 with --cpus $CPUS --memory $MEMORY --memory-swap $MEMORY (no swap), volume $VOLUME"
 status=0
 docker run --rm --cpus "$CPUS" --memory "$MEMORY" --memory-swap "$MEMORY" -v "$VOLUME:/bench" -v "$OUT:/export" "$TAG" \
-  bash -c "set -e
-    echo \"== \$(. /etc/os-release; echo \$PRETTY_NAME) \$(uname -m) kernel \$(uname -r); nproc \$(nproc);\" \
-         \"cgroup cpu.max \$(cat /sys/fs/cgroup/cpu.max 2>/dev/null); memory.max \$(cat /sys/fs/cgroup/memory.max 2>/dev/null)\"
-    df -h /bench | tail -1
-    python tools/scale_benchmark.py run --out /bench/scale --sizes ${SIZES[*]} --max-hours $MAX_HOURS || true
-    python tools/scale_benchmark.py report --out /bench/scale --images /bench/images || true
-    cd /bench/scale && cp runs.json scale_tables.md scale_summary.json /export/ 2>/dev/null || true
-    for d in area_*km2; do mkdir -p /export/\$d; cp \$d/benchmark.json /export/\$d/ 2>/dev/null || true; done
-    du -sh /bench/scale/area_*km2" || status=$?
+  bash -s -- "$MAX_HOURS" "${SIZES[@]}" <<'BENCHMARK' || status=$?
+set -uo pipefail
+max_hours=$1; shift
+status=0
+python tools/scale_benchmark.py run --out /bench/scale --sizes "$@" --max-hours "$max_hours" || status=$?
+# Retain partial measurements, but never replace a failed run's exit status with a successful report.
+python tools/scale_benchmark.py report --out /bench/scale --images /bench/images || { rc=$?; [[ $status != 0 ]] || status=$rc; }
+for name in runs.json scale_tables.md scale_summary.json; do
+  cp "/bench/scale/$name" /export/ || { [[ $status != 0 ]] || status=1; }
+done
+shopt -s nullglob
+for area in /bench/scale/area_*km2; do
+  mkdir -p "/export/${area##*/}"
+  if [[ -f $area/benchmark.json ]]; then
+    cp "$area/benchmark.json" "/export/${area##*/}/" || { [[ $status != 0 ]] || status=1; }
+  else
+    status=1
+  fi
+done
+printf '%s\n' "$status" > /export/exit_status.txt
+exit "$status"
+BENCHMARK
 echo "== results in $OUT (data stay in docker volume $VOLUME; remove with: docker volume rm $VOLUME)"
 exit $status

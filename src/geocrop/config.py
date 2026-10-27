@@ -388,6 +388,9 @@ def validate(cfg: dict) -> dict:
     for name, spec in cfg["experiments"].items():
         if not isinstance(spec, dict) or not ({"groups", "features", "periods"} & set(spec)):
             raise ConfigError(f"Experiment {name} needs groups, features and/or periods")
+        if "sensors" in spec and (not isinstance(spec["sensors"], list) or not spec["sensors"]
+                                  or any(s not in ("S1", "S2") for s in spec["sensors"])):
+            raise ConfigError(f"Experiment {name}.sensors must be a non-empty list of S1 and/or S2")
     return cfg
 
 

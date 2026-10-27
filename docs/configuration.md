@@ -58,7 +58,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `indices`, `stats`, `groups` | [`cbm.index`], [mean, std], [ts, stats, windows, shape] | signature features |
 | | `step_days`, `output_step_days`, `window_days`, `lambda`, `bootstrap` | 5, 15, 30, 20, 200 | series grid, Whittaker smoothing, bootstrap replicates |
 | | `params` | `{}` | parcel estimator settings, e.g. `{algorithm: rf, n_estimators: 300}` (validated like `model.params`) |
-| `experiments` | `<id>: {groups, periods, features, exclude}` | E0–E4 ladder | ablation definitions |
+| `experiments` | `<id>: {groups, periods, features, exclude, sensors}` | E0–E4 ladder | ablation definitions; optional `sensors: [S2]` or `[S1]` also filters derived features by their manifest sensor |
 | `parcels` | `id_field`, `declared_field`, `crop_mapping` | `parcel_id`, `declared_crop`, null | parcel schema |
 | | `strategy` | `mean_probability` | `majority`, `mean_probability`, `combined` |
 | | `interior_buffer_px`, `min_valid_pixels` | 1, 4 | edge exclusion, resolution limit |

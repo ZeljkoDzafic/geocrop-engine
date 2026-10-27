@@ -78,15 +78,18 @@ def load_manifest(stack: str | Path) -> list[Feature]:
     return [Feature(**{**f, "periods": tuple(f.get("periods", ()))}) for f in body["features"]]
 
 
-def select(features: list[Feature], groups=None, periods=None, names=None, exclude=None) -> list[str]:
+def select(features: list[Feature], groups=None, periods=None, names=None, exclude=None, sensors=None) -> list[str]:
     """Feature subset for ablation experiments.
 
     groups: subset of GROUPS; periods: windows to keep (deltas need both ends; seasonal
     features are dropped when periods are restricted, as they summarise all windows);
     names: explicit names (combined with AND); exclude: substrings to drop.
+    sensors: exact manifest sensor names, e.g. ["S2"]; also filters derived delta/seasonal features.
     """
     chosen = []
     for f in features:
+        if sensors is not None and f.sensor not in sensors:
+            continue
         if groups and f.group not in groups:
             continue
         if periods:

@@ -173,6 +173,11 @@ sample count) with the coefficients before and after the recalibration in this r
 * Composite, feature and training runtimes are conservative by 1.0–2.7x; they are left unchanged because they
   are upper bounds on a busier machine. Scene import (network) is not estimated by preflight; use the rates below.
 
+The Linux wrapper returns a non-zero status if any requested area fails, times out, is skipped for the time
+budget, or has incomplete stage evidence. It still exports partial reports and `exit_status.txt` for diagnosis.
+Each invocation uses a fresh Docker volume by default; `--volume <name>` explicitly resumes an existing run.
+A successful report-generation step does not convert a failed benchmark into a successful run.
+
 ## Linux (container) measurements
 
 The same tool on Ubuntu, as a proxy for a VM (no Ubuntu VM was available). **This is a resource-limited container

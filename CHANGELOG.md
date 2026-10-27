@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+### Validation fixes
+- Optical E2 ablations now use `sensors: [S2]` so radar-derived delta features cannot enter the optical baseline.
+  The selector, default ladder and both 2023 study configurations enforce this separation; recorded feature lists
+  and spatial fold signatures are regression-tested.
+- Scale benchmark orchestration returns a failing status for failed, incomplete, timed-out or budget-skipped
+  requested areas. The Linux wrapper exports partial evidence without hiding failures, records `exit_status.txt`
+  and starts with a fresh Docker volume unless resumption is explicitly requested with `--volume`.
+- Fresh-user checks preserve proxy/trust settings across the ordinary-user login; `--ca-bundle` supports a
+  read-only combined CA bundle for environments with an HTTPS inspection proxy.
+
 ### Tests
 - Branch-coverage tests for error and edge paths of the result-critical core modules, review/registry and the
   data adapters (mocked HTTP, no network): every 1.0 coverage-goal module is at or above 90 % branch coverage on the

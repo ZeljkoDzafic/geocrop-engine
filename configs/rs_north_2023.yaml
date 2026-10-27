@@ -64,7 +64,7 @@ model:
 experiments:
   E0_S2_bands: {groups: [s2_band]}
   E1_S2_bands_indices: {groups: [s2_band, s2_index]}
-  E2_S2_temporal: {groups: [s2_band, s2_index, delta, seasonal]}
+  E2_S2_temporal: {groups: [s2_band, s2_index, delta, seasonal], sensors: [S2]}
   E3_S1_only: {groups: [s1]}
   E4_S1_S2_fusion: {groups: [s2_band, s2_index, s1, delta, seasonal]}
   E5_fusion_P1_P2: {groups: [s2_band, s2_index, s1, delta], periods: [P1, P2]}

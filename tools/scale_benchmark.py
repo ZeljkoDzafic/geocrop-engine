@@ -382,17 +382,35 @@ def _ram_bytes() -> int:
 
 # ----------------------------------------------------------------------------------------- orchestration
 
-def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> None:
+def completed_result(path: Path, with_s1: bool) -> dict | None:
+    """A JSON file alone is not proof that every requested stage completed."""
+    try:
+        result = json.loads(path.read_text())
+        required = set(STAGE_ORDER) - (set() if with_s1 else {"s1_import", "s1_composites"})
+        stages = result["stages"]
+        if not result.get("error") and required <= {s["stage"] for s in stages if s["status"] == "ok"}:
+            return result
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> bool:
+    """Return False when any requested area fails or is skipped for the time budget."""
     out.mkdir(parents=True, exist_ok=True)
     log = out / "runs.json"
     runs = json.loads(log.read_text()) if log.exists() else {}
     prev = None
+    complete = True
     for km2 in sorted(sizes):
         key = f"{km2:g}"
         target = out / f"area_{key}km2"
         done = target / "benchmark.json"
-        if done.exists() and not json.loads(done.read_text()).get("error"):
-            prev = json.loads(done.read_text())
+        cached = completed_result(done, km2 in s1_sizes)
+        if cached is not None:
+            prev = cached
+            runs[key] = {"status": "ok", "reused": True}
+            log.write_text(json.dumps(runs, indent=2))
             print(f"{key} km2: already measured, reused", flush=True)
             continue
         if prev and prev.get("total_wall_s"):
@@ -402,6 +420,7 @@ def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> None:
                              f"{prev['area']:g} km2) exceeds {max_hours} h"}
                 print(f"{key} km2: {runs[key]['reason']}", flush=True)
                 log.write_text(json.dumps(runs, indent=2))
+                complete = False
                 continue
         print(f"{key} km2: starting", flush=True)
         cmd = [python, str(Path(__file__).resolve()), "one", "--km2", str(km2), "--out", str(target)]
@@ -411,12 +430,16 @@ def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> None:
         try:
             rc = subprocess.run(cmd, timeout=max_hours * 3600).returncode
             status = "ok" if rc == 0 else f"exit {rc}"
+            if status == "ok" and completed_result(done, km2 in s1_sizes) is None:
+                status = "incomplete: missing or failed benchmark.json"
         except subprocess.TimeoutExpired:
             status = f"killed after {max_hours} h"
+        complete = complete and status == "ok"
         runs[key] = {"status": status, "wall_s": round(time.perf_counter() - t0, 1)}
         log.write_text(json.dumps(runs, indent=2))
-        if done.exists():
+        if status == "ok" and done.exists():
             prev = json.loads(done.read_text())
+    return complete
 
 
 # ----------------------------------------------------------------------------------------- report
@@ -603,7 +626,8 @@ def main(argv=None):
     p.add_argument("--images", default="docs/images")
     a = ap.parse_args(argv)
     if a.cmd == "run":
-        run_all(Path(a.out), a.sizes, a.sizes if a.s1_sizes is None else a.s1_sizes, a.max_hours, sys.executable)
+        if not run_all(Path(a.out), a.sizes, a.sizes if a.s1_sizes is None else a.s1_sizes, a.max_hours, sys.executable):
+            sys.exit(1)
     elif a.cmd == "one":
         res = run_one(a.km2, Path(a.out), a.s1)
         sys.exit(1 if res["error"] else 0)

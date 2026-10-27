@@ -32,6 +32,7 @@ MEMORY=4g
 OUT=""
 SKIP=""
 PLATFORM=""
+CA_BUNDLE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -42,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --cpus) CPUS=$2; shift 2 ;;
     --memory) MEMORY=$2; shift 2 ;;
     --platform) PLATFORM=$2; shift 2 ;;
+    --ca-bundle) CA_BUNDLE=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
     --skip) SKIP="$SKIP $2"; shift 2 ;;
     -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
@@ -68,6 +70,13 @@ echo "== image $IMAGE, --cpus $CPUS --memory $MEMORY, source: $SOURCE, output: $
 docker_args=(run --rm -i --cpus "$CPUS" --memory "$MEMORY" -v "$OUT:/report" -e "SKIP=$SKIP" -e "REF=$REF"
              -e "CLONE=$CLONE" -e "REPO_URL=$REPO_URL" -e "SOURCE=$SOURCE" -e "IMAGE=$IMAGE")
 [[ -n $PLATFORM ]] && docker_args+=(--platform "$PLATFORM")
+if [[ -n $CA_BUNDLE ]]; then
+  [[ -f $CA_BUNDLE ]] || { echo "CA bundle does not exist" >&2; exit 2; }
+  docker_args+=(-v "$CA_BUNDLE:/run/geocrop-ca.pem:ro")
+  for name in SSL_CERT_FILE PIP_CERT REQUESTS_CA_BUNDLE CURL_CA_BUNDLE GIT_SSL_CAINFO; do
+    docker_args+=(-e "$name=/run/geocrop-ca.pem")
+  done
+fi
 
 status=0
 docker "${docker_args[@]}" "$IMAGE" bash -s <<'CONTAINER' || status=$?
@@ -132,7 +141,8 @@ step serve 'export GEOCROP_WEB_TOKEN=$(python -c "import secrets; print(secrets.
 exit $failed
 STEPS
 chown alice: /home/alice/steps.sh
-su - alice -c "SKIP='$SKIP' REF='$REF' CLONE='$CLONE' REPO_URL='$REPO_URL' SOURCE='$SOURCE' IMAGE='$IMAGE' bash ~/steps.sh"
+su --whitelist-environment=SKIP,REF,CLONE,REPO_URL,SOURCE,IMAGE,HTTP_PROXY,HTTPS_PROXY,NO_PROXY,http_proxy,https_proxy,no_proxy,SSL_CERT_FILE,PIP_CERT,REQUESTS_CA_BUNDLE,CURL_CA_BUNDLE,GIT_SSL_CAINFO \
+  - alice -c 'bash ~/steps.sh'
 CONTAINER
 
 {

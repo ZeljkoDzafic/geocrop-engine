@@ -23,7 +23,7 @@ from .samples import Samples
 DEFAULT_EXPERIMENTS = {
     "E0_S2_bands": {"groups": ["s2_band"]},
     "E1_S2_bands_indices": {"groups": ["s2_band", "s2_index"]},
-    "E2_S2_full_temporal": {"groups": ["s2_band", "s2_index", "delta", "seasonal"]},
+    "E2_S2_full_temporal": {"groups": ["s2_band", "s2_index", "delta", "seasonal"], "sensors": ["S2"]},
     "E3_S1_only": {"groups": ["s1"]},
     "E4_S1_S2_fusion": {"groups": ["s2_band", "s2_index", "s1", "delta", "seasonal"]},
 }
@@ -77,7 +77,7 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
     for name, spec in experiments.items():
         try:
             names = select(available, groups=spec.get("groups"), periods=spec.get("periods"),
-                           names=spec.get("features"), exclude=spec.get("exclude"))
+                           names=spec.get("features"), exclude=spec.get("exclude"), sensors=spec.get("sensors"))
         except ValueError:
             rows.append({"experiment": name, "status": "skipped: no matching features"})
             continue
