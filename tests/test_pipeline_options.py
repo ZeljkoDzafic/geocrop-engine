@@ -43,13 +43,18 @@ def _inner_fingerprints(overrides):
     return runner, {s: getattr(runner, s)() for s in MAIN_FINGERPRINTS["default"]}
 
 
-def test_default_fingerprints_unchanged_from_main(tmp_path, monkeypatch):
+def test_default_fingerprints_preserved_except_corrected_ablation(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner, fps = _inner_fingerprints({})
-    assert fps == MAIN_FINGERPRINTS["default"]
+    # E2 now excludes radar deltas: invalidate old ablation results without rerunning unrelated stages.
+    assert {k: v for k, v in fps.items() if k != "experiments"} == {
+        k: v for k, v in MAIN_FINGERPRINTS["default"].items() if k != "experiments"}
+    assert fps["experiments"] != MAIN_FINGERPRINTS["default"]["experiments"]
     _, fps = _inner_fingerprints({"timeseries": {"enabled": True, "start": "2023-03-01", "end": "2023-10-31"},
                                   "model": {"holdout_fraction": 0.2, "n_estimators": 50}})
-    assert fps == MAIN_FINGERPRINTS["timeseries"]
+    assert {k: v for k, v in fps.items() if k != "experiments"} == {
+        k: v for k, v in MAIN_FINGERPRINTS["timeseries"].items() if k != "experiments"}
+    assert fps["experiments"] != MAIN_FINGERPRINTS["timeseries"]["experiments"]
     assert {s: runner.depends(s) for s in MAIN_DEPENDS} == MAIN_DEPENDS
     assert runner.embeddings() is None and runner.parcel_classify() is None
     assert config.fingerprint(config.load()) == "09ff103f5880447d"          # main c091962

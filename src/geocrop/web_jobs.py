@@ -135,7 +135,7 @@ class SpawnedProcess:
 
 
 def spawn(args: list[str], cwd: Path, env: dict, stdout):
-    """Start an engine job child in its own session, with stdout and stderr appended to `stdout`.
+    """Start an engine job child in an isolated process group (and session where supported), with stdout and stderr appended to `stdout`.
 
     On POSIX the child is started with `os.posix_spawn`, never with fork(): this server process may hold
     libraries with fork handlers that are unsafe in a forked child. In particular PROJ (loaded by map
@@ -151,10 +151,16 @@ def spawn(args: list[str], cwd: Path, env: dict, stdout):
     fd = stdout.fileno()
     actions = [(os.POSIX_SPAWN_OPEN, 0, os.devnull, os.O_RDONLY, 0),
                (os.POSIX_SPAWN_DUP2, fd, 1), (os.POSIX_SPAWN_DUP2, fd, 2)]
-    pid = os.posix_spawn(args[0], [args[0], "-c", _BOOTSTRAP, str(cwd), *args[3:]], env,
-                         file_actions=actions, setsid=True,
-                         # like Popen(restore_signals=True): signals Python ignores are not inherited as ignored
-                         setsigdef=[getattr(signal, n) for n in ("SIGPIPE", "SIGXFSZ") if hasattr(signal, n)])
+    argv = [args[0], "-c", _BOOTSTRAP, str(cwd), *args[3:]]
+    # Like Popen(restore_signals=True): do not inherit Python's ignored signals.
+    options = {"file_actions": actions,
+               "setsigdef": [getattr(signal, n) for n in ("SIGPIPE", "SIGXFSZ") if hasattr(signal, n)]}
+    try:
+        pid = os.posix_spawn(args[0], argv, env, setsid=True, **options)
+    except NotImplementedError:
+        # Some Python/libc builds lack POSIX_SPAWN_SETSID. A separate process group still makes
+        # cancellation safe for the worker's group, without invoking unsafe fork handlers.
+        pid = os.posix_spawn(args[0], argv, env, setpgroup=0, **options)
     return SpawnedProcess(pid)
 
 

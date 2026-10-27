@@ -365,6 +365,9 @@ def test_resources_disk_levels_and_unknown_ram(study, monkeypatch, free_gb, stat
     ram = [c for c in rep.checks if c["code"] == "resources.ram"]
     assert not ram or ram[0]["status"] == "error"       # 1e9 GB of RAM is never installed
     monkeypatch.setattr(preflight, "os", _FakeOs(sysconf=ValueError("no sysconf")))
+    assert preflight.memory_limit_bytes(cgroup_files=[]) == (None, "installed")
+    # Unknown installed RAM alone is no longer unknown memory: containers can still expose a cgroup limit.
+    monkeypatch.setattr(preflight, "memory_limit_bytes", lambda: (None, "installed"))
     rep = preflight._Report()
     preflight._check_resources(cfg, est, rep)
     assert not any(c["code"] == "resources.ram" for c in rep.checks)

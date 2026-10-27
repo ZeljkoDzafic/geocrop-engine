@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -144,3 +145,27 @@ def test_client_download_failure_leaves_no_partial_file(tmp_path, monkeypatch):
     assert (tmp_path / "d" / "x.tif").read_text() == "mine" and len(list((tmp_path / "d").iterdir())) == 1
     with pytest.raises(ValueError, match="positive"):
         c.wait("job", timeout=0)
+
+
+@posix_only
+def test_spawn_without_setsid_still_isolates_the_process_group(tmp_path, monkeypatch):
+    original = os.posix_spawn
+    calls = []
+
+    def without_setsid(*args, **kwargs):
+        calls.append(kwargs)
+        if kwargs.get('setsid'):
+            raise NotImplementedError('posix_spawn: setsid unavailable on this platform')
+        return original(*args, **kwargs)
+
+    def no_fork(*args, **kwargs):
+        raise AssertionError('fallback must not fork')
+
+    monkeypatch.setattr(os, 'posix_spawn', without_setsid)
+    monkeypatch.setattr(subprocess, 'Popen', no_fork)
+    with (tmp_path / 'job.log').open('wb') as out:
+        proc = web_jobs.spawn([sys.executable, '-m', 'geocrop.cli', 'indices'], tmp_path,
+                              {**os.environ, 'PYTHONPATH': str(Path(web_jobs.__file__).parents[1])}, out)
+    assert os.getpgid(proc.pid) == proc.pid
+    assert proc.wait(timeout=30) == 0
+    assert calls[0]['setsid'] and calls[1]['setpgroup'] == 0

@@ -82,6 +82,8 @@ status=0
 docker "${docker_args[@]}" "$IMAGE" bash -s <<'CONTAINER' || status=$?
 set -uo pipefail
 export DEBIAN_FRONTEND=noninteractive
+report_owner=$(stat -c '%u:%g' /report)
+trap 'chown -R "$report_owner" /report' EXIT
 # --- container stand-in for "a fresh Ubuntu machine with a sudo user" (not a documented step) -------------------
 { apt-get update -qq && apt-get install -y -qq --no-install-recommends sudo >/dev/null; } >/report/transcript.log 2>&1
 useradd -m -s /bin/bash alice && echo 'alice ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/alice
