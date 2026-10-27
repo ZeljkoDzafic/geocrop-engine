@@ -85,8 +85,11 @@ export DEBIAN_FRONTEND=noninteractive
 # --- container stand-in for "a fresh Ubuntu machine with a sudo user" (not a documented step) -------------------
 { apt-get update -qq && apt-get install -y -qq --no-install-recommends sudo >/dev/null; } >/report/transcript.log 2>&1
 useradd -m -s /bin/bash alice && echo 'alice ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/alice
+echo 'Defaults env_keep += "HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy SSL_CERT_FILE PIP_CERT REQUESTS_CA_BUNDLE CURL_CA_BUNDLE GIT_SSL_CAINFO"' >> /etc/sudoers.d/alice
 [[ -f /report/source.tar ]] && cp /report/source.tar /home/alice/ && chown alice: /home/alice/source.tar
 chown alice: /report /report/transcript.log
+chmod 755 /report
+chmod 644 /report/transcript.log
 
 # --- the documented steps, run as alice in a login shell ---------------------------------------------------------
 cat > /home/alice/steps.sh <<'STEPS'
