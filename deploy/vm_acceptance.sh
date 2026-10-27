@@ -9,7 +9,7 @@
 #   git clone https://github.com/ZeljkoDzafic/geocrop-engine.git && cd geocrop-engine
 #   sudo bash deploy/vm_acceptance.sh --system          # once: apt packages (git, build tools; Python 3.12 via apt or uv)
 #   bash deploy/vm_acceptance.sh                        # as the run user; verifies HEAD
-#   COMMIT=v0.9.0 bash deploy/vm_acceptance.sh          # verify a tag or commit
+#   COMMIT=v1.0.0rc1 bash deploy/vm_acceptance.sh          # verify a tag or commit
 #   SKIP="c. d." bash deploy/vm_acceptance.sh           # skip slow/network-heavy checks by id prefix
 #   CONDA=1 bash deploy/vm_acceptance.sh                # additionally exercise deploy/setup_ubuntu.sh --user
 #
