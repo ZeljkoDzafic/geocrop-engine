@@ -1,0 +1,3684 @@
+{
+"type": "FeatureCollection",
+"name": "synthetic",
+"crs": {
+"type": "name",
+"properties": {
+"name": "urn:ogc:def:crs:EPSG::32633"
+}
+},
+"features": [
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY00",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676320.0,
+4984880.0
+],
+[
+676320.0,
+4985120.0
+],
+[
+676080.0,
+4985120.0
+],
+[
+676080.0,
+4984880.0
+],
+[
+676320.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY01",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682720.0,
+4988880.0
+],
+[
+682720.0,
+4989120.0
+],
+[
+682480.0,
+4989120.0
+],
+[
+682480.0,
+4988880.0
+],
+[
+682720.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY02",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4987680.0
+],
+[
+678320.0,
+4987920.0
+],
+[
+678080.0,
+4987920.0
+],
+[
+678080.0,
+4987680.0
+],
+[
+678320.0,
+4987680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY03",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4986080.0
+],
+[
+681120.0,
+4986320.0
+],
+[
+680880.0,
+4986320.0
+],
+[
+680880.0,
+4986080.0
+],
+[
+681120.0,
+4986080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY04",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4984480.0
+],
+[
+677520.0,
+4984720.0
+],
+[
+677280.0,
+4984720.0
+],
+[
+677280.0,
+4984480.0
+],
+[
+677520.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY05",
+"declared_crop": "NEPOZNATO"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679520.0,
+4985280.0
+],
+[
+679520.0,
+4985520.0
+],
+[
+679280.0,
+4985520.0
+],
+[
+679280.0,
+4985280.0
+],
+[
+679520.0,
+4985280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY06",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679520.0,
+4990880.0
+],
+[
+679520.0,
+4991120.0
+],
+[
+679280.0,
+4991120.0
+],
+[
+679280.0,
+4990880.0
+],
+[
+679520.0,
+4990880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY07",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4990080.0
+],
+[
+682320.0,
+4990320.0
+],
+[
+682080.0,
+4990320.0
+],
+[
+682080.0,
+4990080.0
+],
+[
+682320.0,
+4990080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY08",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681520.0,
+4988480.0
+],
+[
+681520.0,
+4988720.0
+],
+[
+681280.0,
+4988720.0
+],
+[
+681280.0,
+4988480.0
+],
+[
+681520.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY09",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4990880.0
+],
+[
+681120.0,
+4991120.0
+],
+[
+680880.0,
+4991120.0
+],
+[
+680880.0,
+4990880.0
+],
+[
+681120.0,
+4990880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY10",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4988480.0
+],
+[
+681120.0,
+4988720.0
+],
+[
+680880.0,
+4988720.0
+],
+[
+680880.0,
+4988480.0
+],
+[
+681120.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY11",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4986080.0
+],
+[
+680320.0,
+4986320.0
+],
+[
+680080.0,
+4986320.0
+],
+[
+680080.0,
+4986080.0
+],
+[
+680320.0,
+4986080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY12",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4985280.0
+],
+[
+680320.0,
+4985520.0
+],
+[
+680080.0,
+4985520.0
+],
+[
+680080.0,
+4985280.0
+],
+[
+680320.0,
+4985280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY13",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679120.0,
+4990480.0
+],
+[
+679120.0,
+4990720.0
+],
+[
+678880.0,
+4990720.0
+],
+[
+678880.0,
+4990480.0
+],
+[
+679120.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY14",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678720.0,
+4984480.0
+],
+[
+678720.0,
+4984720.0
+],
+[
+678480.0,
+4984720.0
+],
+[
+678480.0,
+4984480.0
+],
+[
+678720.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY15",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4987280.0
+],
+[
+678320.0,
+4987520.0
+],
+[
+678080.0,
+4987520.0
+],
+[
+678080.0,
+4987280.0
+],
+[
+678320.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY16",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4988480.0
+],
+[
+681920.0,
+4988720.0
+],
+[
+681680.0,
+4988720.0
+],
+[
+681680.0,
+4988480.0
+],
+[
+681920.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY17",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4988880.0
+],
+[
+679920.0,
+4989120.0
+],
+[
+679680.0,
+4989120.0
+],
+[
+679680.0,
+4988880.0
+],
+[
+679920.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY18",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679120.0,
+4985680.0
+],
+[
+679120.0,
+4985920.0
+],
+[
+678880.0,
+4985920.0
+],
+[
+678880.0,
+4985680.0
+],
+[
+679120.0,
+4985680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY19",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683920.0,
+4991280.0
+],
+[
+683920.0,
+4991520.0
+],
+[
+683680.0,
+4991520.0
+],
+[
+683680.0,
+4991280.0
+],
+[
+683920.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY20",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4991280.0
+],
+[
+682320.0,
+4991520.0
+],
+[
+682080.0,
+4991520.0
+],
+[
+682080.0,
+4991280.0
+],
+[
+682320.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY21",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4984480.0
+],
+[
+681120.0,
+4984720.0
+],
+[
+680880.0,
+4984720.0
+],
+[
+680880.0,
+4984480.0
+],
+[
+681120.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY22",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4990480.0
+],
+[
+677920.0,
+4990720.0
+],
+[
+677680.0,
+4990720.0
+],
+[
+677680.0,
+4990480.0
+],
+[
+677920.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY23",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4987280.0
+],
+[
+677920.0,
+4987520.0
+],
+[
+677680.0,
+4987520.0
+],
+[
+677680.0,
+4987280.0
+],
+[
+677920.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY24",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4991280.0
+],
+[
+681120.0,
+4991520.0
+],
+[
+680880.0,
+4991520.0
+],
+[
+680880.0,
+4991280.0
+],
+[
+681120.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY25",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4984880.0
+],
+[
+680320.0,
+4985120.0
+],
+[
+680080.0,
+4985120.0
+],
+[
+680080.0,
+4984880.0
+],
+[
+680320.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSOY26",
+"declared_crop": "SOJA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682720.0,
+4984480.0
+],
+[
+682720.0,
+4984720.0
+],
+[
+682480.0,
+4984720.0
+],
+[
+682480.0,
+4984480.0
+],
+[
+682720.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN00",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676320.0,
+4991680.0
+],
+[
+676320.0,
+4991920.0
+],
+[
+676080.0,
+4991920.0
+],
+[
+676080.0,
+4991680.0
+],
+[
+676320.0,
+4991680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN01",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4988480.0
+],
+[
+679920.0,
+4988720.0
+],
+[
+679680.0,
+4988720.0
+],
+[
+679680.0,
+4988480.0
+],
+[
+679920.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN02",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679520.0,
+4984080.0
+],
+[
+679520.0,
+4984320.0
+],
+[
+679280.0,
+4984320.0
+],
+[
+679280.0,
+4984080.0
+],
+[
+679520.0,
+4984080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN03",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682720.0,
+4989280.0
+],
+[
+682720.0,
+4989520.0
+],
+[
+682480.0,
+4989520.0
+],
+[
+682480.0,
+4989280.0
+],
+[
+682720.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN04",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680720.0,
+4986480.0
+],
+[
+680720.0,
+4986720.0
+],
+[
+680480.0,
+4986720.0
+],
+[
+680480.0,
+4986480.0
+],
+[
+680720.0,
+4986480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN05",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677120.0,
+4987680.0
+],
+[
+677120.0,
+4987920.0
+],
+[
+676880.0,
+4987920.0
+],
+[
+676880.0,
+4987680.0
+],
+[
+677120.0,
+4987680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN06",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4984080.0
+],
+[
+677520.0,
+4984320.0
+],
+[
+677280.0,
+4984320.0
+],
+[
+677280.0,
+4984080.0
+],
+[
+677520.0,
+4984080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN07",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4987280.0
+],
+[
+676720.0,
+4987520.0
+],
+[
+676480.0,
+4987520.0
+],
+[
+676480.0,
+4987280.0
+],
+[
+676720.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN08",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4988080.0
+],
+[
+677920.0,
+4988320.0
+],
+[
+677680.0,
+4988320.0
+],
+[
+677680.0,
+4988080.0
+],
+[
+677920.0,
+4988080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN09",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679120.0,
+4988480.0
+],
+[
+679120.0,
+4988720.0
+],
+[
+678880.0,
+4988720.0
+],
+[
+678880.0,
+4988480.0
+],
+[
+679120.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN10",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4988480.0
+],
+[
+678320.0,
+4988720.0
+],
+[
+678080.0,
+4988720.0
+],
+[
+678080.0,
+4988480.0
+],
+[
+678320.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN11",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4986080.0
+],
+[
+677520.0,
+4986320.0
+],
+[
+677280.0,
+4986320.0
+],
+[
+677280.0,
+4986080.0
+],
+[
+677520.0,
+4986080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN12",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4989280.0
+],
+[
+682320.0,
+4989520.0
+],
+[
+682080.0,
+4989520.0
+],
+[
+682080.0,
+4989280.0
+],
+[
+682320.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN13",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676320.0,
+4986080.0
+],
+[
+676320.0,
+4986320.0
+],
+[
+676080.0,
+4986320.0
+],
+[
+676080.0,
+4986080.0
+],
+[
+676320.0,
+4986080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN14",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679520.0,
+4989680.0
+],
+[
+679520.0,
+4989920.0
+],
+[
+679280.0,
+4989920.0
+],
+[
+679280.0,
+4989680.0
+],
+[
+679520.0,
+4989680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN15",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4986480.0
+],
+[
+677520.0,
+4986720.0
+],
+[
+677280.0,
+4986720.0
+],
+[
+677280.0,
+4986480.0
+],
+[
+677520.0,
+4986480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN16",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4988880.0
+],
+[
+681120.0,
+4989120.0
+],
+[
+680880.0,
+4989120.0
+],
+[
+680880.0,
+4988880.0
+],
+[
+681120.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN17",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4991680.0
+],
+[
+681920.0,
+4991920.0
+],
+[
+681680.0,
+4991920.0
+],
+[
+681680.0,
+4991680.0
+],
+[
+681920.0,
+4991680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN18",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676320.0,
+4990480.0
+],
+[
+676320.0,
+4990720.0
+],
+[
+676080.0,
+4990720.0
+],
+[
+676080.0,
+4990480.0
+],
+[
+676320.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN19",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677120.0,
+4989680.0
+],
+[
+677120.0,
+4989920.0
+],
+[
+676880.0,
+4989920.0
+],
+[
+676880.0,
+4989680.0
+],
+[
+677120.0,
+4989680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN20",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4989680.0
+],
+[
+679920.0,
+4989920.0
+],
+[
+679680.0,
+4989920.0
+],
+[
+679680.0,
+4989680.0
+],
+[
+679920.0,
+4989680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN21",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678720.0,
+4986880.0
+],
+[
+678720.0,
+4987120.0
+],
+[
+678480.0,
+4987120.0
+],
+[
+678480.0,
+4986880.0
+],
+[
+678720.0,
+4986880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN22",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4991680.0
+],
+[
+677920.0,
+4991920.0
+],
+[
+677680.0,
+4991920.0
+],
+[
+677680.0,
+4991680.0
+],
+[
+677920.0,
+4991680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN23",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4984480.0
+],
+[
+678320.0,
+4984720.0
+],
+[
+678080.0,
+4984720.0
+],
+[
+678080.0,
+4984480.0
+],
+[
+678320.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN24",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4984080.0
+],
+[
+676720.0,
+4984320.0
+],
+[
+676480.0,
+4984320.0
+],
+[
+676480.0,
+4984080.0
+],
+[
+676720.0,
+4984080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN25",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4991280.0
+],
+[
+680320.0,
+4991520.0
+],
+[
+680080.0,
+4991520.0
+],
+[
+680080.0,
+4991280.0
+],
+[
+680320.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PSUN26",
+"declared_crop": "SUNCOKRET"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4988080.0
+],
+[
+681120.0,
+4988320.0
+],
+[
+680880.0,
+4988320.0
+],
+[
+680880.0,
+4988080.0
+],
+[
+681120.0,
+4988080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI00",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4990480.0
+],
+[
+681920.0,
+4990720.0
+],
+[
+681680.0,
+4990720.0
+],
+[
+681680.0,
+4990480.0
+],
+[
+681920.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI01",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680720.0,
+4987280.0
+],
+[
+680720.0,
+4987520.0
+],
+[
+680480.0,
+4987520.0
+],
+[
+680480.0,
+4987280.0
+],
+[
+680720.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI02",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4984880.0
+],
+[
+677920.0,
+4985120.0
+],
+[
+677680.0,
+4985120.0
+],
+[
+677680.0,
+4984880.0
+],
+[
+677920.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI03",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4986880.0
+],
+[
+677920.0,
+4987120.0
+],
+[
+677680.0,
+4987120.0
+],
+[
+677680.0,
+4986880.0
+],
+[
+677920.0,
+4986880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI04",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682720.0,
+4986880.0
+],
+[
+682720.0,
+4987120.0
+],
+[
+682480.0,
+4987120.0
+],
+[
+682480.0,
+4986880.0
+],
+[
+682720.0,
+4986880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI05",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677920.0,
+4984480.0
+],
+[
+677920.0,
+4984720.0
+],
+[
+677680.0,
+4984720.0
+],
+[
+677680.0,
+4984480.0
+],
+[
+677920.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI06",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4984880.0
+],
+[
+681920.0,
+4985120.0
+],
+[
+681680.0,
+4985120.0
+],
+[
+681680.0,
+4984880.0
+],
+[
+681920.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI07",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683120.0,
+4986880.0
+],
+[
+683120.0,
+4987120.0
+],
+[
+682880.0,
+4987120.0
+],
+[
+682880.0,
+4986880.0
+],
+[
+683120.0,
+4986880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI08",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683120.0,
+4987680.0
+],
+[
+683120.0,
+4987920.0
+],
+[
+682880.0,
+4987920.0
+],
+[
+682880.0,
+4987680.0
+],
+[
+683120.0,
+4987680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI09",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4990480.0
+],
+[
+679920.0,
+4990720.0
+],
+[
+679680.0,
+4990720.0
+],
+[
+679680.0,
+4990480.0
+],
+[
+679920.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI10",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683120.0,
+4985280.0
+],
+[
+683120.0,
+4985520.0
+],
+[
+682880.0,
+4985520.0
+],
+[
+682880.0,
+4985280.0
+],
+[
+683120.0,
+4985280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI11",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682720.0,
+4984080.0
+],
+[
+682720.0,
+4984320.0
+],
+[
+682480.0,
+4984320.0
+],
+[
+682480.0,
+4984080.0
+],
+[
+682720.0,
+4984080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI12",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4991680.0
+],
+[
+676720.0,
+4991920.0
+],
+[
+676480.0,
+4991920.0
+],
+[
+676480.0,
+4991680.0
+],
+[
+676720.0,
+4991680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI13",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4990080.0
+],
+[
+676720.0,
+4990320.0
+],
+[
+676480.0,
+4990320.0
+],
+[
+676480.0,
+4990080.0
+],
+[
+676720.0,
+4990080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI14",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4991280.0
+],
+[
+676720.0,
+4991520.0
+],
+[
+676480.0,
+4991520.0
+],
+[
+676480.0,
+4991280.0
+],
+[
+676720.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI15",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679120.0,
+4986480.0
+],
+[
+679120.0,
+4986720.0
+],
+[
+678880.0,
+4986720.0
+],
+[
+678880.0,
+4986480.0
+],
+[
+679120.0,
+4986480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI16",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4984480.0
+],
+[
+681920.0,
+4984720.0
+],
+[
+681680.0,
+4984720.0
+],
+[
+681680.0,
+4984480.0
+],
+[
+681920.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI17",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4990480.0
+],
+[
+682320.0,
+4990720.0
+],
+[
+682080.0,
+4990720.0
+],
+[
+682080.0,
+4990480.0
+],
+[
+682320.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI18",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4985680.0
+],
+[
+681920.0,
+4985920.0
+],
+[
+681680.0,
+4985920.0
+],
+[
+681680.0,
+4985680.0
+],
+[
+681920.0,
+4985680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI19",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4986080.0
+],
+[
+682320.0,
+4986320.0
+],
+[
+682080.0,
+4986320.0
+],
+[
+682080.0,
+4986080.0
+],
+[
+682320.0,
+4986080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI20",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4988480.0
+],
+[
+677520.0,
+4988720.0
+],
+[
+677280.0,
+4988720.0
+],
+[
+677280.0,
+4988480.0
+],
+[
+677520.0,
+4988480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI21",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4990880.0
+],
+[
+681920.0,
+4991120.0
+],
+[
+681680.0,
+4991120.0
+],
+[
+681680.0,
+4990880.0
+],
+[
+681920.0,
+4990880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI22",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4989280.0
+],
+[
+676720.0,
+4989520.0
+],
+[
+676480.0,
+4989520.0
+],
+[
+676480.0,
+4989280.0
+],
+[
+676720.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI23",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4984880.0
+],
+[
+676720.0,
+4985120.0
+],
+[
+676480.0,
+4985120.0
+],
+[
+676480.0,
+4984880.0
+],
+[
+676720.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI24",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4984880.0
+],
+[
+678320.0,
+4985120.0
+],
+[
+678080.0,
+4985120.0
+],
+[
+678080.0,
+4984880.0
+],
+[
+678320.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI25",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4990880.0
+],
+[
+677520.0,
+4991120.0
+],
+[
+677280.0,
+4991120.0
+],
+[
+677280.0,
+4990880.0
+],
+[
+677520.0,
+4990880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PMAI26",
+"declared_crop": "KUKURUZ"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4990480.0
+],
+[
+681120.0,
+4990720.0
+],
+[
+680880.0,
+4990720.0
+],
+[
+680880.0,
+4990480.0
+],
+[
+681120.0,
+4990480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA00",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4987680.0
+],
+[
+680320.0,
+4987920.0
+],
+[
+680080.0,
+4987920.0
+],
+[
+680080.0,
+4987680.0
+],
+[
+680320.0,
+4987680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA01",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680320.0,
+4987280.0
+],
+[
+680320.0,
+4987520.0
+],
+[
+680080.0,
+4987520.0
+],
+[
+680080.0,
+4987280.0
+],
+[
+680320.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA02",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677520.0,
+4991680.0
+],
+[
+677520.0,
+4991920.0
+],
+[
+677280.0,
+4991920.0
+],
+[
+677280.0,
+4991680.0
+],
+[
+677520.0,
+4991680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA03",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4984880.0
+],
+[
+682320.0,
+4985120.0
+],
+[
+682080.0,
+4985120.0
+],
+[
+682080.0,
+4984880.0
+],
+[
+682320.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA04",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4989280.0
+],
+[
+681920.0,
+4989520.0
+],
+[
+681680.0,
+4989520.0
+],
+[
+681680.0,
+4989280.0
+],
+[
+681920.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA05",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683920.0,
+4984480.0
+],
+[
+683920.0,
+4984720.0
+],
+[
+683680.0,
+4984720.0
+],
+[
+683680.0,
+4984480.0
+],
+[
+683920.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA06",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683920.0,
+4984880.0
+],
+[
+683920.0,
+4985120.0
+],
+[
+683680.0,
+4985120.0
+],
+[
+683680.0,
+4984880.0
+],
+[
+683920.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA07",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4984480.0
+],
+[
+676720.0,
+4984720.0
+],
+[
+676480.0,
+4984720.0
+],
+[
+676480.0,
+4984480.0
+],
+[
+676720.0,
+4984480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA08",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681920.0,
+4988880.0
+],
+[
+681920.0,
+4989120.0
+],
+[
+681680.0,
+4989120.0
+],
+[
+681680.0,
+4988880.0
+],
+[
+681920.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA09",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681120.0,
+4989280.0
+],
+[
+681120.0,
+4989520.0
+],
+[
+680880.0,
+4989520.0
+],
+[
+680880.0,
+4989280.0
+],
+[
+681120.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA10",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4989280.0
+],
+[
+679920.0,
+4989520.0
+],
+[
+679680.0,
+4989520.0
+],
+[
+679680.0,
+4989280.0
+],
+[
+679920.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA11",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678320.0,
+4990080.0
+],
+[
+678320.0,
+4990320.0
+],
+[
+678080.0,
+4990320.0
+],
+[
+678080.0,
+4990080.0
+],
+[
+678320.0,
+4990080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA12",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676320.0,
+4986880.0
+],
+[
+676320.0,
+4987120.0
+],
+[
+676080.0,
+4987120.0
+],
+[
+676080.0,
+4986880.0
+],
+[
+676320.0,
+4986880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA13",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4991280.0
+],
+[
+679920.0,
+4991520.0
+],
+[
+679680.0,
+4991520.0
+],
+[
+679680.0,
+4991280.0
+],
+[
+679920.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA14",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678720.0,
+4985280.0
+],
+[
+678720.0,
+4985520.0
+],
+[
+678480.0,
+4985520.0
+],
+[
+678480.0,
+4985280.0
+],
+[
+678720.0,
+4985280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA15",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4988880.0
+],
+[
+682320.0,
+4989120.0
+],
+[
+682080.0,
+4989120.0
+],
+[
+682080.0,
+4988880.0
+],
+[
+682320.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA16",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676720.0,
+4988880.0
+],
+[
+676720.0,
+4989120.0
+],
+[
+676480.0,
+4989120.0
+],
+[
+676480.0,
+4988880.0
+],
+[
+676720.0,
+4988880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA17",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683520.0,
+4987280.0
+],
+[
+683520.0,
+4987520.0
+],
+[
+683280.0,
+4987520.0
+],
+[
+683280.0,
+4987280.0
+],
+[
+683520.0,
+4987280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA18",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4985680.0
+],
+[
+682320.0,
+4985920.0
+],
+[
+682080.0,
+4985920.0
+],
+[
+682080.0,
+4985680.0
+],
+[
+682320.0,
+4985680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA19",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680720.0,
+4990880.0
+],
+[
+680720.0,
+4991120.0
+],
+[
+680480.0,
+4991120.0
+],
+[
+680480.0,
+4990880.0
+],
+[
+680720.0,
+4990880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA20",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677120.0,
+4989280.0
+],
+[
+677120.0,
+4989520.0
+],
+[
+676880.0,
+4989520.0
+],
+[
+676880.0,
+4989280.0
+],
+[
+677120.0,
+4989280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA21",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683120.0,
+4991280.0
+],
+[
+683120.0,
+4991520.0
+],
+[
+682880.0,
+4991520.0
+],
+[
+682880.0,
+4991280.0
+],
+[
+683120.0,
+4991280.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA22",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681520.0,
+4986480.0
+],
+[
+681520.0,
+4986720.0
+],
+[
+681280.0,
+4986720.0
+],
+[
+681280.0,
+4986480.0
+],
+[
+681520.0,
+4986480.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA23",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683920.0,
+4990080.0
+],
+[
+683920.0,
+4990320.0
+],
+[
+683680.0,
+4990320.0
+],
+[
+683680.0,
+4990080.0
+],
+[
+683920.0,
+4990080.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA24",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679920.0,
+4984880.0
+],
+[
+679920.0,
+4985120.0
+],
+[
+679680.0,
+4985120.0
+],
+[
+679680.0,
+4984880.0
+],
+[
+679920.0,
+4984880.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA25",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678720.0,
+4989680.0
+],
+[
+678720.0,
+4989920.0
+],
+[
+678480.0,
+4989920.0
+],
+[
+678480.0,
+4989680.0
+],
+[
+678720.0,
+4989680.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"parcel_id": "PGRA26",
+"declared_crop": "TRAVA"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682320.0,
+4987680.0
+],
+[
+682320.0,
+4987920.0
+],
+[
+682080.0,
+4987920.0
+],
+[
+682080.0,
+4987680.0
+],
+[
+682320.0,
+4987680.0
+]
+]
+]
+}
+}
+]
+}

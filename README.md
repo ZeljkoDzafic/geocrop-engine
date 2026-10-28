@@ -151,7 +151,7 @@ geocrop clean --config configs/example.yaml --dry-run                      # tem
 
 [`configs/example.yaml`](configs/example.yaml) is the annotated configuration; every key is listed in
 [configuration](docs/configuration.md). [Getting started](docs/getting-started.md) walks through a study, and
-`geocrop audit` / `geocrop preflight` check inputs and resources before a long run
+`geocrop audit` / `geocrop preflight` check inputs and resources before a long run, and `geocrop intake` checks restricted reference data on arrival
 ([preflight](docs/preflight.md)). For a VM, see the [runbook](deploy/README.md).
 
 ## Why another crop-mapping tool?
@@ -203,6 +203,7 @@ The [presentation website](website/README.md) introduces the workflow with actua
 | [Embeddings](docs/embeddings.md) | AlphaEarth, TESSERA, Presto, Galileo, AnySat feature providers |
 | [Public benchmarks](docs/benchmarks/README.md) · [Acceptance run](docs/acceptance.md) · [Performance](docs/performance.md) | measured accuracy (public data), real-data chain check, scaling |
 | [Testing](docs/testing.md) | test tiers, reliability and security gates, coverage |
+| [Priprema podataka (SR)](docs/priprema-podataka.md) | step-by-step guide (Serbian) for preparing reference data and running `geocrop intake` |
 | [Reproducibility & privacy](docs/reproducibility.md) · [Deployment](docs/deployment.md) | manifests, caching, data protection, hardware sizing |
 | [Security model](docs/security.md) ([reporting](SECURITY.md)) · [Releases & rollback](docs/release.md) | web API threat model, dependency audits, SemVer, pinned installs |
 

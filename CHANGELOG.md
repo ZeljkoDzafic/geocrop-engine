@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `geocrop intake`: read-only intake of training polygons, declared parcels and field observations (JSON + Markdown
+  report, pass/warn/error, exit code 2 on errors): readability, CRS, geometry repair counts, IDs, class-name
+  spelling/encoding with a suggested normalisation map, crop-mapping coverage, date format and season, AOI overlap,
+  per-municipality counts, class/polygon/pixel support under the configured spatial blocks and holdout, parcel and
+  observation leakage. Reports hold counts and (limited) IDs only. Reuses `audit` and `preflight`.
+- CSV/tabular input (WKT or x/y columns, utf-8/cp1250 detected or `--encoding`, `;` or `,`) for `normalize-parcels`
+  and the new `normalize-observations`; `read_mapping` reads cp1250 and semicolon CSVs.
+- Serbian data-preparation guide `docs/priprema-podataka.md` and a synthetic example under `examples/intake_example/`.
+- `geocrop preflight` points to `geocrop intake`.
+
 - `docs/performance.md`: Linux container measurements of the release candidate in two resource profiles (2 CPU / 5 GB
   at 25 and 100 km², 8 CPU / 14 GB at 100 and 500 km²); 500 km² now completes on Linux.
 

@@ -1,0 +1,1227 @@
+{
+"type": "FeatureCollection",
+"name": "synthetic",
+"crs": {
+"type": "name",
+"properties": {
+"name": "urn:ogc:def:crs:EPSG::32633"
+}
+},
+"features": [
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-10",
+"group_id": "PSOY00"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676200.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-11",
+"group_id": "PSOY01"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682600.0,
+4989000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-12",
+"group_id": "PSOY02"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678200.0,
+4987800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-13",
+"group_id": "PSOY03"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4986200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-14",
+"group_id": "PSOY04"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-15",
+"group_id": "PSOY05"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679400.0,
+4985400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-16",
+"group_id": "PSOY06"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679400.0,
+4991000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-17",
+"group_id": "PSOY07"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682200.0,
+4990200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-18",
+"group_id": "PSOY08"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681400.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-19",
+"group_id": "PSOY09"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4991000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-20",
+"group_id": "PSOY10"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-21",
+"group_id": "PSOY11"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680200.0,
+4986200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-22",
+"group_id": "PSOY12"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680200.0,
+4985400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-23",
+"group_id": "PSOY13"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679000.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-24",
+"group_id": "PSOY14"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678600.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-10",
+"group_id": "PSOY15"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678200.0,
+4987400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-11",
+"group_id": "PSOY16"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-12",
+"group_id": "PSOY17"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679800.0,
+4989000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-13",
+"group_id": "PSOY18"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679000.0,
+4985800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-14",
+"group_id": "PSOY19"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+683800.0,
+4991400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-15",
+"group_id": "PSOY20"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682200.0,
+4991400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-16",
+"group_id": "PSOY21"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-17",
+"group_id": "PSOY22"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-18",
+"group_id": "PSOY23"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4987400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-06-19",
+"group_id": "PSOY24"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4991400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-07-20",
+"group_id": "PSOY25"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680200.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "soybean",
+"observed_at": "2023-08-21",
+"group_id": "PSOY26"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682600.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-10",
+"group_id": "PSUN00"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676200.0,
+4991800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-11",
+"group_id": "PSUN01"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679800.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-12",
+"group_id": "PSUN02"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679400.0,
+4984200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-13",
+"group_id": "PSUN03"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682600.0,
+4989400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-14",
+"group_id": "PSUN04"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680600.0,
+4986600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-15",
+"group_id": "PSUN05"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677000.0,
+4987800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-16",
+"group_id": "PSUN06"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4984200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-17",
+"group_id": "PSUN07"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4987400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-18",
+"group_id": "PSUN08"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4988200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-19",
+"group_id": "PSUN09"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679000.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-20",
+"group_id": "PSUN10"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678200.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-21",
+"group_id": "PSUN11"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4986200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-22",
+"group_id": "PSUN12"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682200.0,
+4989400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-23",
+"group_id": "PSUN13"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676200.0,
+4986200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-24",
+"group_id": "PSUN14"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679400.0,
+4989800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-10",
+"group_id": "PSUN15"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4986600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-11",
+"group_id": "PSUN16"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4989000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-12",
+"group_id": "PSUN17"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4991800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-13",
+"group_id": "PSUN18"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676200.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-14",
+"group_id": "PSUN19"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677000.0,
+4989800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-15",
+"group_id": "PSUN20"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679800.0,
+4989800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-16",
+"group_id": "PSUN21"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678600.0,
+4987000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-17",
+"group_id": "PSUN22"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4991800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-18",
+"group_id": "PSUN23"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678200.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-06-19",
+"group_id": "PSUN24"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4984200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-07-20",
+"group_id": "PSUN25"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680200.0,
+4991400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "sunflower",
+"observed_at": "2023-08-21",
+"group_id": "PSUN26"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4988200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-10",
+"group_id": "PMAI00"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-11",
+"group_id": "PMAI01"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+680600.0,
+4987400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-12",
+"group_id": "PMAI02"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-13",
+"group_id": "PMAI03"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4987000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-14",
+"group_id": "PMAI04"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682600.0,
+4987000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-15",
+"group_id": "PMAI05"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677800.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-16",
+"group_id": "PMAI06"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-17",
+"group_id": "PMAI07"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+683000.0,
+4987000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-18",
+"group_id": "PMAI08"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+683000.0,
+4987800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-19",
+"group_id": "PMAI09"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679800.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-20",
+"group_id": "PMAI10"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+683000.0,
+4985400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-21",
+"group_id": "PMAI11"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682600.0,
+4984200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-22",
+"group_id": "PMAI12"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4991800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-23",
+"group_id": "PMAI13"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4990200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-24",
+"group_id": "PMAI14"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4991400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-10",
+"group_id": "PMAI15"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+679000.0,
+4986600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-11",
+"group_id": "PMAI16"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4984600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-12",
+"group_id": "PMAI17"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682200.0,
+4990600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-13",
+"group_id": "PMAI18"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4985800.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-14",
+"group_id": "PMAI19"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+682200.0,
+4986200.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-15",
+"group_id": "PMAI20"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4988600.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-16",
+"group_id": "PMAI21"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681800.0,
+4991000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-17",
+"group_id": "PMAI22"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4989400.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-18",
+"group_id": "PMAI23"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+676600.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-06-19",
+"group_id": "PMAI24"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+678200.0,
+4985000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-07-20",
+"group_id": "PMAI25"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+677400.0,
+4991000.0
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"class_name": "maize",
+"observed_at": "2023-08-21",
+"group_id": "PMAI26"
+},
+"geometry": {
+"type": "Point",
+"coordinates": [
+681000.0,
+4990600.0
+]
+}
+}
+]
+}
