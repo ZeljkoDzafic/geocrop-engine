@@ -51,7 +51,9 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install pip-audit
       # Pinned set shipped in the repository, then the latest resolvable set of every runtime extra.
-      - run: pip-audit --progress-spinner off -r constraints/py312.txt
+      # constraints/py312.txt is a complete freeze (transitive packages included): audit exactly those versions.
+      # Letting pip re-resolve them can fail on a new upstream release without any vulnerability being involved.
+      - run: pip-audit --progress-spinner off --no-deps --disable-pip -r constraints/py312.txt
       - run: |
           python -m venv /tmp/latest
           /tmp/latest/bin/python -m pip install --upgrade pip

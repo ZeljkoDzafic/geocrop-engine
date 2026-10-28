@@ -13,6 +13,8 @@
   nothing changes. Preflight and the disk guard count the AOI blocks and report "AOI share of grid"; new module
   `geocrop.aoi`, command-line options `--aoi-mask`, `--no-aoi-mask`, `--aoi-halo-px`, `quicklook --aoi`,
   `tools/aoi_benchmark.py`.
+- Dependabot: pip version updates are off (the pinned freeze is regenerated as a whole; security updates stay on).
+- CI: the `audit` job audits the pinned versions in `constraints/py312.txt` without re-resolving them (`--no-deps --disable-pip`).
 
 - `docs/performance.md`: Linux container measurements of the release candidate in two resource profiles (2 CPU / 5 GB
   at 25 and 100 km², 8 CPU / 14 GB at 100 and 500 km²); 500 km² now completes on Linux.
