@@ -61,7 +61,7 @@ markdown-it-py==4.2.0
 MarkupSafe==3.0.4
 matplotlib==3.11.2
 mdurl==0.1.2
-mpmath==1.3.0
+mpmath==1.4.1
 msgpack==1.2.3
 msgspec==0.22.0
 narwhals==2.27.1
@@ -73,7 +73,7 @@ odc-geo==0.5.3
 odc-loader==0.6.5
 odc-stac==0.5.3
 omnicloudmask==1.8.1
-openeo==0.37.0
+openeo==0.53.0
 opentelemetry-api==1.45.1
 packageurl-python==0.17.6
 packaging==26.3
