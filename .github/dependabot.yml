@@ -1,10 +1,14 @@
 version: 2
 updates:
+  # constraints/py312.txt is a coordinated freeze of 150+ packages: bumping one entry on its own can make the set
+  # unresolvable (e.g. openeo >= 0.38 needs pandas < 3 while the freeze pins pandas 3.x). Version updates are
+  # therefore off; the freeze is regenerated as a whole from a clean venv and checked by the `pinned` and `audit`
+  # jobs. Dependabot SECURITY updates (repository setting) are not affected by this limit.
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     groups:
       python-minor-and-patch:
         update-types: ["minor", "patch"]
