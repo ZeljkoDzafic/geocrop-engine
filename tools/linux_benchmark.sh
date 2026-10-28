@@ -76,7 +76,7 @@ else
 fi
 echo "== running sizes ${SIZES[*]} km2 with --cpus $CPUS --memory $MEMORY --memory-swap $MEMORY (no swap), volume $VOLUME"
 status=0
-docker run --rm --cpus "$CPUS" --memory "$MEMORY" --memory-swap "$MEMORY" -v "$VOLUME:/bench" -v "$OUT:/export" "$TAG" \
+docker run --rm -i --cpus "$CPUS" --memory "$MEMORY" --memory-swap "$MEMORY" -v "$VOLUME:/bench" -v "$OUT:/export" "$TAG" \
   bash -s -- "$MAX_HOURS" "${SIZES[@]}" <<'BENCHMARK' || status=$?
 set -uo pipefail
 max_hours=$1; shift
@@ -99,5 +99,10 @@ done
 printf '%s\n' "$status" > /export/exit_status.txt
 exit "$status"
 BENCHMARK
+# A container that never ran the measurement (e.g. stdin not attached) must not look like a success.
+if [[ ! -s $OUT/exit_status.txt ]]; then
+  echo "== no exit_status.txt in $OUT: the benchmark did not run inside the container" >&2
+  status=1
+fi
 echo "== results in $OUT (data stay in docker volume $VOLUME; remove with: docker volume rm $VOLUME)"
 exit $status
