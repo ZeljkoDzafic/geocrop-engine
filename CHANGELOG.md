@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+
+- `tools/linux_benchmark.sh`: `docker run` now attaches stdin (`-i`); without it the container ran nothing and the
+  script reported success. A missing `exit_status.txt` now fails the run.
 ### Validation fixes
 - Ablation and model-benchmark McNemar comparisons use one majority-vote prediction per reference polygon, not per pixel; reports
   retain unit counts, deterministic tie handling and raw/Holm-adjusted p-values for separate OOF/holdout families.
