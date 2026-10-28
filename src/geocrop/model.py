@@ -28,6 +28,7 @@ from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
 from . import applicability, attribution, contracts, faultinject, metrics, splits, uncertainty
+from .aoi import AoiMask, creation_options
 from .estimators import importances, make_estimator, predict_labels, sequence_params
 from .hashing import sha256
 from .raster import (
@@ -741,7 +742,7 @@ def _uncertainty_bands(proba: np.ndarray, n_classes: int) -> np.ndarray:
 
 
 def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512,
-            smoothing: dict | bool | None = None, shift: dict | None = None) -> dict:
+            smoothing: dict | bool | None = None, shift: dict | None = None, aoi: AoiMask | None = None) -> dict:
     """Blockwise inference -> classes.tif (uint8 index, see class_legend.json), probabilities.tif
     (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy).
 
@@ -754,8 +755,18 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     compares a pixel sample of the stack (inside the parcels when given) with the model's
     ``domain_reference.npz`` and writes ``shift_report.json`` (`geocrop.shift`); the manifest then states
     whether conformal coverage is established. Without it the outputs are unchanged.
+
+    `aoi` (`geocrop.aoi.AoiMask`) restricts prediction to the AOI: only AOI pixels are classified, every other
+    pixel of classes / probabilities / uncertainty / AOA map (and of the unsmoothed probabilities) is no-data,
+    and blocks without AOI pixels are neither read nor written. Probabilities of the pixels within the smoothing
+    radius of the AOI are computed first (so smoothing at the AOI border sees the same neighbours as an unmasked
+    run), which needs `aoi.halo` >= the smoothing radius; pixels inside the AOI equal an unmasked run.
     """
     smooth = smoothing_settings(smoothing)
+    smooth_halo = smooth["window"] // 2 if smooth is not None else 0
+    if aoi is not None and aoi.halo < smooth_halo:
+        raise ValueError(f"AOI halo {aoi.halo} px is smaller than the smoothing radius {smooth_halo} px; "
+                         "pass an AoiMask with halo >= window // 2 (and build the stack with the same halo)")
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     model_sha256 = sha256(model_path)
@@ -778,15 +789,20 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
         prob_prof = {**base, "count": len(classes), "dtype": "float32", "nodata": NODATA, "predictor": 3}
         unc_prof = {**base, "count": 3, "dtype": "float32", "nodata": NODATA, "predictor": 3}
         width, height = src.width, src.height
+        if aoi is not None:
+            aoi.check_grid(src, "the feature stack")
+            cls_prof, prob_prof, unc_prof = ({**p, **creation_options(aoi)} for p in (cls_prof, prob_prof, unc_prof))
 
         def describe(p_dst):
             p_dst.update_tags(model_sha256=model_sha256)
             for i, c in enumerate(classes, 1):
                 p_dst.set_band_description(i, c)
 
-        def model_proba(w):
+        def model_proba(w, restrict=True):
             cube = read_block(src, bands, window=w)
             ok = valid_mask(cube, src.nodata)
+            if aoi is not None and restrict:
+                ok &= aoi.read(w)        # classify AOI pixels only
             proba = None
             if ok.any():
                 proba = model.predict_proba(cube[:, ok].T)
@@ -798,7 +814,9 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                 describe(r_dst)
                 r_dst.update_tags(smoothing="none (input to smoothing)")
                 for w in blocks(width, height, block_size):
-                    ok, proba = model_proba(w)
+                    if aoi is not None and not aoi.active(w, smooth_halo):
+                        continue
+                    ok, proba = model_proba(w, restrict=False)
                     p = np.full((len(classes), *ok.shape), NODATA, dtype="float32")
                     if proba is not None:
                         p[:, ok] = proba.T
@@ -817,8 +835,10 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                     destination.update_tags(smoothing=json.dumps(smooth))
             for i, n in enumerate(("max_probability", "margin", "entropy"), 1):
                 u_dst.set_band_description(i, n)
-            halo = smooth["window"] // 2 if smooth is not None else 0
+            halo = smooth_halo
             for w in blocks(width, height, block_size):
+                if aoi is not None and not aoi.active(w, 0):
+                    continue
                 if smooth is None:
                     ok, proba = model_proba(w)
                 else:
@@ -831,6 +851,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                     inner = (slice(w.row_off - r0, w.row_off - r0 + w.height),
                              slice(w.col_off - c0, w.col_off - c0 + w.width))
                     ok = big_ok[inner]
+                    if aoi is not None:
+                        ok = ok & aoi.read(w)
                     proba = cube[:, inner[0], inner[1]][:, ok].T if ok.any() else None
                 any_valid = any_valid or bool(ok.any())
                 shape = ok.shape
@@ -845,6 +867,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                 p_dst.write(p, window=w)
                 u_dst.write(u, window=w)
                 faultinject.point("predict")
+    if aoi is not None and smooth is not None:
+        _mask_raw_probabilities(raw_path, aoi, smooth_halo, block_size)
     if not any_valid:
         for name in ("classes.tif", "probabilities.tif", "uncertainty.tif"):
             (out / name).unlink(missing_ok=True)
@@ -853,7 +877,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     legend = {str(i): c for i, c in enumerate(classes)}
     aoa_json = Path(model_path).with_name("aoa.json")
     if aoa_json.exists():
-        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size)
+        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size,
+                              aoi=aoi)
     (out / "class_legend.json").write_text(json.dumps(legend, indent=2), encoding="utf8")
     manifest = out / "prediction_manifest.json"
     body = {
@@ -862,6 +887,10 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
         "calibration_mode": payload.get("calibration_mode", "oof"),
         "scope": "Artifact identity and inference settings only; not a scientific validity assessment.",
     }
+    if aoi is not None:
+        body["aoi"] = {"mask": aoi.path.name, "halo_px": aoi.halo,
+                       "note": "Only AOI pixels are classified; every pixel outside the AOI is no-data in "
+                               "classes, probabilities, uncertainty, aoa and the unsmoothed probabilities."}
     if smooth is not None:
         body["smoothing"] = {**smooth, "method": "edge-aware Bayesian-style log-odds smoothing",
                              "unsmoothed_probabilities": raw_path.name,
@@ -878,6 +907,21 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     if smooth is not None:
         result["probabilities_unsmoothed"] = str(raw_path)
     return result
+
+
+def _mask_raw_probabilities(path: Path, aoi: AoiMask, halo: int, block_size: int) -> None:
+    """After smoothing: set the unsmoothed probabilities of pixels outside the AOI (computed only as smoothing
+    context) to no-data, so no product holds a prediction outside the AOI."""
+    with rasterio.open(path, "r+") as ds:
+        for w in blocks(ds.width, ds.height, block_size):
+            if not aoi.active(w, halo):
+                continue
+            inside = aoi.read(w)
+            if inside.all():
+                continue
+            data = ds.read(window=w)
+            data[:, ~inside] = NODATA
+            ds.write(data, window=w)
 
 
 

@@ -43,7 +43,7 @@ enforced by `tests/test_architecture.py` ([ADR 0001](adr/0001-layered-architectu
  │               segmentation_metrics · ftw · embeddings · feature_providers ·           │
  │               presto_encoder · galileo_encoder · anysat_encoder · active_learning ·   │
  │               review · attribution · cachedirs · faultinject · plugins · contracts ·  │
- │               hashing · _layers                                                       │
+ │               hashing · aoi · _layers                                                 │
  └──────────────────────────────────────────────────────────────────────────────────────┘
         ▲ plugins (entry points: geocrop.estimators / indices / segmenters / exporters / validators / feature_providers)
 ```
@@ -62,6 +62,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `s1` | SNAP graph generation (σ⁰ or terrain-flattened γ⁰), scene import, linear-domain per-window composites (optionally per orbit direction) |
 | `snap` | adapter running SNAP `gpt` (`s1.run_snap` remains as an alias) |
 | `raster` | reference grid, block iteration, aligned reads, GeoTIFF profiles, checked input access (`RasterInputError` naming file and problem) |
+| `aoi` | AOI mask on the reference grid, 512 px block index and halo; stages skip blocks outside the AOI ([AOI-aware processing](aoi-aware.md)) |
 | `indices` | single registry of spectral/radar indices with formulas and references |
 | `features` | multi-temporal stack (bands, indices, radar, deltas, seasonal statistics) + feature manifest; feature selection for experiments |
 | `samples` | windowed extraction of reference pixels, cached `.npz` |

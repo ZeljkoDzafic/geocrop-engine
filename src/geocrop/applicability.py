@@ -16,6 +16,7 @@ import numpy as np
 import rasterio
 from scipy.spatial import cKDTree
 
+from .aoi import AoiMask, creation_options
 from .raster import NODATA, blocks, float_profile, valid_mask
 
 
@@ -85,8 +86,13 @@ def fit(X, folds_index, features, importance=None, max_points: int = 20000, seed
     return model
 
 
-def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_size: int = 512) -> Path:
-    """Write a two-band raster: DI and AOA flag (1 inside, 0 outside)."""
+def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_size: int = 512,
+            aoi: AoiMask | None = None) -> Path:
+    """Write a two-band raster: DI and AOA flag (1 inside, 0 outside).
+
+    With an AOI mask (`geocrop.aoi`) the dissimilarity is computed for the AOI pixels only (the nearest-neighbour
+    search is the most expensive step of prediction); everything else is no-data. Values inside the AOI are
+    those of an unmasked run (the index is per pixel)."""
     with rasterio.open(stack) as src:
         names = list(src.descriptions)
         missing = [f for f in model.features if f not in names]
@@ -95,12 +101,18 @@ def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_s
         bands = [names.index(f) + 1 for f in model.features]
         out = Path(output)
         out.parent.mkdir(parents=True, exist_ok=True)
-        with rasterio.open(out, "w", **float_profile(src, count=2)) as dst:
+        if aoi is not None:
+            aoi.check_grid(src, "the feature stack")
+        with rasterio.open(out, "w", **float_profile(src, count=2, **creation_options(aoi))) as dst:
             dst.set_band_description(1, "dissimilarity_index")
             dst.set_band_description(2, "inside_aoa")
             for w in blocks(src.width, src.height, block_size):
+                if aoi is not None and not aoi.active(w, 0):
+                    continue
                 cube = src.read(bands, window=w)
                 ok = valid_mask(cube, src.nodata)
+                if aoi is not None:
+                    ok &= aoi.read(w)
                 di = np.full(ok.shape, NODATA, dtype="float32")
                 flag = np.full(ok.shape, NODATA, dtype="float32")
                 if ok.any():

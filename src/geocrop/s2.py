@@ -20,6 +20,7 @@ from scipy.ndimage import binary_dilation
 
 from . import attribution, clouds
 from . import scenes as scene_meta
+from .aoi import AoiMask, creation_options
 from .indices import S2_BANDS
 from .raster import (
     NODATA,
@@ -78,7 +79,7 @@ def _locate(safe: Path, band: str) -> Path:
 
 
 def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shadow_projection: bool = True,
-                reference: str | Path | None = None) -> Path:
+                reference: str | Path | None = None, aoi: AoiMask | None = None) -> Path:
     """Convert one L2A SAFE to the scene-folder contract.
 
     By default the output keeps the native 10 m grid of B02 (the whole 110 km tile). With `reference`
@@ -86,32 +87,42 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shado
     AOI and already aligned for compositing, which saves most of the disk space on regional runs.
     20 m bands are bilinearly resampled to 10 m (no information gain; recorded in provenance);
     SCL and CLDPRB use nearest neighbour.
+
+    With an AOI mask (`reference` required) only the blocks that touch the AOI (plus its halo) are decoded
+    and written; the others stay no-data (sparse) and cost neither JP2 decoding nor disk space.
     """
     safe, out = Path(safe), Path(out)
+    if aoi is not None and reference is None:
+        raise ValueError("An AOI mask needs the study grid as reference")
     out.mkdir(parents=True, exist_ok=True)
     quant, offsets = safe_metadata(safe)
     atags = attribution.tags([scene_meta.parse_product_name(safe.name).get("datetime")])
     with rasterio.open(reference or _locate(safe, "B02")) as ref:
         if ref.crs is None:
             raise ValueError("Missing raster CRS")
-        profile = float_profile(ref)
+        if aoi is not None:
+            aoi.check_grid(ref, "the reference grid")
+        profile = float_profile(ref, **creation_options(aoi))
+        todo = list(blocks(ref.width, ref.height, block_size))
+        if aoi is not None:
+            todo = [w for w in todo if aoi.active(w)]
         for band in S2_BANDS:
             method = Resampling.nearest if band in ("B02", "B03", "B04", "B08") else Resampling.bilinear
             with rasterio.open(_locate(safe, band)) as src, rasterio.open(out / f"{band}.tif", "w", **profile) as dst:
                 dst.update_tags(**atags)
-                for w in blocks(ref.width, ref.height, block_size):
+                for w in todo:
                     dn = read_aligned(src, ref.window_transform(w), ref.crs, (int(w.height), int(w.width)),
                                       method, dtype="float32", fill=0, src_nodata=0)
                     ok = dn > 0
                     dst.write(np.where(ok, (dn + offsets[band]) / quant, NODATA).astype("float32"), 1, window=w)
-        uint8 = gtiff_profile(ref, count=1, dtype="uint8", nodata=None)
+        uint8 = gtiff_profile(ref, count=1, dtype="uint8", nodata=None, **creation_options(aoi))
         for name in ("SCL", "CLDPRB"):
             path = _locate(safe, name)
             if path is None:
                 continue
             with rasterio.open(path) as src, rasterio.open(out / f"{name}.tif", "w", **uint8) as dst:
                 dst.update_tags(**atags)
-                for w in blocks(ref.width, ref.height, block_size):
+                for w in todo:
                     a = read_aligned(src, ref.window_transform(w), ref.crs, (int(w.height), int(w.width)),
                                      Resampling.nearest, dtype="uint8", fill=0)
                     dst.write(a, 1, window=w)
@@ -123,6 +134,7 @@ def import_safe(safe: str | Path, out: str | Path, block_size: int = 1024, shado
             extra = {"shadow_projection": f"skipped: {exc}"}
     meta = scene_meta.parse_product_name(safe.name)
     scene_meta.write(out, **meta, **extra, source=safe.name, quantification=quant, boa_offsets=offsets,
+                     **({"aoi_mask": aoi.path.name, "aoi_halo_px": aoi.halo} if aoi is not None else {}),
                      note="20 m bands bilinearly resampled to 10 m; no spatial information gain")
     return out
 
@@ -184,7 +196,8 @@ def clear_mask(scl: np.ndarray, cloud_prob: np.ndarray | None, scl_invalid=DEFAU
 def composite(scene_dirs, out_dir, reference: str | Path | None = None, statistic: str = "median",
               scl_invalid=DEFAULT_SCL_INVALID, cloud_probability_max: float | None = None,
               mask_dilation_px: int = 0, min_valid_observations: int = 1, block_size: int = 512,
-              temporal_screening: bool = False, blue_delta: float = 0.04, dark_delta: float = 0.04) -> Path:
+              temporal_screening: bool = False, blue_delta: float = 0.04, dark_delta: float = 0.04,
+              aoi: AoiMask | None = None) -> Path:
     """Per-pixel temporal composite of clear observations from several scene folders.
 
     Optional per-scene CLOUDMASK.tif / SHADOW.tif are honoured; `temporal_screening` additionally drops
@@ -193,6 +206,10 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
     Writes one GeoTIFF per band, `valid_count.tif` (clear observations per pixel) and
     `composite.json` (scene list and parameters). Pixels with fewer than
     `min_valid_observations` clear observations are no-data, never zero-filled.
+
+    With an AOI mask (`geocrop.aoi`) only the blocks that touch the AOI (plus its halo) are composited and
+    written; every other block stays no-data (and `valid_count` 0) without being read. The blocks that are
+    computed are identical to an unmasked run.
     """
     dirs = [Path(d) for d in scene_dirs]
     if not dirs:
@@ -226,8 +243,10 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
         with rasterio.open(ref_path) as ref:
             if ref.crs is None:
                 raise ValueError("Reference grid needs a CRS")
-            profile = float_profile(ref)
-            count_profile = gtiff_profile(ref, count=1, dtype="uint16", nodata=None)
+            if aoi is not None:
+                aoi.check_grid(ref, "the reference grid")
+            profile = float_profile(ref, **creation_options(aoi))
+            count_profile = gtiff_profile(ref, count=1, dtype="uint16", nodata=None, **creation_options(aoi))
             sinks = {b: rasterio.open(out_dir / f"{b}.tif", "w", **profile) for b in S2_BANDS}
             counter = rasterio.open(out_dir / "valid_count.tif", "w", **count_profile)
             credit = attribution.read([d / "B02.tif" for d in dirs])   # Copernicus attribution of the scenes
@@ -236,6 +255,8 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
             halo = int(mask_dilation_px)
             try:
                 for w in blocks(ref.width, ref.height, block_size):
+                    if aoi is not None and not aoi.active(w):
+                        continue
                     big = expand(w, halo)
                     transform, shape = ref.window_transform(big), (int(big.height), int(big.width))
                     inner = (slice(halo, halo + int(w.height)), slice(halo, halo + int(w.width)))
@@ -299,5 +320,7 @@ def composite(scene_dirs, out_dir, reference: str | Path | None = None, statisti
         "scl_invalid": list(scl_invalid), "cloud_probability_max": cloud_probability_max,
         "mask_dilation_px": mask_dilation_px, "min_valid_observations": min_valid_observations,
         "temporal_screening": temporal_screening,
-        "reference_grid": str(ref_path)}, indent=2), encoding="utf8")
+        "reference_grid": str(ref_path),
+        **({"aoi_mask": str(aoi.path), "aoi_halo_px": aoi.halo, "aoi_blocks": len(aoi.windows(block_size))}
+           if aoi is not None else {})}, indent=2), encoding="utf8")
     return out_dir

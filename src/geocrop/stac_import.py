@@ -23,6 +23,7 @@ from rasterio.windows import Window, from_bounds
 
 from . import attribution
 from . import scenes as scene_meta
+from .aoi import AoiMask, creation_options
 from .indices import S2_BANDS
 from .raster import NODATA, float_profile, gtiff_profile
 
@@ -39,11 +40,14 @@ GDAL_ENV = {"AWS_NO_SIGN_REQUEST": "YES", "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY
             "GDAL_HTTP_LOW_SPEED_TIME": "60", "GDAL_HTTP_LOW_SPEED_LIMIT": "1024"}
 
 
-def grid_identity(reference: str | Path) -> str:
-    """Fingerprint of the study grid (CRS, transform, shape) a scene folder was cropped to."""
+def grid_identity(reference: str | Path, aoi: AoiMask | None = None) -> str:
+    """Fingerprint of the study grid (CRS, transform, shape) a scene folder was cropped to; with an AOI mask
+    also the mask content and halo (a scene imported for one footprint is not reused for another)."""
     import hashlib
     with rasterio.open(reference) as ref:
         body = f"{ref.crs.to_wkt()}|{tuple(ref.transform)[:6]}|{ref.shape}"
+    if aoi is not None:
+        body += f"|aoi:{aoi.identity()}"
     return hashlib.sha256(body.encode()).hexdigest()[:20]
 
 
@@ -87,17 +91,51 @@ def read_window_aligned(src, dst_transform, dst_crs, shape, resampling, dtype="f
     return out
 
 
+def read_window_aligned_active(src, dst_transform, dst_crs, shape, resampling, dtype="float32", fill=np.nan,
+                               windows=(), margin=4):
+    """`read_window_aligned` for the given grid windows only: each is read from the source separately and the
+    rest of the grid is `fill`. Windows that do not touch the source raster are not read at all (no HTTP
+    request); a window that does reads just the source blocks it needs."""
+    from rasterio.windows import transform as window_transform
+    out = np.full(shape, fill, dtype=dtype)
+    sb = src.bounds
+    for w in windows:
+        h, wd = int(w.height), int(w.width)
+        t = window_transform(w, dst_transform)
+        left, top = t @ (0, 0)
+        right, bottom = t @ (wd, h)
+        x0, y0, x1, y1 = transform_bounds(dst_crs, src.crs, left, bottom, right, top)
+        if x1 < sb.left or x0 > sb.right or y1 < sb.bottom or y0 > sb.top:
+            continue
+        r0, c0 = int(w.row_off), int(w.col_off)
+        out[r0:r0 + h, c0:c0 + wd] = read_window_aligned(src, t, dst_crs, (h, wd), resampling, dtype, fill, margin)
+    return out
+
+
 def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: dict | None = None,
                 min_clear_fraction: float = 0.0, scl_invalid=(0, 1, 3, 8, 9, 10, 11),
-                max_negative_fraction: float = 0.05) -> dict:
-    """Write one scene folder for `item` on the reference grid; skip it if the AOI is mostly cloudy."""
+                max_negative_fraction: float = 0.05, aoi: AoiMask | None = None) -> dict:
+    """Write one scene folder for `item` on the reference grid; skip it if the AOI is mostly cloudy.
+
+    With an AOI mask (`geocrop.aoi`) only the COG windows of the blocks that touch the AOI (plus its halo) are
+    read, and only where the scene classification shows data; the rest of the grid stays no-data (sparse files,
+    no HTTP requests). The clear fraction is then measured over the AOI pixels instead of the bounding box."""
     keys = asset_keys or ASSET_KEYS
     out = Path(out_dir)
     with rasterio.open(reference) as ref, rasterio.Env(**GDAL_ENV):
         shape, transform, crs = ref.shape, ref.transform, ref.crs
-        with rasterio.open(item.assets[keys["SCL"]].href) as src:
-            scl = read_window_aligned(src, transform, crs, shape, Resampling.nearest, "uint8", 0)
+        if aoi is None:
+            inside, active = None, None
+            with rasterio.open(item.assets[keys["SCL"]].href) as src:
+                scl = read_window_aligned(src, transform, crs, shape, Resampling.nearest, "uint8", 0)
+        else:
+            aoi.check_grid(ref, "the reference grid")
+            inside, active = aoi.dense(), aoi.windows()
+            with rasterio.open(item.assets[keys["SCL"]].href) as src:
+                scl = read_window_aligned_active(src, transform, crs, shape, Resampling.nearest, "uint8", 0, active)
         footprint = scl > 0
+        if inside is not None:
+            footprint &= inside                       # the AOI, not its halo or the bounding box
         if not footprint.any():
             return {"item": item.id, "status": "skipped: no coverage"}
         clear = footprint & ~np.isin(scl, list(scl_invalid))
@@ -106,22 +144,31 @@ def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: di
             return {"item": item.id, "status": f"skipped: clear fraction {clear_fraction:.2f}"}
         out.mkdir(parents=True, exist_ok=True)
         bands = {}
+        data_windows = None
+        if active is not None:       # blocks where the scene has data: nothing else is requested
+            data_windows = [w for w in active if (scl[int(w.row_off):int(w.row_off + w.height),
+                                                       int(w.col_off):int(w.col_off + w.width)] > 0).any()]
         for band in S2_BANDS:
             asset = item.assets[keys[band]]
             scale, offset = radiometry(item, asset)
             method = Resampling.nearest if band in ("B02", "B03", "B04", "B08") else Resampling.bilinear
             with rasterio.open(asset.href) as src:
-                dn = read_window_aligned(src, transform, crs, shape, method, "float32", 0)
+                if data_windows is None:
+                    dn = read_window_aligned(src, transform, crs, shape, method, "float32", 0)
+                else:
+                    dn = read_window_aligned_active(src, transform, crs, shape, method, "float32", 0, data_windows)
             bands[band] = np.where(dn > 0, dn * scale + offset, np.nan).astype("float32")
         red = bands["B04"][clear & np.isfinite(bands["B04"])]
         if red.size and (red < 0).mean() > max_negative_fraction:
             raise ValueError(f"{item.id}: {(red < 0).mean():.0%} negative red reflectance; check radiometric offset")
         atags = attribution.tags([item.properties.get("datetime")])
+        sparse = creation_options(aoi)
         for band, arr in bands.items():
-            with rasterio.open(out / f"{band}.tif", "w", **float_profile(ref)) as dst:
+            with rasterio.open(out / f"{band}.tif", "w", **float_profile(ref, **sparse)) as dst:
                 dst.write(np.where(np.isfinite(arr), arr, NODATA).astype("float32"), 1)
                 dst.update_tags(**atags)
-        with rasterio.open(out / "SCL.tif", "w", **gtiff_profile(ref, count=1, dtype="uint8", nodata=None)) as dst:
+        with rasterio.open(out / "SCL.tif", "w", **gtiff_profile(ref, count=1, dtype="uint8", nodata=None,
+                                                                 **sparse)) as dst:
             dst.write(scl, 1)
             dst.update_tags(**atags)
     p = item.properties
@@ -129,16 +176,38 @@ def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: di
                      platform=p.get("platform"), processing_baseline=p.get("s2:processing_baseline"),
                      boa_offset_applied=p.get("earthsearch:boa_offset_applied"), source=item.id,
                      stac_self=item.get_self_href(), clear_fraction=round(clear_fraction, 4),
-                     grid_id=grid_identity(reference), attribution=atags[attribution.TAG],
+                     grid_id=grid_identity(reference, aoi), attribution=atags[attribution.TAG],
                      licence=attribution.COPERNICUS_LICENCE,
+                     **({"aoi_mask": aoi.path.name, "aoi_halo_px": aoi.halo, "blocks_read": len(data_windows)}
+                        if aoi is not None else {}),
                      note="Windowed COG import on the reference grid")
-    return {"item": item.id, "status": "imported", "path": str(out), "clear_fraction": clear_fraction}
+    return {"item": item.id, "status": "imported", "path": str(out), "clear_fraction": clear_fraction,
+            **({"blocks_read": len(data_windows), "blocks_active": len(active)} if aoi is not None else {})}
+
+
+def _region_wgs84(aoi: AoiMask):
+    """Footprint of the blocks that touch the AOI (with halo) in WGS 84."""
+    import geopandas as gpd
+    return gpd.GeoSeries([aoi.footprint()], crs=aoi.crs).to_crs("EPSG:4326").iloc[0]
+
+
+def footprint_intersects(item, region) -> bool:
+    """True unless the item's footprint is known and misses `region` (a WGS 84 shapely geometry)."""
+    from shapely.geometry import shape
+    try:
+        return bool(shape(item.geometry).intersects(region)) if item.geometry else True
+    except (ValueError, TypeError, AttributeError):
+        return True
 
 
 def import_season(reference: str | Path, out_root: str | Path, start: str, end: str,
                   endpoint: str = EARTH_SEARCH, collection: str = "sentinel-2-l2a", max_cloud: float | None = 80,
-                  min_clear_fraction: float = 0.2, max_items: int = 500, asset_keys: dict | None = None) -> list[dict]:
-    """Search the STAC API over the reference grid's footprint and import every acquisition as a scene folder."""
+                  min_clear_fraction: float = 0.2, max_items: int = 500, asset_keys: dict | None = None,
+                  aoi: AoiMask | None = None) -> list[dict]:
+    """Search the STAC API over the reference grid's footprint and import every acquisition as a scene folder.
+
+    With an AOI mask (`geocrop.aoi`) items whose footprint misses every block that touches the AOI are not
+    imported at all, and the others are read window by window (see `import_item`)."""
     try:
         from pystac_client import Client
     except ImportError as exc:
@@ -149,15 +218,19 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
     items = Client.open(endpoint).search(collections=[collection], bbox=list(bbox), datetime=f"{start}/{end}",
                                          query=query, max_items=max_items).items()
     results = []
-    grid_id = grid_identity(reference)
+    grid_id = grid_identity(reference, aoi)
+    region = _region_wgs84(aoi) if aoi is not None else None
     for item in sorted(items, key=lambda i: i.properties.get("datetime", "")):
+        if region is not None and not footprint_intersects(item, region):
+            results.append({"item": item.id, "status": "skipped: outside AOI blocks"})
+            continue
         target = Path(out_root) / item.id
         if cached_scene_valid(target, grid_id):
             results.append({"item": item.id, "status": "cached", "path": str(target)})
             continue
         (target / scene_meta.SIDE_CAR).unlink(missing_ok=True)   # stale grid or incomplete: re-import
         try:
-            results.append(import_item(item, reference, target, asset_keys, min_clear_fraction))
+            results.append(import_item(item, reference, target, asset_keys, min_clear_fraction, aoi=aoi))
         except (ValueError, rasterio.errors.RasterioIOError) as exc:
             results.append({"item": item.id, "status": f"failed: {exc}"})
     return results

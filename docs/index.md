@@ -20,7 +20,7 @@
 13. [Configuration](configuration.md)
 14. [CLI reference](cli.md)
 15. [Reproducibility and data protection](reproducibility.md)
-16. [Deployment and sizing](deployment.md) · [Measured performance at scale](performance.md) · [Preflight, disk guard and cleanup](preflight.md)
+16. [Deployment and sizing](deployment.md) · [Measured performance at scale](performance.md) · [Preflight, disk guard and cleanup](preflight.md) · [AOI-aware processing (irregular AOIs)](aoi-aware.md)
 17. [Scope, status and limitations](limitations.md)
 18. [Open-source review and implementation evidence](open-source-review.md)
 19. [Testing](testing.md)

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- AOI-aware processing ([docs/aoi-aware.md](docs/aoi-aware.md)): for an irregular AOI the engine no longer imports,
+  composites, featurises, classifies or writes the part of the bounding-box grid outside the AOI. `geocrop grid`
+  also writes the AOI mask `<grid>_aoi.tif` and the 512 px block index `<grid>_aoi.json` (`--no-aoi-mask`,
+  `--halo-px`); config keys `grid.aoi_mask` (auto-discovered next to `grid.reference`), `grid.aoi`,
+  `grid.aoi_halo_px`. STAC imports (S2, S1) read only the COG windows of blocks touching the AOI, composites,
+  feature and time-series stacks compute only those blocks (sparse GeoTIFFs), `predict` classifies AOI pixels only
+  (probability smoothing keeps its halo; AOA map for AOI pixels), segmentation skips tiles without AOI pixels.
+  Results inside the AOI equal the unmasked run; outside the AOI final products are no-data. Without a mask
+  nothing changes. Preflight and the disk guard count the AOI blocks and report "AOI share of grid"; new module
+  `geocrop.aoi`, command-line options `--aoi-mask`, `--no-aoi-mask`, `--aoi-halo-px`, `quicklook --aoi`,
+  `tools/aoi_benchmark.py`.
+
 - `docs/performance.md`: Linux container measurements of the release candidate in two resource profiles (2 CPU / 5 GB
   at 25 and 100 km², 8 CPU / 14 GB at 100 and 500 km²); 500 km² now completes on Linux.
 

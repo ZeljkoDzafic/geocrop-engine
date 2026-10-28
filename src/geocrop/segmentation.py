@@ -20,6 +20,7 @@ from rasterio.features import shapes
 from rasterio.windows import Window
 from shapely.geometry import shape
 
+from .aoi import AoiMask, creation_options
 from .raster import blocks, expand, float_profile, valid_mask
 
 _SKIMAGE_HINT = 'segmentation needs scikit-image: pip install -e ".[segmentation]"'
@@ -42,7 +43,8 @@ def _write(frame: gpd.GeoDataFrame, output: str | Path) -> Path:
     return target
 
 
-def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 98) -> np.ndarray:
+def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 98,
+                   aoi: AoiMask | None = None) -> np.ndarray:
     """Per-band percentiles of a regular subsample of the whole raster, so every tile is normalised identically.
 
     Every f-th row and column (f = longest side / `sample`, rounded up) is taken, reading window by window along
@@ -50,6 +52,8 @@ def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 9
     decompress each row of tiles again for every output row once that row of tiles no longer fits the block cache
     (GDAL_CACHEMAX defaults to 5 % of RAM or of the container limit): on a 5 Mpx, 97-band stack in a 4 GB container
     it had not finished after 39 min; read block by block it takes ~10 s.
+
+    With an AOI mask only AOI pixels enter the percentiles (and windows without AOI pixels are not read).
     """
     f = max(1, int(np.ceil(max(src.width, src.height) / sample)))
     bh, bw = src.block_shapes[0]
@@ -61,8 +65,13 @@ def global_stretch(src, idx, sample: int = 1024, low: float = 2, high: float = 9
             h, w = min(wh, src.height - top), min(ww, src.width - left)
             if r0 >= h or c0 >= w:
                 continue
-            arr = src.read(idx, window=Window(left, top, w, h))[:, r0::f, c0::f].astype("float32")
+            win = Window(left, top, w, h)
+            if aoi is not None and not aoi.active(win, 0):
+                continue
+            arr = src.read(idx, window=win)[:, r0::f, c0::f].astype("float32")
             ok = valid_mask(arr, src.nodata)
+            if aoi is not None:
+                ok &= aoi.read(win)[r0::f, c0::f]
             for b in range(len(idx)):
                 values[b].append(arr[b][ok])
     if not any(v.size for v in values[0]):
@@ -80,8 +89,14 @@ def _stretch(arr, ok, ranges):
 
 def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 1024, segments_per_km2: float = 50,
          compactness: float = 0.1, min_area_pixels: int = 9, merge_seams: bool = True, merge_distance: float = 0.08,
-         min_shared_px: float = 3.0) -> dict:
+         min_shared_px: float = 3.0, aoi: AoiMask | None = None) -> dict:
     """SLIC superpixels per tile -> polygons, with seam reconciliation across tiles.
+
+    With an AOI mask (`geocrop.aoi`) tiles without AOI pixels are skipped (no read, no SLIC), the global stretch
+    is computed over AOI pixels, and only AOI pixels are segmented, so no segment extends outside the AOI. The
+    result equals the unmasked run on the stack with its non-AOI pixels set to no-data (not the bounding-box
+    run: percentile stretch and SLIC depend on the pixels they see). Seam reconciliation compares segments of
+    adjacent processed tiles only, exactly as before.
 
     `bands` selects stack bands by name or 1-based index (e.g. peak-season red, NIR, SWIR and NDVI). All tiles
     use one global 2-98 % stretch. With `merge_seams`, two segments from different tiles are merged when they
@@ -100,10 +115,18 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
         idx = [names.index(b) + 1 if isinstance(b, str) else int(b) for b in bands] if bands else list(range(1, src.count + 1))
         px_area = abs(src.transform.a * src.transform.e)
         px_size = abs(src.transform.a)
-        ranges = global_stretch(src, idx)
+        if aoi is not None:
+            aoi.check_grid(src, "the segmentation raster")
+        ranges = global_stretch(src, idx, aoi=aoi)
+        tiles_skipped = 0
         for w in blocks(src.width, src.height, tile_size):
+            if aoi is not None and not aoi.active(w, 0):
+                tiles_skipped += 1
+                continue
             arr = src.read(idx, window=w).astype("float32")
             ok = valid_mask(arr, src.nodata)
+            if aoi is not None:
+                ok &= aoi.read(w)
             if ok.sum() < min_area_pixels:
                 continue
             norm = _stretch(arr, ok, ranges)
@@ -168,7 +191,8 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
     merged["area_px"] = merged.area_px.round(1)
     path = _write(merged[["segment_id", "tile", "parts", "seam_merged", "area_px", "geometry"]], output)
     return {"path": str(path), "segments": int(len(merged)), "segments_before_merge": int(len(frame)),
-            "seam_merges": int(merges), "seams_merged": bool(merge_seams)}
+            "seam_merges": int(merges), "seams_merged": bool(merge_seams),
+            **({"tiles_skipped_outside_aoi": tiles_skipped} if aoi is not None else {})}
 
 
 def boundaries_to_parcels(boundary_probability: str | Path, output: str | Path, threshold: float = 0.5,
@@ -354,9 +378,11 @@ def unet_train(images: str | Path, masks: str | Path, model_path: str | Path, ep
 
 
 def unet_infer(raster: str | Path, model_path: str | Path, output: str | Path, patch: int = 256, overlap: int = 32,
-               bands=None, device: str | None = None) -> Path:
+               bands=None, device: str | None = None, aoi: AoiMask | None = None) -> Path:
     """Tiled boundary-probability inference; each tile is predicted with `overlap` context pixels on
-    every side and only its centre is written, which removes tile-edge artefacts."""
+    every side and only its centre is written, which removes tile-edge artefacts. With an AOI mask tiles without
+    AOI pixels are skipped and the probability outside the AOI is no-data; AOI pixels equal an unmasked run
+    (the context pixels of a tile are read from the raster, whatever the mask)."""
     import torch
 
     from .unet import UNet
@@ -373,12 +399,16 @@ def unet_infer(raster: str | Path, model_path: str | Path, output: str | Path, p
         idx = [names.index(b) + 1 if isinstance(b, str) else int(b) for b in bands] if bands else list(range(1, src.count + 1))
         if len(idx) != ckpt["channels"]:
             raise ValueError("Band count does not match the checkpoint")
-        profile = float_profile(src)
+        if aoi is not None:
+            aoi.check_grid(src, "the segmentation raster")
+        profile = float_profile(src, **creation_options(aoi))
         target = Path(output)
         target.parent.mkdir(parents=True, exist_ok=True)
         with rasterio.open(target, "w", **profile) as dst, torch.no_grad():
             dst.set_band_description(1, "boundary_probability")
             for w in blocks(src.width, src.height, patch):
+                if aoi is not None and not aoi.active(w, 0):
+                    continue
                 big = expand(w, overlap)
                 arr = src.read(idx, window=big, boundless=True, fill_value=src.nodata if src.nodata is not None else 0)
                 arr = arr.astype("float32")
@@ -389,5 +419,6 @@ def unet_infer(raster: str | Path, model_path: str | Path, output: str | Path, p
                 arr = np.pad(arr, ((0, 0), (0, ph), (0, pw)))
                 pred = torch.sigmoid(net(torch.from_numpy(arr[None]).to(device))).cpu().numpy()[0, 0, :h, :wd]
                 core = (slice(overlap, overlap + int(w.height)), slice(overlap, overlap + int(w.width)))
-                dst.write(np.where(ok[core], pred[core], -9999.0).astype("float32"), 1, window=w)
+                keep = ok[core] if aoi is None else ok[core] & aoi.read(w)
+                dst.write(np.where(keep, pred[core], -9999.0).astype("float32"), 1, window=w)
     return target

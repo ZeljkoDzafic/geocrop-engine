@@ -35,9 +35,17 @@ from rasterio.warp import Resampling, transform_bounds
 
 from . import attribution
 from . import scenes as scene_meta
+from .aoi import AoiMask, creation_options
 from .indices import S1_POLARISATIONS
 from .raster import NODATA, float_profile
-from .stac_import import GDAL_ENV, grid_identity, read_window_aligned
+from .stac_import import (
+    GDAL_ENV,
+    _region_wgs84,
+    footprint_intersects,
+    grid_identity,
+    read_window_aligned,
+    read_window_aligned_active,
+)
 
 PLANETARY_COMPUTER = "https://planetarycomputer.microsoft.com/api/stac/v1"
 COLLECTION = "sentinel-1-rtc"
@@ -111,8 +119,10 @@ def cached_scene_valid(folder: Path, grid_id: str) -> bool:
 
 
 def read_item(item, reference: str | Path, signer: Signer | None = None,
-              asset_keys: dict | None = None) -> dict[str, np.ndarray]:
-    """Linear gamma0 VV/VH of one STAC item on the reference grid (NaN where not covered or non-positive)."""
+              asset_keys: dict | None = None, aoi: AoiMask | None = None) -> dict[str, np.ndarray]:
+    """Linear gamma0 VV/VH of one STAC item on the reference grid (NaN where not covered or non-positive).
+
+    With an AOI mask only the COG windows of the blocks that touch the AOI (plus halo) are read."""
     keys = asset_keys or ASSET_KEYS
     signer = signer or Signer()
     out = {}
@@ -122,17 +132,32 @@ def read_item(item, reference: str | Path, signer: Signer | None = None,
             if keys[pol] not in item.assets:
                 raise ValueError(f"{item.id}: no {pol} asset")
             with rasterio.open(signer.sign(item.assets[keys[pol]].href)) as src:
-                v = read_window_aligned(src, transform, crs, shape, Resampling.bilinear, "float32", np.nan)
+                if aoi is None:
+                    v = read_window_aligned(src, transform, crs, shape, Resampling.bilinear, "float32", np.nan)
+                else:
+                    aoi.check_grid(ref, "the reference grid")
+                    v = read_window_aligned_active(src, transform, crs, shape, Resampling.bilinear, "float32",
+                                                   np.nan, aoi.windows())
             out[pol] = np.where(np.isfinite(v) & (v > 0), v, np.nan).astype("float32")
     return out
 
 
+def _coverage(arrays: dict[str, np.ndarray], aoi: AoiMask | None) -> float:
+    """Fraction of the grid (of the AOI pixels with a mask) with finite VV and VH."""
+    covered = np.isfinite(arrays["VV"]) & np.isfinite(arrays["VH"])
+    if aoi is None:
+        return float(covered.mean())
+    inside = aoi.dense()
+    return float((covered & inside).sum() / max(1, inside.sum()))
+
+
 def write_scene(arrays: dict[str, np.ndarray], items: list, reference: str | Path, out: str | Path,
-                collection: str = COLLECTION, endpoint: str = PLANETARY_COMPUTER) -> dict:
+                collection: str = COLLECTION, endpoint: str = PLANETARY_COMPUTER,
+                aoi: AoiMask | None = None) -> dict:
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     with rasterio.open(reference) as ref:
-        profile = float_profile(ref)
+        profile = float_profile(ref, **creation_options(aoi))
     atags = attribution.tags([items[0].properties.get("datetime")])
     for pol in S1_POLARISATIONS:
         with rasterio.open(out / f"{pol}.tif", "w", **profile) as dst:
@@ -141,7 +166,7 @@ def write_scene(arrays: dict[str, np.ndarray], items: list, reference: str | Pat
             dst.update_tags(**atags, licence=LICENCE,
                             attribution=ATTRIBUTION.format(year=str(items[0].properties.get("datetime", ""))[:4]))
     p = items[0].properties
-    coverage = float((np.isfinite(arrays["VV"]) & np.isfinite(arrays["VH"])).mean())
+    coverage = _coverage(arrays, aoi)
     year = str(p.get("datetime", ""))[:4]
     scene_meta.write(out, sensor="S1", datetime=p.get("datetime"),
                      orbit_direction=str(p.get("sat:orbit_state", "")).upper() or None,
@@ -150,19 +175,21 @@ def write_scene(arrays: dict[str, np.ndarray], items: list, reference: str | Pat
                      orbit_source=p.get("s1:orbit_source"), product_timeliness=p.get("s1:product_timeliness"),
                      source=[i.id for i in items], collection=collection, endpoint=endpoint,
                      stac_self=[i.get_self_href() for i in items], coverage=round(coverage, 4),
-                     grid_id=grid_identity(reference), licence=LICENCE, attribution=ATTRIBUTION.format(year=year),
+                     grid_id=grid_identity(reference, aoi), licence=LICENCE,
+                     attribution=ATTRIBUTION.format(year=year),
+                     **({"aoi_mask": aoi.path.name, "aoi_halo_px": aoi.halo} if aoi is not None else {}),
                      note="Windowed COG import of Planetary Computer Sentinel-1 RTC (terrain-flattened gamma0) "
                           "on the reference grid; no SNAP processing")
     return {"path": str(out), "coverage": coverage}
 
 
 def import_item(item, reference: str | Path, out_dir: str | Path, signer: Signer | None = None,
-                min_coverage: float = 0.5) -> dict:
-    arrays = read_item(item, reference, signer)
-    coverage = float((np.isfinite(arrays["VV"]) & np.isfinite(arrays["VH"])).mean())
+                min_coverage: float = 0.5, aoi: AoiMask | None = None) -> dict:
+    arrays = read_item(item, reference, signer, aoi=aoi)
+    coverage = _coverage(arrays, aoi)
     if coverage < min_coverage:
         return {"item": item.id, "status": f"skipped: coverage {coverage:.2f}"}
-    return {"item": item.id, "status": "imported", **write_scene(arrays, [item], reference, out_dir)}
+    return {"item": item.id, "status": "imported", **write_scene(arrays, [item], reference, out_dir, aoi=aoi)}
 
 
 def _acquisition_key(item) -> str:
@@ -198,18 +225,25 @@ def search(reference: str | Path, start: str, end: str, endpoint: str = PLANETAR
 
 def import_season(reference: str | Path, out_root: str | Path, start: str, end: str,
                   endpoint: str = PLANETARY_COMPUTER, collection: str = COLLECTION, min_coverage: float = 0.9,
-                  max_items: int = 200, orbit_direction: str | None = None, signer: Signer | None = None) -> list[dict]:
+                  max_items: int = 200, orbit_direction: str | None = None, signer: Signer | None = None,
+                  aoi: AoiMask | None = None) -> list[dict]:
     """Search the RTC collection over the grid footprint and write one scene folder per overpass.
 
     Overpasses covering less than `min_coverage` of the grid (after mosaicking slices) are skipped. Per-item
     read failures are reported in the result list; a failing catalogue or token service raises ServiceUnavailable.
+
+    With an AOI mask (`geocrop.aoi`) items that miss every block touching the AOI are dropped before any read,
+    only the COG windows of those blocks are read, and coverage is measured over the AOI pixels.
     """
     items = search(reference, start, end, endpoint, collection, max_items, orbit_direction)
+    if aoi is not None:
+        region = _region_wgs84(aoi)
+        items = [i for i in items if footprint_intersects(i, region)]
     signer = signer or Signer(collection)
     groups: dict[str, list] = {}
     for item in items:
         groups.setdefault(_acquisition_key(item), []).append(item)
-    grid_id = grid_identity(reference)
+    grid_id = grid_identity(reference, aoi)
     results = []
     for members in groups.values():
         ids = [i.id for i in members]
@@ -222,18 +256,18 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
         try:
             mosaic = None
             for item in members:
-                arrays = read_item(item, reference, signer)
+                arrays = read_item(item, reference, signer, aoi=aoi)
                 if mosaic is None:
                     mosaic = arrays
                 else:
                     for pol in S1_POLARISATIONS:
                         fill = ~np.isfinite(mosaic[pol])
                         mosaic[pol][fill] = arrays[pol][fill]
-            coverage = float((np.isfinite(mosaic["VV"]) & np.isfinite(mosaic["VH"])).mean())
+            coverage = _coverage(mosaic, aoi)
             if coverage < min_coverage:
                 results.append({"item": ids, "status": f"skipped: coverage {coverage:.2f}"})
                 continue
-            written = write_scene(mosaic, members, reference, target, collection, endpoint)
+            written = write_scene(mosaic, members, reference, target, collection, endpoint, aoi=aoi)
             results.append({"item": ids, "status": "imported", **written})
         except ServiceUnavailable:
             raise

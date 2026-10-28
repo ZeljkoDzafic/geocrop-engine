@@ -136,12 +136,18 @@ def valid_mask(stack: np.ndarray, nodata=NODATA) -> np.ndarray:
     return ok
 
 
-def make_grid(aoi, crs: str, resolution: float, output: str | Path, buffer_m: float = 0.0) -> Path:
+def make_grid(aoi, crs: str, resolution: float, output: str | Path, buffer_m: float = 0.0,
+              aoi_mask: bool = False, halo_px: int = 0) -> Path:
     """Write the study's reference grid: a uint8 GeoTIFF (1 inside AOI, 0 outside) whose origin is
     snapped to multiples of `resolution`. Every composite, feature and prediction uses this grid.
 
     Choose ONE projected CRS for the whole AOI even when it spans UTM zones (e.g. EPSG:32634 for
     16-19.5 E); scenes from other zones are reprojected onto it during compositing.
+
+    With `aoi_mask=True` the same footprint is also written as the AOI mask ``<output stem>_aoi.tif`` (uint8,
+    1 inside, 0 outside, see `geocrop.aoi`) with its block index ``<output stem>_aoi.json`` (`halo_px` pixels of
+    context around the AOI); pipeline stages then skip the blocks outside the AOI. Off by default so that
+    library callers keep their outputs.
     """
     import geopandas as gpd
     from rasterio.features import geometry_mask
@@ -163,9 +169,22 @@ def make_grid(aoi, crs: str, resolution: float, output: str | Path, buffer_m: fl
                "transform": transform, "nodata": 0, "compress": "deflate", "tiled": True,
                "blockxsize": 256, "blockysize": 256, "BIGTIFF": "IF_SAFER"}
     out = ensure_parent(output)
-    with rasterio.open(out, "w", **profile) as dst:
-        for w in blocks(width, height, 2048):
-            mask = geometry_mask([geom], out_shape=(int(w.height), int(w.width)),
-                                 transform=rasterio.windows.transform(w, transform), invert=True)
-            dst.write(mask.astype("uint8"), 1, window=w)
+    mask_dst = None
+    if aoi_mask:
+        from .aoi import default_mask_path
+        mask_dst = rasterio.open(default_mask_path(out), "w", **profile)
+    try:
+        with rasterio.open(out, "w", **profile) as dst:
+            for w in blocks(width, height, 2048):
+                mask = geometry_mask([geom], out_shape=(int(w.height), int(w.width)),
+                                     transform=rasterio.windows.transform(w, transform), invert=True)
+                dst.write(mask.astype("uint8"), 1, window=w)
+                if mask_dst is not None:
+                    mask_dst.write(mask.astype("uint8"), 1, window=w)
+    finally:
+        if mask_dst is not None:
+            mask_dst.close()
+    if aoi_mask:
+        from .aoi import AoiMask, write_index
+        write_index(AoiMask(default_mask_path(out), halo_px))
     return out

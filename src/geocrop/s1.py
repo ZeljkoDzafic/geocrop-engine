@@ -21,6 +21,7 @@ from rasterio.warp import Resampling
 
 from . import attribution
 from . import scenes as scene_meta
+from .aoi import AoiMask, creation_options
 from .indices import S1_POLARISATIONS
 from .raster import NODATA, blocks, float_profile, read_aligned
 
@@ -123,11 +124,14 @@ def import_geotiff(geotiff: str | Path, out: str | Path, product_name: str, orbi
 # --------------------------------------------------------------------------- compositing
 
 def composite(scene_dirs, out_dir, reference: str | Path, separate_orbits: bool = False,
-              statistic: str = "mean", block_size: int = 512) -> Path:
+              statistic: str = "mean", block_size: int = 512, aoi: AoiMask | None = None) -> Path:
     """Window composite of linear VV/VH on the reference (Sentinel-2) grid.
 
     With separate_orbits=True, ascending and descending scenes produce ASC_VV.tif, DESC_VH.tif, ...
     otherwise VV.tif / VH.tif. Statistic: mean or median, in linear power.
+
+    With an AOI mask (`geocrop.aoi`) only blocks that touch the AOI (plus its halo) are read and composited;
+    the rest stays no-data without being read.
     """
     metas = [scene_meta.read(d) for d in scene_dirs]
     if not metas:
@@ -142,7 +146,9 @@ def composite(scene_dirs, out_dir, reference: str | Path, separate_orbits: bool 
     out_dir.mkdir(parents=True, exist_ok=True)
     reducer = {"mean": np.nanmean, "median": np.nanmedian}[statistic]
     with rasterio.open(reference) as ref:
-        profile = float_profile(ref)
+        if aoi is not None:
+            aoi.check_grid(ref, "the reference grid")
+        profile = float_profile(ref, **creation_options(aoi))
         for key, members in groups.items():
             prefix = f"{key}_" if key else ""
             handles = [{p: rasterio.open(m["path"] / f"{p}.tif") for p in S1_POLARISATIONS} for m in members]
@@ -151,6 +157,8 @@ def composite(scene_dirs, out_dir, reference: str | Path, separate_orbits: bool 
                     with rasterio.open(out_dir / f"{prefix}{pol}.tif", "w", **profile) as dst:
                         attribution.propagate([m["path"] / f"{pol}.tif" for m in members], dst)
                         for w in blocks(ref.width, ref.height, block_size):
+                            if aoi is not None and not aoi.active(w):
+                                continue
                             shape = (int(w.height), int(w.width))
                             layers = []
                             for h in handles:
@@ -166,5 +174,7 @@ def composite(scene_dirs, out_dir, reference: str | Path, separate_orbits: bool 
                         ds.close()
     (out_dir / "composite_s1.json").write_text(json.dumps({
         "sensor": "S1", "statistic": statistic, "domain": "linear", "separate_orbits": separate_orbits,
-        "groups": {k or "ALL": [str(m["path"]) for m in v] for k, v in groups.items()}}, indent=2), encoding="utf8")
+        "groups": {k or "ALL": [str(m["path"]) for m in v] for k, v in groups.items()},
+        **({"aoi_mask": str(aoi.path), "aoi_halo_px": aoi.halo} if aoi is not None else {})}, indent=2),
+        encoding="utf8")
     return out_dir

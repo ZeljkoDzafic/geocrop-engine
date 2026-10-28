@@ -28,7 +28,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 LAYERS: dict[str, frozenset[str]] = {
     # Pure geospatial/ML logic. Reads and writes local files only; no network, no subprocesses.
     CORE: frozenset({
-        "active_learning", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "embeddings", "estimators",
+        "active_learning", "aoi", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "embeddings", "estimators",
         "faultinject", "features", "fieldwork", "ftw", "hashing",
         "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
         "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",

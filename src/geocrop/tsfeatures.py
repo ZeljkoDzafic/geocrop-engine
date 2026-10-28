@@ -27,6 +27,7 @@ from . import attribution, contracts, indices
 from . import scenes as scene_meta
 from . import temporal_quality as tq
 from . import timeseries as ts
+from .aoi import AoiMask, creation_options
 from .features import Feature, load_manifest, write_manifest
 from .raster import NODATA, blocks, ensure_parent, float_profile, read_aligned
 from .s2 import DEFAULT_SCL_INVALID, clear_mask
@@ -56,13 +57,18 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
                            harmonic_order: int = 2, scl_invalid=DEFAULT_SCL_INVALID, cloud_probability_max=None,
                            orbit: str | None = None, block_size: int = 256,
                            min_observed_fraction: float = 0, max_gap_days: float | None = None,
-                           temporal_support: bool = False, support_tolerance_days: float = 10) -> Path:
+                           temporal_support: bool = False, support_tolerance_days: float = 10,
+                           aoi: AoiMask | None = None) -> Path:
     """Regular-grid time-series feature stack plus a ``_quality.tif`` QA raster.
 
     With `temporal_support=True` a third raster ``<stack>_temporal_support.tif`` (+ ``.json`` manifest)
     separates observed from interpolated values per pixel and index (`geocrop.temporal_quality`): clear
     acquisitions, longest gap, season coverage and the distance of SOS/peak/EOS to the nearest clear
     acquisition. The feature stack itself is unchanged.
+
+    With an AOI mask (`geocrop.aoi`) only the blocks that touch the AOI (plus its halo) are reconstructed; the
+    rest of every output stays no-data (sparse). Reconstruction is per pixel, so computed blocks are identical
+    to an unmasked run. The pixel totals in the quality JSON then count the computed blocks only.
     """
     if not np.isfinite(min_observed_fraction) or not 0 <= min_observed_fraction <= 1:
         raise ValueError("min_observed_fraction must be between zero and one")
@@ -107,8 +113,12 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         if temporal_support else []
     tq_sink = None
     totals = {name: {"pixels": 0, "passes_policy": 0, "without_observations": 0} for _, name, _ in series}
-    with rasterio.open(reference) as ref, rasterio.open(out, "w", **float_profile(ref, count=len(names))) as sink, \
-            rasterio.open(qa_path, "w", **float_profile(ref, count=len(qa_names))) as qa_sink:
+    sparse = creation_options(aoi)
+    with rasterio.open(reference) as ref, \
+            rasterio.open(out, "w", **float_profile(ref, count=len(names), **sparse)) as sink, \
+            rasterio.open(qa_path, "w", **float_profile(ref, count=len(qa_names), **sparse)) as qa_sink:
+        if aoi is not None:
+            aoi.check_grid(ref, "the reference grid")
         for i, n in enumerate(names, 1):
             sink.set_band_description(i, n)
         for i, n in enumerate(qa_names, 1):
@@ -119,12 +129,14 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         for target in (sink, qa_sink) if credit else ():
             target.update_tags(**{attribution.TAG: credit, attribution.LICENCE_TAG: attribution.COPERNICUS_LICENCE})
         if temporal_support:
-            tq_sink = rasterio.open(tq_path, "w", **float_profile(ref, count=len(tq_names)))
+            tq_sink = rasterio.open(tq_path, "w", **float_profile(ref, count=len(tq_names), **sparse))
             for i, n in enumerate(tq_names, 1):
                 tq_sink.set_band_description(i, n)
         handles = {}
         try:
             for w in blocks(ref.width, ref.height, block_size):
+                if aoi is not None and not aoi.active(w):
+                    continue
                 transform, shape = ref.window_transform(w), (int(w.height), int(w.width))
                 npx = shape[0] * shape[1]
                 values: dict[str, np.ndarray] = {}
@@ -204,7 +216,8 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
         "stack": out.name, "kind": "timeseries", "grid_start": start.isoformat(), "grid_end": end.isoformat(),
         "step_days": step_days, "lambda": lam, "envelope_iterations": envelope_iterations,
         "scenes": {"S2": len(s2), "S1": len(s1)}, "nodata": NODATA,
-        "features": [asdict(f) for f in features]})
+        "features": [asdict(f) for f in features],
+        **({"aoi_mask": aoi.path.name, "aoi_halo_px": aoi.halo} if aoi is not None else {})})
     qa_path.with_suffix(".json").write_text(json.dumps({
         "schema": "geocrop-temporal-support/1", "quality_raster": qa_path.name,
         "start": start.isoformat(), "end": end.isoformat(), "grid_bins": len(grid), "step_days": step_days,
@@ -231,8 +244,10 @@ def build_timeseries_stack(scene_root: str | Path, reference: str | Path, output
     return out
 
 
-def merge_stacks(stacks, output: str | Path, block_size: int = 512) -> Path:
-    """Concatenate feature stacks on one grid (bands and manifests) into a single stack."""
+def merge_stacks(stacks, output: str | Path, block_size: int = 512, aoi: AoiMask | None = None) -> Path:
+    """Concatenate feature stacks on one grid (bands and manifests) into a single stack.
+
+    With an AOI mask (`geocrop.aoi`) only the blocks that touch the AOI (plus its halo) are copied."""
     handles = [rasterio.open(s) for s in stacks]
     try:
         first = handles[0]
@@ -245,11 +260,13 @@ def merge_stacks(stacks, output: str | Path, block_size: int = 512) -> Path:
         if len(set(names)) != len(names):
             raise ValueError("Duplicate feature names across stacks")
         out = ensure_parent(output)
-        with rasterio.open(out, "w", **float_profile(first, count=len(names))) as sink:
+        with rasterio.open(out, "w", **float_profile(first, count=len(names), **creation_options(aoi))) as sink:
             for i, n in enumerate(names, 1):
                 sink.set_band_description(i, n)
             attribution.propagate(stacks, sink)
             for w in blocks(first.width, first.height, block_size):
+                if aoi is not None and not aoi.active(w):
+                    continue
                 band = 1
                 for h in handles:
                     data = h.read(window=w)
