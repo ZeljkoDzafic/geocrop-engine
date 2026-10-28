@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `docs/performance.md`: Linux container measurements of the release candidate in two resource profiles (2 CPU / 5 GB
+  at 25 and 100 km², 8 CPU / 14 GB at 100 and 500 km²); 500 km² now completes on Linux.
+
 - `tools/linux_benchmark.sh`: `docker run` now attaches stdin (`-i`); without it the container ran nothing and the
   script reported success. A missing `exit_status.txt` now fails the run.
 ### Validation fixes
