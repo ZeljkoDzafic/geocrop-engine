@@ -232,7 +232,7 @@ disk, not a bind mount of the host).
   15-core laptop. Prediction is dominated by the single-core AOA map and ran 2.1x slower than on the laptop's
   faster cores.
 
-**500 km²: not completed.** A first attempt (code 3a05477) stalled in OBIA segmentation: its global stretch made
+**500 km², earlier attempt: not completed** (completed in the release-candidate runs below). A first attempt (code 3a05477) stalled in OBIA segmentation: its global stretch made
 a decimated whole-raster read of the 97-band pixel-interleaved stack, and with GDAL's block cache at 5 % of the
 container memory (~205 MB) every output row re-decompressed a whole row of 25 MB tiles; after 39 min the stage
 had not finished and was stopped. This is fixed in this release (block-wise regular subsample, ~10 s for that
@@ -254,6 +254,66 @@ container exit status or OOM record survived), so training, prediction and parce
 measured on Linux**. The macOS run peaked at 6.0 GiB in training at this size and the recalibrated preflight
 estimates 8.3 GB, i.e. above this container's 4 GiB: preflight now reports that as an error inside the container
 (see below), and a 500 km² run should get ≥ 8 GB.
+
+### Release candidate 1.0.0rc1: two resource profiles, 25 to 500 km²
+
+Measured on the committed release candidate (code `16f44ad`, 2026-10-28) with `tools/linux_benchmark.sh` in an
+`ubuntu:26.04` container (CPython 3.12 via uv, pinned install). The Docker VM was a Rancher Desktop VM on the same
+Apple M5 Pro laptop as above (15 cores, 48 GB), so these are **resource-limited containers on a shared laptop, not a
+dedicated Linux server**, and the "CPU" limit is a CFS quota on VM vCPUs. Two profiles:
+
+| Profile | `docker run` limits | Docker VM | Areas |
+|---|---|---|---|
+| small | `--cpus 2 --memory 5g` (no swap) | 2 vCPUs, 5.8 GiB | 25, 100 km² |
+| large | `--cpus 8 --memory 14g` (no swap) | 8 vCPUs, 15.6 GiB | 100, 500 km² |
+
+```bash
+tools/linux_benchmark.sh --sizes 25 100 --cpus 2 --memory 5g --out outputs/scale-linux-2cpu-5g
+tools/linux_benchmark.sh --sizes 100 500 --cpus 8 --memory 14g --max-hours 3 --out outputs/scale-linux-8cpu-14g
+```
+
+All stages of all four runs completed (`exit_status.txt` 0). Training labels are pseudo-labels (software
+measurement, not accuracy).
+
+| Profile | Area km² | Wall min | CPU min | Peak RSS GiB | Output peak GiB |
+|---|---|---|---|---|---|
+| small | 25 | 6.0 | 1.3 | 1.12 | 0.32 |
+| small | 100 | 9.1 | 5.3 | 1.60 | 1.18 |
+| large | 100 | 10.4 | 8.1 | 1.96 | 1.18 |
+| large | 500 | 37.5 | 54.6 | 4.90 | 5.59 |
+
+Per stage (wall seconds; CPU seconds in brackets):
+
+| Stage | small 25 km² | small 100 km² | large 100 km² | large 500 km² |
+|---|---|---|---|---|
+| s2_import | 181 (8) | 298 (15) | 374 (17) | 563 (66) |
+| s1_import | 131 (5) | 40 (10) | 45 (12) | 414 (58) |
+| s2_composites | 2 (2) | 8 (8) | 13 (13) | 58 (58) |
+| s1_composites | 1 (1) | 2 (2) | 3 (3) | 14 (14) |
+| features | 1 (1) | 5 (5) | 6 (6) | 31 (31) |
+| segmentation | 2 (2) | 18 (18) | 22 (22) | 122 (122) |
+| pseudo_labels | 0 (0) | 4 (4) | 2 (2) | 25 (28) |
+| training | 22 (35) | 108 (188) | 57 (302) | 403 (2186) |
+| prediction | 22 (23) | 64 (67) | 100 (109) | 613 (704) |
+| parcels | 0 (0) | 1 (1) | 2 (2) | 9 (9) |
+
+Reading the two profiles (all figures from the tables above):
+
+* **Extra cores help only the stage that uses them.** Training used 1.75 busy cores in the small profile and 5.3 to
+  5.4 in the large one: at 100 km² it took 108 s instead of 57 s, and at 500 km² 403 s. Prediction (dominated by the
+  single-core AOA map), OBIA segmentation and the composites ran on about 1.0 to 1.15 cores in both profiles, so
+  they did not speed up (prediction at 100 km² was even slower in the large profile, 100 s vs 64 s, within the
+  run-to-run spread of a shared laptop).
+* **The two imports dominate small areas** (62 % of the wall time at 100 km² in the small profile, 67 % in the
+  large one, 43 % at 500 km²). They are network-bound and sequential, which is why the large profile was not
+  faster in total at 100 km² (10.4 vs 9.1 min).
+* **500 km² now completes on Linux**: 37.5 min wall, 54.6 CPU-min, 4.9 GiB peak RSS, 5.6 GiB output peak, about
+  3.7 GiB received. After the imports, the largest stages are prediction (613 s, single core) and training (403 s).
+  The earlier attempt that did not finish (below) hit the segmentation stall fixed in this release and a Docker
+  daemon stop; neither occurred in these runs. The measured peak (4.9 GiB) is below the preflight RAM estimate
+  (8.3 GB), so the estimate is conservative.
+* Wall times depend on the network and on other jobs on the laptop (another container ran in the same VM): treat
+  the minutes as roughly ±30 %. Linux (9.1 and 10.4 min) and macOS (8.0 min) at 100 km² agree within that spread.
 
 ### Preflight on Linux
 
