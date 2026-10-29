@@ -151,6 +151,85 @@ mosaics of both orbit directions; Sentinel-1B was not operating in 2023).
   include memory retained from earlier stages of the same process.
 * **Disk** grows linearly: ~11.7 MiB per km² of output for this configuration (4 windows, S2 + S1, 97 features).
 
+## Parallel imports and blockwise processes: before and after
+
+Re-measured on the same macOS laptop (15 cores, native, no Docker) with `tools/scale_benchmark.py`, same areas and
+season as above, Sentinel-1 included. **Baseline** = the sequential code paths of earlier releases
+(`--workers 1 --import-workers 1 --aoa-search kdtree`); **new** = the defaults (4 import threads, 4 block/tile
+processes, matrix-product AOA search). Each variant was run once per area:
+
+```bash
+PYTHONPATH=src python tools/scale_benchmark.py run --out outputs/scale-base --sizes 100 500 --workers 1 --import-workers 1 --aoa-search kdtree
+PYTHONPATH=src python tools/scale_benchmark.py run --out outputs/scale-new  --sizes 100 500
+```
+
+**The host was shared and heavily loaded** (1-min load 5-100 on 15 cores, differing between the two variants, see
+the load columns), so wall times of the unchanged single-core stages vary by up to ~1.3x between runs; speed-ups
+below about 1.3x are noise. Peak RSS is the sampled sum over the process tree; in this tool all stages of an area
+run in one process, so it includes memory retained from earlier stages.
+
+**100 km2**
+
+| Stage | Baseline wall s | New wall s | Speed-up | Baseline load1 | New load1 | Baseline peak RSS MB | New peak RSS MB |
+|---|---|---|---|---|---|---|---|
+| s2_import | 235.49 | 74.38 | 3.17x | 12.8 | 11.7 | 367.6 | 563.6 |
+| s1_import | 78.76 | 44.15 | 1.78x | 16.1 | 6.8 | 373.1 | 496.5 |
+| s2_composites | 11.71 | 10.91 | 1.07x | 16.3 | 5.8 | 705.0 | 753.9 |
+| s1_composites | 3.21 | 2.97 | 1.08x | 16.7 | 5.5 | 724.1 | 715.2 |
+| features | 8.8 | 8.31 | 1.06x | 16.7 | 5.3 | 1184.7 | 1155.8 |
+| segmentation | 15.82 | 15.76 | 1.00x | 16.4 | 5.2 | 1572.5 | 1542.0 |
+| pseudo_labels | 2.01 | 1.89 | 1.06x | 15.9 | 5.6 | 1207.3 | 1167.5 |
+| training | 30.88 | 29.22 | 1.06x | 23.0 | 8.2 | 1497.5 | 1839.0 |
+| prediction | 117.39 | 16.52 | 7.11x | 23.5 | 9.5 | 2372.8 | 5743.0 |
+| parcels | 1.43 | 1.31 | 1.09x | 19.4 | 9.2 | 2142.4 | 1668.9 |
+| total | 505 | 205 | 2.46x | | | | |
+
+**500 km2**
+
+| Stage | Baseline wall s | New wall s | Speed-up | Baseline load1 | New load1 | Baseline peak RSS MB | New peak RSS MB |
+|---|---|---|---|---|---|---|---|
+| s2_import | 548.16 | 154.61 | 3.55x | 36.8 | 5.5 | 747.2 | 1532.4 |
+| s1_import | 408.52 | 137.0 | 2.98x | 15.1 | 9.6 | 765.6 | 1170.3 |
+| s2_composites | 67.42 | 55.57 | 1.21x | 29.4 | 11.9 | 1795.1 | 2132.4 |
+| s1_composites | 17.2 | 13.43 | 1.28x | 25.9 | 11.2 | 1773.0 | 1636.3 |
+| features | 47.07 | 42.34 | 1.11x | 22.1 | 9.5 | 3067.5 | 3087.6 |
+| segmentation | 83.44 | 41.92 | 1.99x | 19.1 | 45.3 | 3558.1 | 6877.5 |
+| pseudo_labels | 9.83 | 10.94 | 0.90x | 21.8 | 60.1 | 3676.0 | 3296.8 |
+| training | 210.38 | 226.1 | 0.93x | 80.4 | 100.0 | 6456.3 | 5867.8 |
+| prediction | 998.17 | 67.86 | 14.71x | 28.1 | 56.2 | 6030.0 | 13111.8 |
+| parcels | 13.69 | 6.11 | 2.24x | 23.0 | 32.2 | 1421.7 | 3631.5 |
+| total | 2404 | 756 | 3.18x | | | | |
+
+What changed and why (measured):
+
+* **Imports** (thread pool over STAC items, `resources.import_workers`, default 4): 3.2-3.6x faster for Sentinel-2,
+  1.8-3.0x for Sentinel-1. The gain is bounded by the machine's bandwidth: sequential Sentinel-1 reads already ran at
+  ~7 MB/s, which looks like the link limit (not verified), so threads help most where the reads are latency-bound.
+* **Prediction**: 7.1x at 100 km² and 14.7x at 500 km² (998 s to 68 s). Two parts: the AOA search is exact but uses a
+  float32 matrix product instead of a k-d tree (35 s vs 146 s per Mpx on one core, same 97 features and 20 000
+  training points, measured on 40 000 real pixels of the 100 km² stack), and blocks run in 4 processes. **Memory grows
+  with workers**: each holds a model copy (287 MB for the 500 km² model) and its block buffers; the prediction stage
+  peaked at 13.1 GB (6.0 GB before) at 500 km² and 5.7 GB (2.4 GB) at 100 km², including ~3-6 GB retained by the
+  benchmark process itself. Set `resources.workers: 2` (or 1) in a small container; `geocrop preflight` adds the
+  per-worker memory.
+* **OBIA segmentation**: tiles run in processes. Profiling a synthetic 500 km² stack (4 bands, field-like blocks,
+  **synthetic data**) gave 63.9 s sequential and 21.5 s with 4 workers, identical segment tables; 1000 km² took 146 s
+  sequentially. The profile does **not** support the seam reconciliation as the cause of the earlier super-linear
+  growth: it takes about 1 s of 146 s. Over 90 % of the time is the mask-centroid initialisation inside
+  scikit-image's SLIC (a k-means over the tile's pixels with one centroid per segment: quadratic in the tile size,
+  linear in the number of tiles). The step between 500 and 1000 km² follows from the count of full 1024-px tiles
+  (4 to 9); total cost is linear in area for a fixed tile size. Real 1000 km² data was not re-measured.
+* **Compositing, features, pseudo-labels, training, parcels** are unchanged (single core or already parallel);
+  per-block parallel composites and features need edits in modules outside this change and were not attempted.
+
+**Equality with the sequential run** (real data, 19.10-19.16 E, 44.72-44.76 N, June 2023, Earth Search and Planetary
+Computer): Sentinel-2, 3 scenes imported with 1 and 4 workers: all 36 files byte-identical (SHA-256), result lists
+identical, 37.5 s vs 12.4 s (3.0x). Sentinel-1, 9 overpasses: all 27 files byte-identical, 10.1 s vs 9.0 s (1.1x; small
+area). Rasters from `map_aoa` with 1 and 3 processes are byte-identical; `predict` classes and AOA are identical and
+probabilities differ by at most 1e-6 (synthetic data, `tests/test_parallel.py`); segment tables from 1 and 4 tile
+workers are identical. The new AOA search equals the k-d tree distances to 3e-17 absolute on the real 40 000-pixel
+sample, with identical float32 DI for all pixels.
+
 ## Preflight estimator vs measurement
 
 `geocrop preflight` estimates were computed for each measured layout (same grid, scenes, windows, features,

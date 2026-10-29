@@ -283,15 +283,17 @@ def test_unloadable_estimator_backend_blocks_preflight(study, monkeypatch):
 
 def test_estimate_is_calibrated_against_the_measured_500_km2_run(study):
     """Coefficients recalibrated from tools/scale_benchmark.py (docs/performance.md): a 5 Mpx grid with 97
-    features, 100 trees and 551 450 training samples measured 741 s prediction (AOA map dominates), 181 s
-    training and 6.1 GB peak RSS. The estimate must stay within a factor of two and not under-estimate RAM."""
+    features, 100 trees and 551 450 training samples measured 68 s prediction with 4 block workers (AOA map
+    spread over them; 998 s single process with the earlier k-d tree search), 226 s training and 5.9 GB peak RSS
+    before prediction (13.1 GB during the 4-worker prediction). The estimate must stay within a factor of two."""
     cfg = _cfg(study, model={"n_estimators": 100, "cv_folds": 3})
     layout = preflight.plan(cfg)
     layout = {**layout, "pixels": 5_000_000, "window_features": 97,
               "grid": {**layout["grid"], "width": 2237, "height": 2237, "res": (10.0, 10.0)}}
-    est = preflight.estimate(cfg, layout, n_samples=551_450, n_classes=4)
+    est = preflight.estimate(cfg, layout, n_samples=551_450, n_classes=4, cpus=4)
     predict_s = est["runtime_hours_rough"]["predict"] * 3600
-    assert 741 / 2 <= predict_s <= 741 * 2
+    assert est["workers"] == 4
+    assert 68 / 2 <= predict_s <= 68 * 2
     assert est["peak_ram_gb"]["max"] >= 6.1
     small = preflight.estimate(cfg, {**layout, "pixels": 250_000}, n_samples=28_600, n_classes=4)
     assert small["peak_ram_gb"]["max"] >= 1.0          # interpreter + GDAL overhead is always included
