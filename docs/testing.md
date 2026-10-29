@@ -79,7 +79,7 @@ computes weighted histogram-gradient-boosting bin edges in Python, which cost mi
 classifier now pre-bins with weighted quantiles. Profile with `pytest --durations=30`; pandas 2 vs 3 made no difference.
 
 `coverage.xml` is uploaded as a workflow artifact. The build fails below the current total minus two points
-(`--cov-fail-under=76`, measured on the minimal CI install `.[dev,stac,web]` where optional backends — torch,
+(`--cov-fail-under=77`, measured on the minimal CI install `.[dev,stac,web]` where optional backends — torch,
 pyarrow, matplotlib, catboost, openeo, xarray — are skipped); raise the threshold when coverage improves. Engine
 commands run by web jobs execute in subprocesses and are not counted; the CLI's own tests cover them in-process.
 
