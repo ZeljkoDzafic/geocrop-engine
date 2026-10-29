@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CI speed: the shift check's domain classifier (`shift.py`) bins its features once with weighted quantiles instead
+  of letting scikit-learn 1.8+ recompute 254 weighted percentiles per feature in Python on every fit; every pipeline
+  test (predict runs the shift check) was 10-15x slower on Python 3.11/3.12 (new scikit-learn) than on 3.10. The
+  tests workflow now runs the default tier with `pytest-xdist` (`-n 2 --dist loadfile`, added to the `dev` extra).
 - Dependabot: pip version updates are off (the pinned freeze is regenerated as a whole; security updates stay on).
 - CI: the `audit` job audits the pinned versions in `constraints/py312.txt` without re-resolving them (`--no-deps --disable-pip`).
 

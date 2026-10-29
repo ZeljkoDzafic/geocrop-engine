@@ -21,7 +21,8 @@ jobs:
       - run: python tools/check_versions.py
       # Fail-under is the measured total on this minimal install (statements + branches, 78.6 %) minus 2; raise it as tests grow.
       - run: >-
-          python -m pytest --cov=geocrop --cov-branch --cov-report=xml --cov-report=term
+          python -m pytest -n 2 --dist loadfile --durations=15
+          --cov=geocrop --cov-branch --cov-report=xml --cov-report=term
           --cov-fail-under=76
       - uses: actions/upload-artifact@v7
         if: always()
