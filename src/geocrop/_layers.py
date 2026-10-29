@@ -31,7 +31,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "active_learning", "applicability", "cbm", "cbm_markers", "clouds", "contracts", "embeddings", "estimators",
         "faultinject", "features", "fieldwork", "ftw", "hashing",
         "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
-        "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
+        "parallel", "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
         "calendars",     # data-driven crop calendars and phenological windows
         "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
@@ -83,6 +83,7 @@ WEB_IMPORTERS = frozenset({"cli"}) | WEB_MODULES
 CORE_THIRD_PARTY = frozenset({
     "numpy", "scipy", "pandas", "sklearn", "joblib", "rasterio", "geopandas", "shapely", "pyproj", "affine",
     "skimage", "torch", "lightgbm", "catboost", "omnicloudmask", "segmentation_models_pytorch",
+    "threadpoolctl",  # BLAS thread limits inside block-worker processes (scikit-learn dependency)
     "matplotlib",   # optional, imported lazily for figures (active_learning.plot_curves)
     "pyarrow",      # Parquet schema reads without loading rows (review.discover)
 })

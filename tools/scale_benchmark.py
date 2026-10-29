@@ -211,7 +211,8 @@ def square(km2: float) -> tuple[float, float, float, float]:
     return (x - half, y - half, x + half, y + half)
 
 
-def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C901 - linear chain
+def run_one(km2: float, out: Path, s1: bool, seed: int = 42, workers: int | None = None,
+            import_workers: int | None = None) -> dict:  # noqa: C901 - linear chain
     import geopandas as gpd
     import numpy as np
     import pandas as pd
@@ -244,14 +245,16 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
                              "bbox_wgs84": [round(v, 5) for v in transform_bounds(g.crs, "EPSG:4326", *g.bounds)]})
         with sampler.stage("s2_import", stages) as rec:
             res = stac_import.import_season(grid, out / "scenes" / "s2", START, END, max_cloud=60,
-                                            min_clear_fraction=0.5, max_items=200)
+                                            min_clear_fraction=0.5, max_items=200,
+                                            workers=import_workers)
             rec["items"] = len(res)
             rec["status_counts"] = pd.Series([r["status"].split(":")[0] for r in res]).value_counts().to_dict()
         s2_dirs = [Path(r["path"]) for r in res if r["status"] in ("imported", "cached")]
         s1_dirs = []
         if s1:
             with sampler.stage("s1_import", stages) as rec:
-                res1 = s1_stac.import_season(grid, out / "scenes" / "s1", START, END, max_items=200)
+                res1 = s1_stac.import_season(grid, out / "scenes" / "s1", START, END, max_items=200,
+                                             workers=import_workers)
                 rec["items"] = len(res1)
                 rec["status_counts"] = pd.Series([r["status"].split(":")[0] for r in res1]).value_counts().to_dict()
             s1_dirs = [Path(r["path"]) for r in res1 if r["status"] in ("imported", "cached")]
@@ -287,7 +290,7 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
             peak = max(med, key=med.get)
             seg = segmentation.obia(stack, out / "segmentation" / "segments.gpkg",
                                     bands=[f"{peak}_B04", f"{peak}_B08", f"{peak}_B11", f"{peak}_NDVI"],
-                                    segments_per_km2=50)
+                                    segments_per_km2=50, workers=workers)
             segs = gpd.read_file(seg["path"])
             rec.update({"peak_window": peak, "segments": len(segs)})
         with sampler.stage("pseudo_labels", stages) as rec:
@@ -308,7 +311,7 @@ def run_one(km2: float, out: Path, s1: bool, seed: int = 42) -> dict:  # noqa: C
             info["samples"], info["classes"] = rep["samples"], len(rep.get("class_counts", {})) or pinfo["k"]
         pred = out / "prediction"
         with sampler.stage("prediction", stages):
-            model.predict(stack, out / "model" / "model.joblib", pred)
+            model.predict(stack, out / "model" / "model.joblib", pred, workers=workers)
         with sampler.stage("parcels", stages) as rec:
             pin = ref.assign(parcel_id=lambda d: "S" + d.segment_id.astype(str),
                              declared_crop=lambda d: d.pseudo_class)[["parcel_id", "declared_crop", "geometry"]]
@@ -395,7 +398,8 @@ def completed_result(path: Path, with_s1: bool) -> dict | None:
     return None
 
 
-def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> bool:
+def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str, workers: int | None = None,
+            import_workers: int | None = None) -> bool:
     """Return False when any requested area fails or is skipped for the time budget."""
     out.mkdir(parents=True, exist_ok=True)
     log = out / "runs.json"
@@ -426,6 +430,9 @@ def run_all(out: Path, sizes, s1_sizes, max_hours: float, python: str) -> bool:
         cmd = [python, str(Path(__file__).resolve()), "one", "--km2", str(km2), "--out", str(target)]
         if km2 in s1_sizes:
             cmd.append("--s1")
+        for flag, value in (("--workers", workers), ("--import-workers", import_workers)):
+            if value is not None:
+                cmd += [flag, str(value)]
         t0 = time.perf_counter()
         try:
             rc = subprocess.run(cmd, timeout=max_hours * 3600).returncode
@@ -617,19 +624,28 @@ def main(argv=None):
     r.add_argument("--s1-sizes", type=float, nargs="*", default=None, help="areas that also import Sentinel-1 "
                    "(default: all)")
     r.add_argument("--max-hours", type=float, default=3.0)
+    r.add_argument("--workers", type=int, help="processes for segmentation tiles and prediction/AOA blocks "
+                   "(default min(usable CPUs, 4); 1 = the sequential behaviour)")
+    r.add_argument("--import-workers", type=int, help="concurrent STAC scene imports (default 4; 1 = sequential)")
+    r.add_argument("--aoa-search", choices=["auto", "kdtree"], default="auto",
+                   help="kdtree = the pre-parallel nearest-neighbour search (baseline measurements)")
     o = sub.add_parser("one", help="measure one area (used by `run`)")
     o.add_argument("--km2", type=float, required=True)
     o.add_argument("--out", required=True)
     o.add_argument("--s1", action="store_true")
+    o.add_argument("--workers", type=int)
+    o.add_argument("--import-workers", type=int)
     p = sub.add_parser("report", help="tables, plots and linear fits from measured areas")
     p.add_argument("--out", required=True)
     p.add_argument("--images", default="docs/images")
     a = ap.parse_args(argv)
     if a.cmd == "run":
-        if not run_all(Path(a.out), a.sizes, a.sizes if a.s1_sizes is None else a.s1_sizes, a.max_hours, sys.executable):
+        os.environ["GEOCROP_AOA_SEARCH"] = a.aoa_search          # inherited by the area processes and their workers
+        if not run_all(Path(a.out), a.sizes, a.sizes if a.s1_sizes is None else a.s1_sizes, a.max_hours, sys.executable,
+                   a.workers, a.import_workers):
             sys.exit(1)
     elif a.cmd == "one":
-        res = run_one(a.km2, Path(a.out), a.s1)
+        res = run_one(a.km2, Path(a.out), a.s1, workers=a.workers, import_workers=a.import_workers)
         sys.exit(1 if res["error"] else 0)
     else:
         report(Path(a.out), Path(a.images))

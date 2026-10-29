@@ -24,6 +24,7 @@ from rasterio.windows import Window, from_bounds
 from . import attribution
 from . import scenes as scene_meta
 from .indices import S2_BANDS
+from .parallel import import_workers, ordered_map, with_backoff
 from .raster import NODATA, float_profile, gtiff_profile
 
 EARTH_SEARCH = "https://earth-search.aws.element84.com/v1"
@@ -137,8 +138,14 @@ def import_item(item, reference: str | Path, out_dir: str | Path, asset_keys: di
 
 def import_season(reference: str | Path, out_root: str | Path, start: str, end: str,
                   endpoint: str = EARTH_SEARCH, collection: str = "sentinel-2-l2a", max_cloud: float | None = 80,
-                  min_clear_fraction: float = 0.2, max_items: int = 500, asset_keys: dict | None = None) -> list[dict]:
-    """Search the STAC API over the reference grid's footprint and import every acquisition as a scene folder."""
+                  min_clear_fraction: float = 0.2, max_items: int = 500, asset_keys: dict | None = None, workers: int | None = None) -> list[dict]:
+    """Search the STAC API over the reference grid's footprint and import every acquisition as a scene folder.
+
+    Acquisitions are read by up to `workers` threads (default 4, at most 8; 1 = sequential). The result list,
+    scene folders and scene.json do not depend on `workers`: results are in acquisition order and a failing item is
+    reported as ``failed: ...`` without affecting the others. Throttling answers (HTTP 429/503) are retried with
+    exponential backoff.
+    """
     try:
         from pystac_client import Client
     except ImportError as exc:
@@ -148,16 +155,23 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
     query = {"eo:cloud_cover": {"lt": max_cloud}} if max_cloud is not None else None
     items = Client.open(endpoint).search(collections=[collection], bbox=list(bbox), datetime=f"{start}/{end}",
                                          query=query, max_items=max_items).items()
-    results = []
+    workers = import_workers(workers)
     grid_id = grid_identity(reference)
+    results, todo = [], []
     for item in sorted(items, key=lambda i: i.properties.get("datetime", "")):
         target = Path(out_root) / item.id
         if cached_scene_valid(target, grid_id):
             results.append({"item": item.id, "status": "cached", "path": str(target)})
             continue
         (target / scene_meta.SIDE_CAR).unlink(missing_ok=True)   # stale grid or incomplete: re-import
+        results.append(item)
+        todo.append(item)
+    run_item = with_backoff(import_item) if workers > 1 else import_item
+
+    def one(item):
         try:
-            results.append(import_item(item, reference, target, asset_keys, min_clear_fraction))
+            return run_item(item, reference, Path(out_root) / item.id, asset_keys, min_clear_fraction)
         except (ValueError, rasterio.errors.RasterioIOError) as exc:
-            results.append({"item": item.id, "status": f"failed: {exc}"})
-    return results
+            return {"item": item.id, "status": f"failed: {exc}"}
+    done = iter(list(ordered_map(one, todo, workers)))
+    return [next(done) if not isinstance(r, dict) else r for r in results]

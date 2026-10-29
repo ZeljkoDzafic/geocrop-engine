@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Parallel I/O and blockwise processes (new module `geocrop.parallel`; keys `resources.import_workers`,
+  `resources.workers`; flags `stac-import --workers`, `predict --workers`, `segment-obia --workers`): the Sentinel-2 and
+  Sentinel-1 STAC imports read scenes with a bounded thread pool (default 4, at most 8) with exponential backoff on
+  HTTP 429/503; the AOA map and the model blocks of `predict` run in a process pool (default min(usable CPUs, 4)); OBIA
+  tiles are segmented in parallel. Outputs are identical to the sequential run (files, scene.json, rasters).
+- AOA nearest-neighbour search: in high dimension it uses a float32 matrix product to find candidates and recomputes the
+  distance exactly in float64 over every point rounding could have made the nearest (same distances as the k-d tree to
+  ~1e-15, ~4x faster on one core; `GEOCROP_AOA_SEARCH=kdtree` selects the old search). `geocrop preflight` credits block workers.
+- `tools/scale_benchmark.py run --workers N --import-workers N --aoa-search kdtree` reproduces the sequential baseline.
+
 - `docs/performance.md`: Linux container measurements of the release candidate in two resource profiles (2 CPU / 5 GB
   at 25 and 100 km², 8 CPU / 14 GB at 100 and 500 km²); 500 km² now completes on Linux.
 

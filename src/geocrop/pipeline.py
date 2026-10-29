@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import __version__, scenes
+from . import __version__, parallel, scenes
 from . import config as cfgmod
 from .cache import HashCache, RunLock
 
@@ -581,8 +581,12 @@ class Runner:
             if smoothing is None:   # a previous smoothed run's raw probabilities no longer describe this map
                 (pred / "probabilities_unsmoothed.tif").unlink(missing_ok=True)
             return model.predict(self.paths["features"], self.out / "model" / "model.joblib", pred,
-                                 smoothing=smoothing, shift=shift)
+                                 smoothing=smoothing, shift=shift, workers=self._block_workers())
         return self.stage("predict", fp, outputs, run)
+
+    def _block_workers(self) -> int:
+        """Processes for blockwise prediction: resources.workers, else a positive model.n_jobs, else min(CPUs, 4)."""
+        return parallel.resolve_workers(self.cfg["resources"].get("workers"), self.cfg["model"].get("n_jobs"))
 
     def _shift_options(self) -> dict:
         """`model.predict` shift-check options (docs/domain-shift.md): sample inside the parcels when available."""
