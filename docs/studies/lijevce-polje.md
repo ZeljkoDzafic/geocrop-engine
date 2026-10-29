@@ -134,7 +134,7 @@ geocrop intake --config configs/studies/lijevce_polje/study_2023.yaml --require-
     --crop-mapping data/lijevce_polje/reference/crop_mapping_rs.csv
 ```
 
-Step-by-step instructions for the data provider (Serbian): [Priprema podataka](../priprema-podataka.md).
+What the checks cover and the accepted input formats: [Reference-data intake](../intake.md).
 `geocrop preflight` reminds of this step and still covers scenes, grid and resources.
 
 ## Open items

@@ -9,7 +9,7 @@
   observation leakage. Reports hold counts and (limited) IDs only. Reuses `audit` and `preflight`.
 - CSV/tabular input (WKT or x/y columns, utf-8/cp1250 detected or `--encoding`, `;` or `,`) for `normalize-parcels`
   and the new `normalize-observations`; `read_mapping` reads cp1250 and semicolon CSVs.
-- Serbian data-preparation guide `docs/priprema-podataka.md` and a synthetic example under `examples/intake_example/`.
+- Reference-data intake documentation `docs/intake.md` and a synthetic example under `examples/intake_example/`.
 - `geocrop preflight` points to `geocrop intake`.
 - Dependabot: pip version updates are off (the pinned freeze is regenerated as a whole; security updates stay on).
 - CI: the `audit` job audits the pinned versions in `constraints/py312.txt` without re-resolving them (`--no-deps --disable-pip`).

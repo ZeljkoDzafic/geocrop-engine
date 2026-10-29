@@ -81,7 +81,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
 | `segmenters` | `Segmenter` protocol and registered OBIA, U-Net + watershed and Fields of The World (`ftw`) segmenters |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
-| `intake` | reference-data intake report (`geocrop intake`): readability, encodings, crop-mapping coverage, season, AOI overlap, class/CV support, leakage; reuses `audit` and `preflight` ([guide](priprema-podataka.md)) |
+| `intake` | reference-data intake report (`geocrop intake`): readability, encodings, crop-mapping coverage, season, AOI overlap, class/CV support, leakage; reuses `audit` and `preflight` ([guide](intake.md)) |
 | `audit` | read-only input audit: schema, geometry, class support, contradictory overlaps and field/training proximity |
 | `pipeline`, `config`, `provenance`, `cli` | orchestration, configuration, manifests and checks, command line |
 | `s1_stac`, `stac_import`, `quicklook` | Sentinel-1 RTC (Planetary Computer) and Sentinel-2 L2A (Earth Search) windowed COG import; quicklooks |

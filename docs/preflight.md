@@ -13,7 +13,7 @@ The Markdown report is printed to the console as well. Exit code `2` means **blo
 also *ready with warnings*), so the command can gate a systemd unit or a CI job.
 
 Reference data (training polygons, parcels, field observations) are checked in depth by
-[`geocrop intake`](priprema-podataka.md) (encodings, crop-mapping coverage, season, AOI overlap, leakage); the
+[`geocrop intake`](intake.md) (encodings, crop-mapping coverage, season, AOI overlap, leakage); the
 preflight report points to it. Run it when the data arrive and require a PASS before the final run.
 
 ## Verdict
