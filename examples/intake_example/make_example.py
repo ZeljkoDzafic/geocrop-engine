@@ -23,9 +23,23 @@ def feature_collection(rows, crs="EPSG:32633"):
         "features": [{"type": "Feature", "properties": p, "geometry": mapping(g)} for p, g in rows]}
 
 
+def _rounded(value, digits=6):
+    if isinstance(value, float):
+        return round(value, digits)
+    if isinstance(value, list):
+        return [_rounded(v, digits) for v in value]
+    if isinstance(value, tuple):
+        return [_rounded(v, digits) for v in value]
+    if isinstance(value, dict):
+        return {k: _rounded(v, digits) for k, v in value.items()}
+    return value
+
+
 def dump(path: Path, collection):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(collection, ensure_ascii=False, indent=0), encoding="utf8")
+    # coordinates rounded to 1e-6 (about 0.1 m): the last floating-point digits of reprojected values differ
+    # between platforms and GEOS/PROJ builds, and the example files are compared byte for byte
+    path.write_text(json.dumps(_rounded(collection), ensure_ascii=False, indent=0), encoding="utf8")
 
 
 def town(x):
