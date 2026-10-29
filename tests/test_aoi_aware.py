@@ -784,3 +784,13 @@ def test_quicklook_keeps_the_bbox_path_and_takes_an_aoi_geometry(tmp_path, monke
         Point(19.10, 44.72).buffer(0.03))], crs="EPSG:4326")
     ql.quicklook(None, "2023-07-01", "2023-07-31", tmp_path / "aoi", aoi=triangle)
     assert isinstance(seen["aoi"], AoiMask) and (tmp_path / "aoi" / "grid_aoi.tif").exists()
+
+
+def test_adjacent_blocks_are_read_as_one_run():
+    from rasterio.windows import Window
+
+    from geocrop.stac_import import merge_runs
+    blocks_ = [Window(1024, 0, 512, 512), Window(0, 0, 512, 512), Window(512, 0, 512, 512),
+               Window(512, 512, 512, 512), Window(1536, 512, 512, 512)]
+    runs = [(int(w.col_off), int(w.row_off), int(w.width), int(w.height)) for w in merge_runs(blocks_)]
+    assert runs == [(0, 0, 1536, 512), (512, 512, 512, 512), (1536, 512, 512, 512)]

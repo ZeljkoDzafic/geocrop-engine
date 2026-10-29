@@ -84,22 +84,40 @@ def read_window_aligned(src, dst_transform, dst_crs, shape, resampling, dtype="f
     win = from_bounds(*b, transform=src.transform).round_offsets().round_lengths()
     win = Window(win.col_off - margin, win.row_off - margin, win.width + 2 * margin, win.height + 2 * margin)
     nodata = src.nodata if src.nodata is not None else 0
-    data = src.read(1, window=win, boundless=True, fill_value=nodata)
+    inside = win.col_off >= 0 and win.row_off >= 0 and win.col_off + win.width <= src.width \
+        and win.row_off + win.height <= src.height
+    # A window inside the raster is read directly, so repeated windows of one dataset share its block cache
+    # (a boundless read goes through a temporary VRT with a cache of its own and re-fetches shared source tiles).
+    data = src.read(1, window=win) if inside else src.read(1, window=win, boundless=True, fill_value=nodata)
     out = np.full(shape, fill, dtype=dtype)
     reproject(data, out, src_transform=src.window_transform(win), src_crs=src.crs, src_nodata=nodata,
               dst_transform=dst_transform, dst_crs=dst_crs, dst_nodata=fill, resampling=resampling)
     return out
 
 
+def merge_runs(windows) -> list[Window]:
+    """Merge grid windows that touch horizontally (same rows, consecutive columns) into one wider window each:
+    one COG read per run instead of one per block (fewer requests, no repeated source tiles at block borders)."""
+    runs: list[Window] = []
+    for w in sorted(windows, key=lambda x: (int(x.row_off), int(x.height), int(x.col_off))):
+        last = runs[-1] if runs else None
+        if (last is not None and int(last.row_off) == int(w.row_off) and int(last.height) == int(w.height)
+                and int(last.col_off + last.width) == int(w.col_off)):
+            runs[-1] = Window(last.col_off, last.row_off, last.width + w.width, last.height)
+        else:
+            runs.append(Window(int(w.col_off), int(w.row_off), int(w.width), int(w.height)))
+    return runs
+
+
 def read_window_aligned_active(src, dst_transform, dst_crs, shape, resampling, dtype="float32", fill=np.nan,
                                windows=(), margin=4):
-    """`read_window_aligned` for the given grid windows only: each is read from the source separately and the
-    rest of the grid is `fill`. Windows that do not touch the source raster are not read at all (no HTTP
-    request); a window that does reads just the source blocks it needs."""
+    """`read_window_aligned` for the given grid windows only: horizontally adjacent windows are read as one run
+    and the rest of the grid is `fill`. Runs that do not touch the source raster are not read at all (no HTTP
+    request); a run that does reads just the source blocks it needs."""
     from rasterio.windows import transform as window_transform
     out = np.full(shape, fill, dtype=dtype)
     sb = src.bounds
-    for w in windows:
+    for w in merge_runs(windows):
         h, wd = int(w.height), int(w.width)
         t = window_transform(w, dst_transform)
         left, top = t @ (0, 0)
