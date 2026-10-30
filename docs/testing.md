@@ -13,7 +13,8 @@ default tier (`addopts = -m 'not network'` in `pyproject.toml`).
 `pytest` selects every test except `network`, so the `slow` tests also run in the default tier;
 `pytest -m "not slow"` skips them for a quick local loop. Run `pytest --co -q` for the current counts.
 
-CI: the `tests` workflow runs the default tier with coverage on Python 3.10, 3.11 and 3.12 (Ubuntu 26.04) for
+CI: the `tests` workflow runs the default tier in two xdist workers (`-n 2 --dist loadfile`, so tests that share
+module-level fixtures stay in one worker) with coverage on Python 3.10, 3.11 and 3.12 (Ubuntu 26.04) for
 every push and pull request; the `integration` workflow runs `pytest -m "network or slow"` weekly and on demand
 on Python 3.11 with the `dev,stac` extras only, so network tests that need PyTorch, odc-stac or credentials
 skip there. Failures of the public STAC services skip, rather than fail, the real-data tests. The real-data
@@ -70,11 +71,15 @@ handlers, and `tests/test_check_versions.py` the release version check.
 CI measures coverage of the default tier on every Python version:
 
 ```bash
-python -m pytest --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
+python -m pytest -n 2 --dist loadfile --cov=geocrop --cov-branch --cov-report=term --cov-report=xml
 ```
 
+Speed note: the dominant cost used to be the shift check that every `predict` runs; scikit-learn >= 1.8 (Python >= 3.11)
+computes weighted histogram-gradient-boosting bin edges in Python, which cost minutes per pipeline test. The domain
+classifier now pre-bins with weighted quantiles. Profile with `pytest --durations=30`; pandas 2 vs 3 made no difference.
+
 `coverage.xml` is uploaded as a workflow artifact. The build fails below the current total minus two points
-(`--cov-fail-under=76`, measured on the minimal CI install `.[dev,stac,web]` where optional backends — torch,
+(`--cov-fail-under=77`, measured on the minimal CI install `.[dev,stac,web]` where optional backends — torch,
 pyarrow, matplotlib, catboost, openeo, xarray — are skipped); raise the threshold when coverage improves. Engine
 commands run by web jobs execute in subprocesses and are not counted; the CLI's own tests cover them in-process.
 

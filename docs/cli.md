@@ -156,6 +156,7 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
 | `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
 | `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
+| `--workers` |  | `4` | concurrent scene imports, 1-8 (1 = sequential; same output) |
 
 ## `geocrop quicklook`
 
@@ -395,6 +396,7 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
 | `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
 | `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
+| `--workers` |  |  | processes for the model and AOA blocks (default: resources.workers of --config, else min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop ablation`
 
@@ -626,6 +628,7 @@ SLIC superpixel segmentation (tiled, segments merged across tile seams)
 | `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
 | `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
 | `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
+| `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop segment-unet-train`
 

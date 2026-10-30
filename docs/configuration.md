@@ -74,6 +74,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | `resources` | `disk_guard` | true | free-space check before `composite`, `features`, `predict` ([preflight](preflight.md)) |
 | | `min_free_gb`, `safety_factor` | 5, 1.25 | space kept free per volume; multiplier (≥ 1) on the estimated stage size |
 | | `compression_ratio` | 0.8 | expected compressed / uncompressed raster size, in (0, 1] |
+| | `import_workers`, `workers` | 4, null | concurrent STAC scene imports, 1-8 (1 = sequential); processes for blockwise prediction and the AOA map (null = `model.n_jobs` if positive, else min(usable CPUs, 4); 1 = single process). Outputs do not depend on either value ([performance](performance.md#parallel-imports-and-blockwise-processes-before-and-after)) |
 | `preflight` | `min_s2_scenes_per_window`, `min_s1_scenes_per_window` | 3, 2 | warn below these scene counts |
 | | `max_unobserved_fraction` | 0.05 | warn when more of the AOI lacks `min_valid_observations` clear observations |
 | | `coverage_max_px`, `inventories` | 512, [] | decimated coverage grid size (≥ 16); inventory CSVs counted per window |
