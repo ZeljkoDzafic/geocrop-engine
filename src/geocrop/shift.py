@@ -257,6 +257,30 @@ def _smd(Xr, wr, Xt) -> np.ndarray:
     return np.where(den > 0, np.nan_to_num(d), 0.0)
 
 
+def _weighted_bins(X: np.ndarray, w: np.ndarray, n_bins: int = 255) -> np.ndarray:
+    """Replace every feature by its weighted-quantile bin index (NaN stays NaN).
+
+    HistGradientBoosting bins each feature at every ``fit``; with sample weights recent scikit-learn
+    versions compute 254 weighted percentiles per feature in Python, which dominated the shift check
+    (seconds per fit). Features with at most 255 distinct values are split on their midpoints, so
+    binning once here with the same weighted quantiles gives the same kind of model at a fraction
+    of the cost, and the bin edges use only unlabelled feature values.
+    """
+    out = np.full(X.shape, np.nan)
+    levels = np.arange(1, n_bins) / n_bins
+    for j in range(X.shape[1]):
+        col = X[:, j]
+        ok = ~np.isnan(col)
+        if not ok.any():
+            continue
+        v, wj = col[ok], w[ok]
+        order = np.argsort(v, kind="stable")
+        cw = np.cumsum(wj[order])
+        edges = np.unique(v[order][np.minimum(np.searchsorted(cw / cw[-1], levels), len(v) - 1)])
+        out[ok, j] = np.searchsorted(edges, v, side="left")
+    return out
+
+
 def _domain_classifier(Xr, wr, gr, Xt, gt, seed: int, folds: int = 5) -> tuple[float, np.ndarray]:
     """Grouped out-of-fold P(target | x) for all rows of [Xr; Xt] and the weighted ROC AUC."""
     from sklearn.ensemble import HistGradientBoostingClassifier
@@ -271,6 +295,7 @@ def _domain_classifier(Xr, wr, gr, Xt, gt, seed: int, folds: int = 5) -> tuple[f
     p = np.full(len(y), 0.5)
     if k < 2:
         return float("nan"), p
+    X = _weighted_bins(X, w)
     for tr, te in GroupKFold(n_splits=k).split(X, y, groups):
         if len(np.unique(y[tr])) < 2:
             continue

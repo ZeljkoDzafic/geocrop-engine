@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CI speed: the shift check's domain classifier (`shift.py`) bins its features once with weighted quantiles instead
+  of letting scikit-learn 1.8+ recompute 254 weighted percentiles per feature in Python on every fit; every pipeline
+  test (predict runs the shift check) was 10-15x slower on Python 3.11/3.12 (new scikit-learn) than on 3.10. The
+  tests workflow now runs the default tier with `pytest-xdist` (`-n 2 --dist loadfile`, added to the `dev` extra).
 - `geocrop intake`: read-only intake of training polygons, declared parcels and field observations (JSON + Markdown
   report, pass/warn/error, exit code 2 on errors): readability, CRS, geometry repair counts, IDs, class-name
   spelling/encoding with a suggested normalisation map, crop-mapping coverage, date format and season, AOI overlap,
