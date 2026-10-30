@@ -24,6 +24,7 @@ from Copernicus Sentinel-1 data (ESA). Products must carry: "Contains modified C
 from __future__ import annotations
 
 import os
+import threading
 import time
 import warnings
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ from rasterio.warp import Resampling, transform_bounds
 from . import attribution
 from . import scenes as scene_meta
 from .indices import S1_POLARISATIONS
+from .parallel import import_workers, ordered_map, with_backoff
 from .raster import NODATA, float_profile
 from .stac_import import GDAL_ENV, grid_identity, read_window_aligned
 
@@ -60,8 +62,13 @@ class Signer:
         self.collection, self.token_url, self.timeout = collection, token_url, timeout
         self._token: str | None = None
         self._expiry = 0.0
+        self._lock = threading.Lock()      # one token request at a time when scenes are imported by threads
 
     def token(self) -> str:
+        with self._lock:
+            return self._token_locked()
+
+    def _token_locked(self) -> str:
         if self._token and time.time() < self._expiry - 300:
             return self._token
         try:
@@ -198,11 +205,14 @@ def search(reference: str | Path, start: str, end: str, endpoint: str = PLANETAR
 
 def import_season(reference: str | Path, out_root: str | Path, start: str, end: str,
                   endpoint: str = PLANETARY_COMPUTER, collection: str = COLLECTION, min_coverage: float = 0.9,
-                  max_items: int = 200, orbit_direction: str | None = None, signer: Signer | None = None) -> list[dict]:
+                  max_items: int = 200, orbit_direction: str | None = None, signer: Signer | None = None,
+                  workers: int | None = None) -> list[dict]:
     """Search the RTC collection over the grid footprint and write one scene folder per overpass.
 
     Overpasses covering less than `min_coverage` of the grid (after mosaicking slices) are skipped. Per-item
     read failures are reported in the result list; a failing catalogue or token service raises ServiceUnavailable.
+    Overpasses are read by up to `workers` threads (default 4, at most 8; 1 = sequential); the result list and scene
+    folders do not depend on `workers`, and throttling answers (HTTP 429/503) are retried with exponential backoff.
     """
     items = search(reference, start, end, endpoint, collection, max_items, orbit_direction)
     signer = signer or Signer(collection)
@@ -210,7 +220,8 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
     for item in items:
         groups.setdefault(_acquisition_key(item), []).append(item)
     grid_id = grid_identity(reference)
-    results = []
+    workers = import_workers(workers)
+    results, todo = [], []
     for members in groups.values():
         ids = [i.id for i in members]
         target = Path(out_root) / _folder_name(members)
@@ -219,10 +230,17 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
                             "coverage": scene_meta.read(target).get("coverage")})
             continue
         (target / scene_meta.SIDE_CAR).unlink(missing_ok=True)
+        results.append(members)
+        todo.append(members)
+    read = with_backoff(read_item) if workers > 1 else read_item
+
+    def one(members):
+        ids = [i.id for i in members]
+        target = Path(out_root) / _folder_name(members)
         try:
             mosaic = None
             for item in members:
-                arrays = read_item(item, reference, signer)
+                arrays = read(item, reference, signer)
                 if mosaic is None:
                     mosaic = arrays
                 else:
@@ -231,15 +249,15 @@ def import_season(reference: str | Path, out_root: str | Path, start: str, end: 
                         mosaic[pol][fill] = arrays[pol][fill]
             coverage = float((np.isfinite(mosaic["VV"]) & np.isfinite(mosaic["VH"])).mean())
             if coverage < min_coverage:
-                results.append({"item": ids, "status": f"skipped: coverage {coverage:.2f}"})
-                continue
+                return {"item": ids, "status": f"skipped: coverage {coverage:.2f}"}
             written = write_scene(mosaic, members, reference, target, collection, endpoint)
-            results.append({"item": ids, "status": "imported", **written})
+            return {"item": ids, "status": "imported", **written}
         except ServiceUnavailable:
             raise
         except (ValueError, rasterio.errors.RasterioIOError) as exc:
-            results.append({"item": ids, "status": f"failed: {exc}"})
-    return results
+            return {"item": ids, "status": f"failed: {exc}"}
+    done = iter(list(ordered_map(one, todo, workers)))
+    return [next(done) if not isinstance(r, dict) else r for r in results]
 
 
 def plausibility(scene_dir: str | Path) -> dict:

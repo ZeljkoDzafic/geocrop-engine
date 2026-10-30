@@ -148,6 +148,7 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--max-cloud` |  | `80` | tile cloud cover pre-filter (%%) |
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
+| `--workers` |  | `4` | concurrent scene imports, 1-8 (1 = sequential; same output) |
 
 ## `geocrop quicklook`
 
@@ -374,6 +375,7 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
 | `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
 | `--registry` |  |  | registry directory for --model registry:<name>@<version/stage> |
+| `--workers` |  |  | processes for the model and AOA blocks (default: resources.workers of --config, else min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop ablation`
 
@@ -602,6 +604,7 @@ SLIC superpixel segmentation (tiled, segments merged across tile seams)
 | `--tile-size` |  | `1024` |  |
 | `--no-merge-seams` |  |  | keep segments split at tile borders |
 | `--merge-distance` |  | `0.08` | max RMS spectral difference for seam merges |
+| `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop segment-unet-train`
 

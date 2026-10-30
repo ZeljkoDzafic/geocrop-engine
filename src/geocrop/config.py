@@ -203,6 +203,11 @@ DEFAULTS: dict[str, Any] = {
         "min_free_gb": 5.0,
         "safety_factor": 1.25,
         "compression_ratio": 0.8,
+        # Parallelism: concurrent STAC scene imports (1 = sequential; at most 8, to stay polite to the servers)
+        # and processes for blockwise prediction / AOA map (null = model.n_jobs if positive, else
+        # min(usable CPUs, 4); 1 = single process). Outputs do not depend on either value.
+        "import_workers": 4,
+        "workers": None,
     },
     # Thresholds for `geocrop preflight` (warnings only; hard blockers are fixed by the pipeline's own rules).
     "preflight": {
@@ -221,6 +226,9 @@ FINGERPRINT_NEUTRAL[("data",)] = copy.deepcopy(DEFAULTS["data"])
 FINGERPRINT_NEUTRAL[("timeseries", "temporal_support")] = False
 FINGERPRINT_NEUTRAL[("cbm", "temporal_support")] = copy.deepcopy(temporal_quality.RULE_DEFAULTS)
 # Training feature selection and the lost-class guard (release gate c091962), at their defaults.
+# Parallelism settings change speed, not outputs.
+FINGERPRINT_NEUTRAL[("resources", "import_workers")] = 4
+FINGERPRINT_NEUTRAL[("resources", "workers")] = None
 FINGERPRINT_NEUTRAL[("model", "feature_groups")] = None
 FINGERPRINT_NEUTRAL[("model", "allow_missing_classes")] = False
 # Domain-shift settings (docs/domain-shift.md) at their defaults.
@@ -516,6 +524,12 @@ def _validate_resources(r: dict, p: dict) -> None:
         raise ConfigError("resources.safety_factor must be a finite number >= 1")
     if not _number(r["compression_ratio"]) or not 0 < r["compression_ratio"] <= 1:
         raise ConfigError("resources.compression_ratio must be in (0, 1]")
+    iw = r["import_workers"]
+    if isinstance(iw, bool) or not isinstance(iw, int) or not 1 <= iw <= 8:
+        raise ConfigError("resources.import_workers must be an integer from 1 to 8")
+    if r["workers"] is not None and (isinstance(r["workers"], bool) or not isinstance(r["workers"], int)
+                                     or r["workers"] < 1):
+        raise ConfigError("resources.workers must be null (automatic) or an integer >= 1")
     for key in ("min_s2_scenes_per_window", "min_s1_scenes_per_window", "coverage_max_px"):
         if isinstance(p[key], bool) or not isinstance(p[key], int) or p[key] < (16 if key == "coverage_max_px" else 0):
             raise ConfigError(f"preflight.{key} must be a nonnegative integer" +

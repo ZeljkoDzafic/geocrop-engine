@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Parallel I/O and blockwise processes (new module `geocrop.parallel`; keys `resources.import_workers`,
+  `resources.workers`; flags `stac-import --workers`, `predict --workers`, `segment-obia --workers`): the Sentinel-2 and
+  Sentinel-1 STAC imports read scenes with a bounded thread pool (default 4, at most 8) with exponential backoff on
+  HTTP 429/503; the AOA map and the model blocks of `predict` run in a process pool (default min(usable CPUs, 4)); OBIA
+  tiles are segmented in parallel. Outputs are identical to the sequential run (files, scene.json, rasters).
+- AOA nearest-neighbour search: in high dimension it uses a float32 matrix product to find candidates and recomputes the
+  distance exactly in float64 over every point rounding could have made the nearest (same distances as the k-d tree to
+  ~1e-15, ~4x faster on one core; `GEOCROP_AOA_SEARCH=kdtree` selects the old search). `geocrop preflight` credits block workers.
+- `tools/scale_benchmark.py run --workers N --import-workers N --aoa-search kdtree` reproduces the sequential baseline.
+
 - CI speed: the shift check's domain classifier (`shift.py`) bins its features once with weighted quantiles instead
   of letting scikit-learn 1.8+ recompute 254 weighted percentiles per feature in Python on every fit; every pipeline
   test (predict runs the shift check) was 10-15x slower on Python 3.11/3.12 (new scikit-learn) than on 3.10. The

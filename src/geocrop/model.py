@@ -30,6 +30,7 @@ from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 from . import applicability, attribution, contracts, faultinject, metrics, splits, uncertainty
 from .estimators import importances, make_estimator, predict_labels, sequence_params
 from .hashing import sha256
+from .parallel import limit_threads, ordered_map, resolve_workers
 from .raster import (
     NODATA,
     RasterInputError,
@@ -740,8 +741,41 @@ def _uncertainty_bands(proba: np.ndarray, n_classes: int) -> np.ndarray:
     return u
 
 
+def _proba_block(src, bands, model, temperature, w):
+    """(valid mask, calibrated probabilities of the valid pixels or None) of one window."""
+    cube = read_block(src, bands, window=w)
+    ok = valid_mask(cube, src.nodata)
+    proba = None
+    if ok.any():
+        proba = model.predict_proba(cube[:, ok].T)
+        proba = uncertainty.apply_temperature(proba, temperature).astype("float32")
+    return ok, proba
+
+
+_PREDICT_WORKER: dict = {}
+
+
+def _predict_init(stack, bands, model_path, temperature):       # runs once in every worker process
+    from multiprocessing.util import Finalize
+    limit_threads(1)
+    payload = contracts.check("model", load(model_path), model_path)
+    model = payload["model"]
+    try:                       # blocks are spread over processes: one thread per model, no oversubscription
+        model.set_params(**{k: 1 for k in model.get_params() if k.split("__")[-1] == "n_jobs"})
+    except (AttributeError, ValueError, TypeError):
+        pass
+    src = rasterio.open(stack)
+    Finalize(None, src.close, exitpriority=10)
+    _PREDICT_WORKER.update(src=src, bands=bands, model=model, temperature=temperature)
+
+
+def _predict_worker(w):
+    p = _PREDICT_WORKER
+    return _proba_block(p["src"], p["bands"], p["model"], p["temperature"], w)
+
+
 def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512,
-            smoothing: dict | bool | None = None, shift: dict | None = None) -> dict:
+            smoothing: dict | bool | None = None, shift: dict | None = None, workers: int | None = None) -> dict:
     """Blockwise inference -> classes.tif (uint8 index, see class_legend.json), probabilities.tif
     (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy).
 
@@ -754,6 +788,11 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     compares a pixel sample of the stack (inside the parcels when given) with the model's
     ``domain_reference.npz`` and writes ``shift_report.json`` (`geocrop.shift`); the manifest then states
     whether conformal coverage is established. Without it the outputs are unchanged.
+
+    `workers` (default ``min(usable CPUs, 4)``, the `resources.workers` config key; 1 = single process) spreads the
+    model blocks and the AOA map over that many processes, each holding its own copy of the model; the main process
+    writes all rasters in block order, so the outputs do not depend on `workers` (classes identical, probabilities
+    equal to float rounding of the tree sum).
     """
     smooth = smoothing_settings(smoothing)
     out = Path(output_dir)
@@ -785,20 +824,23 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                 p_dst.set_band_description(i, c)
 
         def model_proba(w):
-            cube = read_block(src, bands, window=w)
-            ok = valid_mask(cube, src.nodata)
-            proba = None
-            if ok.any():
-                proba = model.predict_proba(cube[:, ok].T)
-                proba = uncertainty.apply_temperature(proba, temperature).astype("float32")
-            return ok, proba
+            return _proba_block(src, bands, model, temperature, w)
+
+        wins = list(blocks(width, height, block_size))
+        n_workers = resolve_workers(workers)
+        use_pool = n_workers > 1 and len(wins) > 1 and width * height >= applicability.POOL_MIN_PIXELS
+
+        def model_results():       # (ok, proba) per window, in window order
+            if use_pool:
+                return ordered_map(_predict_worker, wins, min(n_workers, len(wins)), "process",
+                                   initializer=_predict_init, initargs=(str(stack), bands, str(model_path), temperature))
+            return (model_proba(w) for w in wins)
 
         if smooth is not None:
             with rasterio.open(raw_path, "w", **prob_prof) as r_dst:
                 describe(r_dst)
                 r_dst.update_tags(smoothing="none (input to smoothing)")
-                for w in blocks(width, height, block_size):
-                    ok, proba = model_proba(w)
+                for w, (ok, proba) in zip(wins, model_results()):
                     p = np.full((len(classes), *ok.shape), NODATA, dtype="float32")
                     if proba is not None:
                         p[:, ok] = proba.T
@@ -818,9 +860,10 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
             for i, n in enumerate(("max_probability", "margin", "entropy"), 1):
                 u_dst.set_band_description(i, n)
             halo = smooth["window"] // 2 if smooth is not None else 0
-            for w in blocks(width, height, block_size):
+            results = model_results() if smooth is None else None
+            for w in wins:
                 if smooth is None:
-                    ok, proba = model_proba(w)
+                    ok, proba = next(results)
                 else:
                     c0, r0 = max(0, w.col_off - halo), max(0, w.row_off - halo)
                     c1 = min(width, w.col_off + w.width + halo)
@@ -853,7 +896,7 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     legend = {str(i): c for i, c in enumerate(classes)}
     aoa_json = Path(model_path).with_name("aoa.json")
     if aoa_json.exists():
-        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size)
+        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size, workers)
     (out / "class_legend.json").write_text(json.dumps(legend, indent=2), encoding="utf8")
     manifest = out / "prediction_manifest.json"
     body = {

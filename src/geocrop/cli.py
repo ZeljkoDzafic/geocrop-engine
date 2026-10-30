@@ -131,6 +131,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--max-cloud", type=float, default=80, help="tile cloud cover pre-filter (%%)")
     x.add_argument("--min-clear", type=float, default=0.2, help="minimum clear fraction inside the grid")
     x.add_argument("--max-items", type=int, default=500)
+    x.add_argument("--workers", type=int, default=4, help="concurrent scene imports, 1-8 (1 = sequential; same output)")
 
     x = cmd("quicklook", "Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map")
     x.add_argument("--bbox", nargs=4, type=float, required=True, metavar=("W", "S", "E", "N"),
@@ -288,6 +289,8 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--smooth-window", type=int, help="odd neighbourhood size in pixels (default 7)")
     x.add_argument("--smoothness", type=float, help="smoothing strength; larger smooths more (default 10)")
     x.add_argument("--registry", help="registry directory for --model registry:<name>@<version|stage>")
+    x.add_argument("--workers", type=int, help="processes for the model and AOA blocks (default: resources.workers "
+                                               "of --config, else min(usable CPUs, 4); 1 = single process)")
 
     x = cmd("ablation", "Feature-group ablation experiments on identical folds")
     x.add_argument("--samples", required=True)
@@ -451,6 +454,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--tile-size", type=int, default=1024)
     x.add_argument("--no-merge-seams", action="store_true", help="keep segments split at tile borders")
     x.add_argument("--merge-distance", type=float, default=0.08, help="max RMS spectral difference for seam merges")
+    x.add_argument("--workers", type=int, help="processes for tiles (default min(usable CPUs, 4); 1 = single process)")
 
     x = cmd("segment-unet-train", "Train the boundary U-Net (requires torch)")
     x.add_argument("--images", required=True)
@@ -1118,7 +1122,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "stac-import":
         from .stac_import import import_season
         res = import_season(a.reference, a.out, a.start, a.end, a.endpoint, a.collection, a.max_cloud, a.min_clear,
-                            a.max_items)
+                            a.max_items, workers=a.workers)
         counts = {}
         for r in res:
             key = r["status"].split(":")[0]
@@ -1283,7 +1287,13 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             except registry.RegistryError as exc:
                 raise SystemExit(f"geocrop predict: {exc}") from exc
             model_path = resolved["path"]
-        result = predict(a.features, model_path, a.out, smoothing=smoothing)
+        workers = a.workers
+        if workers is None and a.config:
+            from . import parallel
+            from .config import load
+            cfg = load(a.config)
+            workers = parallel.resolve_workers(cfg["resources"].get("workers"), cfg["model"].get("n_jobs"))
+        result = predict(a.features, model_path, a.out, smoothing=smoothing, workers=workers)
         if resolved:
             registry.annotate_prediction(result["manifest"], resolved)
             result["registry"] = {k: resolved[k] for k in ("name", "version", "stage", "sha256")}
@@ -1392,7 +1402,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "segment-obia":
         from .segmentation import obia
         _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness,
-                    merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance))
+                    merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance, workers=a.workers))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
         r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,

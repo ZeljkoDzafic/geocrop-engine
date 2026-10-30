@@ -25,8 +25,9 @@ from pathlib import Path
 
 import numpy as np
 
-from . import __version__, scenes
+from . import __version__, applicability, parallel, scenes
 from . import config as cfgmod
+from .parallel import CGROUP_CPU_FILES, available_cpus  # noqa: F401  (defined in parallel; re-exported)
 
 SCHEMA = "geocrop-preflight/1"
 GB = 1e9
@@ -48,10 +49,11 @@ RUNTIME = {
     "train_s_per_msample_tree": 1.5,       # per million samples per tree, per CV fold + final fit (measured 1.2),
                                            # wall time on >= TRAIN_REFERENCE_CPUS cores (scaled up on fewer)
     "predict_s_per_mpx_tree": 0.1,         # per million pixels per tree, RF probabilities + uncertainty bands
-    # Area-of-applicability map: nearest-neighbour search of every pixel among up to 20 000 training points
-    # (applicability.fit max_points) on one core. Measured 98-148 s per Mpx with 97 features on real Semberija
-    # stacks (tools/scale_benchmark.py, docs/performance.md); scaled linearly with the feature count.
-    "aoa_s_per_mpx_100_features": 150.0,
+    # Area-of-applicability map: exact nearest-neighbour search of every pixel among up to 20 000 training points,
+    # per process (the map is spread over `workers` processes, see estimate()). Measured 35 s per Mpx with 97
+    # features on real Semberija stacks with the matrix-product search (146-150 s with the k-d tree of earlier
+    # releases; docs/performance.md); scaled linearly with the feature count and rounded up.
+    "aoa_s_per_mpx_100_features": 40.0,
 }
 # Training (parallel tree building) was timed on 8 cores; with fewer usable CPUs its wall time grows in proportion
 # (measured 2.1x the 8-core estimate in a 2-CPU Ubuntu container, docs/performance.md). More cores are not credited.
@@ -59,6 +61,7 @@ TRAIN_REFERENCE_CPUS = 8
 # Python interpreter, GDAL block cache and imported libraries: measured ~1 GB above the per-stage working sets
 # on 25-1000 km2 real runs (docs/performance.md).
 RAM_OVERHEAD_BYTES = 1.0 * GB
+WORKER_OVERHEAD_BYTES = 0.5 * GB          # interpreter, GDAL and libraries of one block worker process
 ASSUMPTIONS = [
     "Rasters are written over the full reference-grid extent (pixels outside the AOI included).",
     "Expected on-disk size = uncompressed float32 size x resources.compression_ratio (deflate + "
@@ -71,7 +74,10 @@ ASSUMPTIONS = [
     "Random-Forest model size (upper bound; separable data gives far smaller trees) ~ trees x 2 x 0.63 x "
     "samples / min_samples_leaf nodes x (64 + 8 x classes) bytes; aoa.json ~ 2 x the float32 sample matrix.",
     "Runtime uses rough per-pixel coefficients (see RUNTIME in geocrop.preflight; prediction includes the "
-    "single-core area-of-applicability map); order of magnitude only. Scene import (network) is not estimated.",
+    "area-of-applicability map, divided by the block workers: resources.workers, else model.n_jobs if positive, "
+    "else min(usable CPUs, 4)); order of magnitude only. Scene import (network) is not estimated.",
+    "Each block worker process adds a model copy, its block buffers and ~0.5 GB of interpreter/library memory to "
+    "the prediction RAM estimate.",
     "Training wall time is scaled by 8 / usable CPUs below 8 (affinity set or cgroup quota); more cores are not credited.",
     "Class support uses polygon centroids; training uses sampled pixel centres, so buffered folds may differ slightly.",
     "Coverage uses SCL/CLDPRB/CLOUDMASK/SHADOW at reduced resolution without mask dilation or temporal screening.",
@@ -123,39 +129,6 @@ def memory_limit_bytes(cgroup_files=CGROUP_MEMORY_FILES) -> tuple[int | None, st
             total, source = int(raw), name           # "max" or a huge v1 sentinel means: no limit
         break
     return total, source
-
-
-CGROUP_CPU_FILES = ("/sys/fs/cgroup/cpu.max",                                         # cgroup v2: "quota period"
-                    ("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us"))  # v1
-
-
-def available_cpus(cgroup_files=CGROUP_CPU_FILES) -> tuple[float, str]:
-    """CPUs this process may use: the CPU affinity set, or a smaller cgroup quota (``docker run --cpus``).
-
-    Returns ``(cpus, source)``; ``source`` is ``"cpu_count"``, ``"affinity"`` or the cgroup file that lowered it.
-    """
-    try:
-        cpus, source = float(len(os.sched_getaffinity(0))), "affinity"
-    except (AttributeError, OSError):
-        cpus, source = float(os.cpu_count() or 1), "cpu_count"
-    for entry in cgroup_files:
-        try:
-            if isinstance(entry, str):
-                quota, period = Path(entry).read_text(encoding="ascii").split()[:2]
-                name = entry
-            else:
-                quota, period = (Path(f).read_text(encoding="ascii").strip() for f in entry)
-                name = entry[0]
-        except (OSError, ValueError):
-            continue
-        try:
-            limit = int(quota) / int(period)
-        except ValueError:                      # "max": no quota
-            break
-        if 0 < limit < cpus:
-            cpus, source = limit, name
-        break
-    return cpus, source
 
 
 def _volume(path) -> str:
@@ -746,21 +719,28 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
     halo = int(cfg["compositing"]["mask_dilation_px"])
     w, h = layout["grid"]["width"], layout["grid"]["height"]
     block = min(BLOCK, w) * min(BLOCK, h)
+    if cpus is None:
+        cpus = available_cpus()[0]
+    # Blockwise prediction / AOA map run in `workers` processes (resources.workers, else model.n_jobs, else
+    # min(usable CPUs, 4)) when the grid is large enough for a pool; each holds a model copy and block buffers.
+    workers = min(parallel.resolve_workers(r.get("workers"), cfg["model"].get("n_jobs"), cpus=cpus), max(1, int(cpus)))
+    workers = workers if px >= applicability.POOL_MIN_PIXELS else 1
     ram = {
         "composite": max_scenes * 11 * (min(BLOCK, w) + 2 * halo) * (min(BLOCK, h) + 2 * halo) * 4 * 3,
         "features": max(1, fw) * block * 4 * 2,
         "timeseries": ts["scenes"] * max(1, ts["series"]) * min(TS_BLOCK, w) * min(TS_BLOCK, h) * 8 * 3,
         "train": samples_bytes * 3 + model_bytes,
-        "predict": max(1, n_features) * block * 4 * 2 + n_classes * block * 4 * 3 + model_bytes,
+        "predict": (max(1, n_features) * block * 4 * 2 + n_classes * block * 4 * 3 + model_bytes
+                    + (workers * (max(1, n_features) * block * 4 * 2 + model_bytes + WORKER_OVERHEAD_BYTES)
+                       if workers > 1 else 0)),
     }
     ram = {k: v + RAM_OVERHEAD_BYTES for k, v in ram.items()}
     out["peak_ram_gb"] = {k: round(v / GB, 2) for k, v in ram.items()}
     out["peak_ram_gb"]["max"] = round(max(ram.values()) / GB, 2)
     mpx = px / 1e6
     trees = int(cfg["model"]["n_estimators"] or 100)
-    if cpus is None:
-        cpus = available_cpus()[0]
     out["cpus"] = round(cpus, 2)
+    out["workers"] = workers
     s1_scenes = sum(len(v) for v in layout["s1_by_window"].values())
     s2_scenes = sum(len(v) for v in layout["s2_by_window"].values())
     secs = {
@@ -772,7 +752,7 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
         "train": n_samples / 1e6 * trees * RUNTIME["train_s_per_msample_tree"] * (cfg["model"]["cv_folds"] + 1)
         * TRAIN_REFERENCE_CPUS / min(TRAIN_REFERENCE_CPUS, max(1.0, cpus)),
         "predict": mpx * trees * RUNTIME["predict_s_per_mpx_tree"]
-        + mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100,
+        + mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100 / workers,
     }
     out["runtime_hours_rough"] = {k: round(v / 3600, 3) for k, v in secs.items()}
     out["runtime_hours_rough"]["total"] = round(sum(secs.values()) / 3600, 3)

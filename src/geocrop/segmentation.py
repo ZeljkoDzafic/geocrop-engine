@@ -20,6 +20,7 @@ from rasterio.features import shapes
 from rasterio.windows import Window
 from shapely.geometry import shape
 
+from .parallel import limit_threads, ordered_map, resolve_workers
 from .raster import blocks, expand, float_profile, valid_mask
 
 _SKIMAGE_HINT = 'segmentation needs scikit-image: pip install -e ".[segmentation]"'
@@ -78,9 +79,48 @@ def _stretch(arr, ok, ranges):
     return out
 
 
+def _segment_tile(src, w, idx, ranges, px_area, min_area_pixels, segments_per_km2, compactness):
+    """SLIC superpixels of one tile -> ``[(piece dict, mean stretched spectrum), ...]`` (empty if too few pixels)."""
+    from skimage.segmentation import slic
+    arr = src.read(idx, window=w).astype("float32")
+    ok = valid_mask(arr, src.nodata)
+    if ok.sum() < min_area_pixels:
+        return []
+    norm = _stretch(arr, ok, ranges)
+    n_seg = max(2, int(ok.sum() * px_area / 1e6 * segments_per_km2))
+    labels = slic(np.moveaxis(norm, 0, -1), n_segments=n_seg, compactness=compactness, mask=ok,
+                  start_label=1, channel_axis=-1)
+    counts = np.bincount(labels.ravel())
+    sums = np.stack([np.bincount(labels.ravel(), weights=norm[b].ravel(), minlength=len(counts))
+                     for b in range(len(idx))], axis=1)
+    tile = f"{int(w.row_off)}_{int(w.col_off)}"
+    found = []
+    for geom, value in shapes(labels.astype("int32"), mask=ok, transform=src.window_transform(w)):
+        g = shape(geom)
+        area_px = g.area / px_area
+        if value > 0 and area_px >= min_area_pixels:
+            found.append(({"tile": tile, "area_px": area_px, "geometry": g}, sums[int(value)] / max(counts[int(value)], 1)))
+    return found
+
+
+_TILE_WORKER: dict = {}
+
+
+def _tile_init(raster, args):          # runs once in every worker process
+    from multiprocessing.util import Finalize
+    limit_threads(1)
+    src = rasterio.open(raster)
+    Finalize(None, src.close, exitpriority=10)
+    _TILE_WORKER.update(src=src, args=args)
+
+
+def _tile_worker(w):
+    return _segment_tile(_TILE_WORKER["src"], w, *_TILE_WORKER["args"])
+
+
 def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 1024, segments_per_km2: float = 50,
          compactness: float = 0.1, min_area_pixels: int = 9, merge_seams: bool = True, merge_distance: float = 0.08,
-         min_shared_px: float = 3.0) -> dict:
+         min_shared_px: float = 3.0, workers: int | None = None) -> dict:
     """SLIC superpixels per tile -> polygons, with seam reconciliation across tiles.
 
     `bands` selects stack bands by name or 1-based index (e.g. peak-season red, NIR, SWIR and NDVI). All tiles
@@ -88,9 +128,14 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
     share at least `min_shared_px` pixels of border along a tile seam and their mean (stretched) spectra differ by
     less than `merge_distance` (Euclidean, RMS per band); merging is transitive (union-find). Output segments
     carry stable global ids ordered north-to-south, west-to-east, the tiles they span and whether they were merged.
+
+    Tiles are independent until the seam reconciliation, so `workers` (default min(usable CPUs, 4); 1 = in this
+    process) spreads them over processes; pieces are collected in tile order, so the output does not depend on
+    `workers`. SLIC's mask-centroid initialisation costs O(pixels x segments) per tile, i.e. quadratic in the tile
+    size and linear in the number of tiles.
     """
     try:
-        from skimage.segmentation import slic
+        from skimage.segmentation import slic  # noqa: F401  (availability check; tiles import it themselves)
     except ImportError as exc:
         raise RuntimeError(_SKIMAGE_HINT) from exc
 
@@ -101,25 +146,18 @@ def obia(raster: str | Path, output: str | Path, bands=None, tile_size: int = 10
         px_area = abs(src.transform.a * src.transform.e)
         px_size = abs(src.transform.a)
         ranges = global_stretch(src, idx)
-        for w in blocks(src.width, src.height, tile_size):
-            arr = src.read(idx, window=w).astype("float32")
-            ok = valid_mask(arr, src.nodata)
-            if ok.sum() < min_area_pixels:
-                continue
-            norm = _stretch(arr, ok, ranges)
-            n_seg = max(2, int(ok.sum() * px_area / 1e6 * segments_per_km2))
-            labels = slic(np.moveaxis(norm, 0, -1), n_segments=n_seg, compactness=compactness, mask=ok,
-                          start_label=1, channel_axis=-1)
-            counts = np.bincount(labels.ravel())
-            sums = np.stack([np.bincount(labels.ravel(), weights=norm[b].ravel(), minlength=len(counts))
-                             for b in range(len(idx))], axis=1)
-            tile = f"{int(w.row_off)}_{int(w.col_off)}"
-            for geom, value in shapes(labels.astype("int32"), mask=ok, transform=src.window_transform(w)):
-                g = shape(geom)
-                area_px = g.area / px_area
-                if value > 0 and area_px >= min_area_pixels:
-                    pieces.append({"tile": tile, "area_px": area_px, "geometry": g})
-                    means.append(sums[int(value)] / max(counts[int(value)], 1))
+        wins = list(blocks(src.width, src.height, tile_size))
+        args = (idx, ranges, px_area, min_area_pixels, segments_per_km2, compactness)
+        n_workers = min(resolve_workers(workers), len(wins))
+        if n_workers > 1:
+            tiles = ordered_map(_tile_worker, wins, n_workers, "process", initializer=_tile_init,
+                                initargs=(str(raster), args))
+        else:
+            tiles = (_segment_tile(src, w, *args) for w in wins)
+        for found in tiles:
+            for piece, mean in found:
+                pieces.append(piece)
+                means.append(mean)
         crs = src.crs
         seams_x = {src.bounds.left + c * px_size for c in range(tile_size, src.width, tile_size)}
         seams_y = {src.bounds.top - r * px_size for r in range(tile_size, src.height, tile_size)}

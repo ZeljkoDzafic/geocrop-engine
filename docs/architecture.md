@@ -97,6 +97,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `active_learning` | batch selection, label ingestion and budget simulation ([active learning](active-learning.md)) |
 | `review`, `evidence` | analyst parcel review queue and decisions; per-parcel evidence packages ([evidence](evidence.md)) |
 | `openeo_adapter`, `datacube` | optional openEO back-end ([openEO](openeo.md)); external xarray/Zarr/NetCDF cubes and odc-stac ([datacube](datacube.md)) |
+| `parallel` | ordered, bounded thread/process maps (scene imports, AOA/prediction blocks, segmentation tiles), throttling backoff, usable-CPU detection |
 | `preflight`, `cleanup`, `cache` | pre-run checks and resource estimates; removal of temporary/partial outputs; content hash cache |
 | `benchmark`, `public_benchmark`, `public_transfer`, `registry` | classifier/segmentation benchmarks; frozen public protocols; local model and benchmark registry |
 | `acceptance`, `demo`, `faultinject` | real-data and offline acceptance run; synthetic demo; test-only fault-injection hook |
