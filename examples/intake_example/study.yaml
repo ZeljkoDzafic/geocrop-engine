@@ -1,0 +1,22 @@
+# SYNTHETIC example study for `geocrop intake` (no real data). Run from the repository root:
+#   geocrop intake --config examples/intake_example/study.yaml --out /tmp/intake_example
+project: intake-example
+seed: 42
+grid: {crs: EPSG:32633, resolution_m: 10}
+windows:
+  P1: {start: "2023-04-01", end: "2023-05-31"}
+  P2: {start: "2023-06-01", end: "2023-08-31"}
+paths:
+  training: examples/intake_example/good/training.geojson
+  parcels: examples/intake_example/good/parcels.geojson
+  observations: examples/intake_example/good/observations.geojson
+  output: outputs/intake_example
+timeseries: {enabled: true, start: "2023-03-15", end: "2023-10-31"}
+classes: {targets: [soybean, sunflower, maize]}
+model: {cv_folds: 3, spatial_block_m: 1000}
+parcels:
+  crop_mapping: examples/intake_example/good/crop_mapping.csv
+validation:
+  year: 2023
+  group_field: group_id
+  training_exclusion_m: 50

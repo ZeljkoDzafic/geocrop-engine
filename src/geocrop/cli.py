@@ -62,6 +62,14 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     def cmd(name, help_):
         return sub.add_parser(name, help=help_, description=help_)
 
+    def _table_options(x):
+        x.add_argument("--wkt-field", help="CSV column with WKT geometry (training/parcels tables)")
+        x.add_argument("--x-field", help="CSV column with x / longitude (point tables)")
+        x.add_argument("--y-field", help="CSV column with y / latitude (point tables)")
+        x.add_argument("--crs", help="CRS of CSV coordinates/WKT, e.g. EPSG:4326 or EPSG:32633")
+        x.add_argument("--encoding", help="text encoding of CSV/Shapefile attributes (utf-8, cp1250); default: detected")
+        x.add_argument("--delimiter", help="CSV delimiter (default: detected, ; or ,)")
+
     x = cmd("serve", "Start the local HTML workspace and HTTP API (optional web extra)")
     x.add_argument("--host", choices=["127.0.0.1", "localhost", "::1"], default="127.0.0.1")
     x.add_argument("--port", type=int, default=8765)
@@ -441,6 +449,33 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--declared-field")
     x.add_argument("--crop-mapping")
     x.add_argument("--pseudonymise", action="store_true")
+    _table_options(x)
+
+    x = cmd("normalize-observations", "Write field observations (vector or CSV table) as the neutral class_name/observed_at layer")
+    x.add_argument("--input", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--label-field", required=True, help="column with the observed class")
+    x.add_argument("--date-field", required=True, help="column with the observation date (ISO or day.month.year)")
+    x.add_argument("--group-field", help="column with the field/block identifier (written as group_id)")
+    _table_options(x)
+
+    x = cmd("intake", "Check restricted reference data (training polygons, parcels, observations) before a run; read-only")
+    x.add_argument("--config", required=True, help="study configuration (YAML)")
+    x.add_argument("--training", help="training polygons (default: paths.training when it exists)")
+    x.add_argument("--parcels", help="declared parcels (default: paths.parcels when it exists)")
+    x.add_argument("--observations", help="independent field observations (default: paths.observations)")
+    x.add_argument("--crop-mapping", help="declaration code -> class CSV (default: parcels.crop_mapping)")
+    x.add_argument("--aoi", help="AOI GeoJSON/GPKG (default: aoi.geojson next to the configuration)")
+    x.add_argument("--municipalities", help="municipality boundaries with a name column, for per-municipality counts")
+    x.add_argument("--out", help="output directory for intake_report.json and intake_report.md "
+                                 "(default: <paths.output>/intake)")
+    x.add_argument("--list-offenders", type=int, default=20,
+                   help="list at most N feature IDs/rows per failed check, 0 for none (default 20)")
+    x.add_argument("--inner-buffer-m", type=float, default=0.0,
+                   help="interior buffer applied to training polygons when counting pixels (pipeline default 0)")
+    x.add_argument("--require-all", action="store_true", help="a missing layer is an error, not a warning")
+    x.add_argument("--strict", action="store_true", help="exit 2 on warnings as well")
+    _table_options(x)
 
     # segmentation
     x = cmd("segment-obia", "SLIC superpixel segmentation (tiled, segments merged across tile seams)")
@@ -1398,7 +1433,28 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "normalize-parcels":
         from .adapters import normalize_parcels, read_mapping
         _print(normalize_parcels(a.input, a.out, a.id_field, a.declared_field, read_mapping(a.crop_mapping),
-                                 a.pseudonymise))
+                                 a.pseudonymise, wkt_field=a.wkt_field, x_field=a.x_field, y_field=a.y_field,
+                                 crs=a.crs, encoding=a.encoding, delimiter=a.delimiter))
+    elif c == "normalize-observations":
+        from .adapters import normalize_observations
+        _print(normalize_observations(a.input, a.out, a.label_field, a.date_field, a.group_field, a.wkt_field,
+                                      a.x_field, a.y_field, a.crs, a.encoding, a.delimiter))
+    elif c == "intake":
+        from . import intake as intake_mod
+        from .config import load
+        cfg = load(a.config)
+        table = {"crs": a.crs, "encoding": a.encoding, "delimiter": a.delimiter}
+        report = intake_mod.run(
+            cfg, a.config, a.training, a.parcels, a.observations, a.crop_mapping, a.aoi, a.municipalities,
+            a.list_offenders, a.inner_buffer_m, a.require_all,
+            read_options={"training": {**table, "wkt_field": a.wkt_field},
+                          "parcels": {**table, "wkt_field": a.wkt_field},
+                          "observations": {**table, "x_field": a.x_field, "y_field": a.y_field}})
+        out = a.out or str(Path(cfg["paths"]["output"]) / "intake")
+        intake_mod.write(report, out, [a.training, a.parcels, a.observations, a.crop_mapping])
+        print(intake_mod.to_markdown(report))
+        if report["verdict"] == "error" or (a.strict and report["verdict"] != "pass"):
+            sys.exit(2)
     elif c == "segment-obia":
         from .segmentation import obia
         _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness,
