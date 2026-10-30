@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 from . import __version__, parallel, scenes
+from . import aoi as aoimod
 from . import config as cfgmod
 from .cache import HashCache, RunLock
 
@@ -151,6 +152,13 @@ class Runner:
         _HASHER = HashCache(self.out / ".hashcache.json", cfg["cache"]["hash"])
         self.hashes = _HASHER
         self.code_fp = _fp(sorted(Path(__file__).parent.glob("*.py")))
+        #: AOI mask of the study (docs/aoi-aware.md) or None: then every stage runs on the whole grid as before.
+        self.aoi = aoimod.from_config(cfg, self.out)
+
+    def _aoi_extra(self) -> dict:
+        """Fingerprint part of the AOI mask (content and halo); empty without a mask, so unmasked studies keep
+        their fingerprints."""
+        return {"aoi": {"mask": self.aoi.path, "halo_px": self.aoi.halo}} if self.aoi is not None else {}
 
     def _note(self, message: str, echo: bool = True):
         """Console message via `self.log` (replaceable) and, always, a timestamped line in run.log."""
@@ -286,8 +294,9 @@ class Runner:
             raise RuntimeError("Composite products conflict with the current sensor/orbit selection: "
                                f"{[str(p) for p in conflicting]}. Choose a new paths.composites directory "
                                "or deliberately clean the conflicting generated products before retrying.")
-        fp = _fp(c, self.cfg["s1"], self.cfg["windows"], grid,
-                 [s["path"] for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v])
+        fp = _fp_with((c, self.cfg["s1"], self.cfg["windows"], grid,
+                       [s["path"] for v in list(s2_scenes.values()) + list(s1_scenes.values()) for s in v]),
+                      self._aoi_extra())
 
         def run():
             info = {"s2": scenes.inventory(s2_scenes) if s2_scenes else [],
@@ -299,11 +308,12 @@ class Runner:
                                  cloud_probability_max=c["cloud_probability_max"],
                                  mask_dilation_px=c["mask_dilation_px"],
                                  min_valid_observations=c["min_valid_observations"],
-                                 temporal_screening=c["temporal_screening"])
+                                 temporal_screening=c["temporal_screening"], aoi=self.aoi)
                 if s1_scenes.get(w):
                     ref = grid or (comp / w / "B02.tif")
                     s1.composite([s["path"] for s in s1_scenes[w]], comp / w, reference=ref,
-                                 separate_orbits=self.cfg["s1"]["separate_orbits"], statistic=self.cfg["s1"]["statistic"])
+                                 separate_orbits=self.cfg["s1"]["separate_orbits"], statistic=self.cfg["s1"]["statistic"],
+                                 aoi=self.aoi)
             return info
         return self.stage("composite", fp, outputs, run)
 
@@ -430,12 +440,13 @@ class Runner:
                  [[a, features.manifest_path(a)] for a in attach]} if attach else {}
         if support:
             extra["support_tolerance_days"] = tolerance
+        extra.update(self._aoi_extra())
         fp = _fp_with(({**f, "embeddings": None}, self._section("timeseries"), periods, inputs, ts_inputs), extra)
 
         def run():
             info = build()
             for raster in attach:
-                features.attach_embeddings(target, raster)
+                features.attach_embeddings(target, raster, aoi=self.aoi)
             if attach:
                 info["embeddings"] = str(attach[0]) if len(attach) == 1 else [str(a) for a in attach]
             return info
@@ -446,7 +457,7 @@ class Runner:
                 win = target.with_name(target.stem + "_windows.tif") if t["enabled"] else target
                 parts.append(features.build_stack(comp, win, periods=periods, s2_bands=f["s2_bands"],
                                                   s2_indices=f["s2_indices"], s1=f["s1"], deltas=f["deltas"],
-                                                  seasonal=f["seasonal"]))
+                                                  seasonal=f["seasonal"], aoi=self.aoi))
             if t["enabled"]:
                 from datetime import date
 
@@ -461,10 +472,11 @@ class Runner:
                     t["harmonic_order"], self.cfg["compositing"]["scl_invalid"],
                     self.cfg["compositing"]["cloud_probability_max"],
                     min_observed_fraction=t["min_observed_fraction"], max_gap_days=t["max_gap_days"],
-                    **({"temporal_support": True, "support_tolerance_days": tolerance} if support else {}))
+                    **({"temporal_support": True, "support_tolerance_days": tolerance} if support else {}),
+                    aoi=self.aoi)
                 parts.append(tsp)
                 if len(parts) > 1:
-                    merge_stacks(parts, target)
+                    merge_stacks(parts, target, aoi=self.aoi)
                 else:
                     import shutil
                     shutil.copy(tsp, target)
@@ -575,13 +587,15 @@ class Runner:
         extra = {"smoothing": smoothing} if smoothing is not None else {}
         if cfgmod.without_neutral_defaults(self.cfg).get("uncertainty") is not None:
             extra["shift"] = {**shift, "parcels": shift["parcels"] and str(shift["parcels"])}
+        extra.update(self._aoi_extra())
         fp = _fp_with((self.paths["features"], self.out / "model" / "model.joblib", aoa), extra)
 
         def run():
             if smoothing is None:   # a previous smoothed run's raw probabilities no longer describe this map
                 (pred / "probabilities_unsmoothed.tif").unlink(missing_ok=True)
             return model.predict(self.paths["features"], self.out / "model" / "model.joblib", pred,
-                                 smoothing=smoothing, shift=shift, workers=self._block_workers())
+                                 smoothing=smoothing, shift=shift, aoi=self.aoi,
+                                 workers=self._block_workers())
         return self.stage("predict", fp, outputs, run)
 
     def _block_workers(self) -> int:

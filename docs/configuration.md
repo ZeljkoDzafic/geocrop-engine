@@ -10,6 +10,7 @@ its fingerprint. Unknown keys are errors (typos never fall back silently). Annot
 | | `seed` | 42 | seed for sampling, folds and models |
 | `cache` | `hash` | `content` | stage-fingerprint hashing: `content` (SHA-256) or `metadata` (size + mtime, for raw archives too large to hash; see [reproducibility](reproducibility.md)) |
 | `grid` | `crs`, `resolution_m`, `reference` | –, 10, – | study grid; `reference` = GeoTIFF from `geocrop grid` |
+| | `aoi_mask`, `aoi`, `aoi_halo_px` | null, null, 0 | AOI-aware processing ([docs](aoi-aware.md)): `aoi_mask` = mask raster from `geocrop grid` (`null`: `<reference stem>_aoi.tif` next to the grid if present; `false`: off); `aoi` = optional AOI vector rasterised onto the grid when no mask exists; `aoi_halo_px` = context pixels around the AOI (the smoothing radius is added automatically) |
 | `windows` | `<name>: {start, end}` | – | non-overlapping phenological windows (ISO dates, inclusive) |
 | `paths` | `s2_scenes`, `s1_scenes`, `composites`, `features`, `training`, `parcels`, `observations`, `output` | `data/...` | file locations |
 | `compositing` | `statistic` | `median` | `median`, `mean` or percentile `pNN` |

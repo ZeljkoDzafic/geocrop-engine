@@ -461,3 +461,44 @@ Cross-checked against [deployment](deployment.md) and the recalibrated preflight
 * Run `geocrop preflight` on the real configuration before a regional run; its disk figures matched within
   ±15 % here and its runtime/RAM figures are now conservative upper bounds.
 
+
+### AOI-aware import measured on the Lijevče polje AOI
+
+Setup: the real AOI (`configs/studies/lijevce_polje/aoi.geojson`, EPSG:32633, 10 m): grid 26.44 Mpx (2643.8 km²),
+AOI 7.19 Mpx (719.4 km², 27.2 % of the grid); 58 of the 117 blocks of 512 px touch the AOI (55.6 % of the grid
+pixels are inside active blocks, because the AOI is a diagonal band). `tools/aoi_benchmark.py` runs the same
+`stac_import.import_season` once without and once with the mask (macOS laptop, shared host with a high load average
+during the runs, Earth Search COGs; wall time and the network counters are therefore noisy).
+Reproduce: `python tools/aoi_benchmark.py --out <dir> --start 2023-07-14 --end 2023-07-18 --order masked unmasked`
+(and the reverse order).
+
+Final implementation, 8 scenes (14-18 July 2023), both orders, masked / unmasked:
+
+| Metric | masked first | unmasked first |
+|---|---|---|
+| wall time | 282 s / 254 s | 248 s / 279 s |
+| process CPU time | 68 s / 107 s | 63 s / 109 s |
+| bytes on disk of the scene folders | 1170 MB / 1905 MB | 1170 MB / 1904 MB |
+| peak RSS | 2143 / 2116 MB | 2152 / 2296 MB |
+
+Every one of the 88 rasters equals the unmasked scene bit for bit inside the active blocks (max abs difference
+0.0) and is no-data elsewhere.
+
+* **Disk**: 61 % of the unmasked size; **CPU**: 58-63 %.
+* **Wall time**: no consistent change (0.89x and 1.11x depending on order); the import is network-bound and the
+  host was loaded, so no wall-time saving is claimed.
+* **Network**: the interface counters of the benchmark (nettop sampling, host counters) disagreed with each other
+  and with the order of the runs (masked / unmasked between 0.90 and 1.34 for the lower bound), so they are not
+  used. A deterministic count of the HTTP range requests of GDAL (`CPL_CURL_VERBOSE`) for one scene
+  (`S2A_33TXK_20230716_0_L2A`, 41 of the 58 active blocks contain scene data) gave 54 requests / 137.5 MB masked
+  against 69 requests / 154.3 MB unmasked (89 %). The saving is small here because the unmasked import already
+  reads only the COG window of the bounding box, and the active blocks are 56 % of it; AOIs that are more compact
+  in blocks save proportionally more.
+* An earlier version of the reader (one boundless read per 512 px block, before adjacent blocks were merged into
+  runs and windows inside the raster were read without a temporary VRT) fetched 236.4 MB for the same scene because
+  neighbouring blocks re-fetched shared source tiles; the final numbers above are from the corrected reader.
+
+A full month (1-31 July 2023, 39 STAC items) was run once with that earlier reader: unmasked 1946 s wall, 755 s CPU,
+7.2 GB on disk; masked 2286 s wall, 838 s CPU, 4.4 GB on disk (28 scenes imported against 29: a scene near the
+clear-fraction threshold is admitted by the AOI-pixel criterion differently, see the limitations in
+[aoi-aware](aoi-aware.md)). It was not repeated with the final reader.

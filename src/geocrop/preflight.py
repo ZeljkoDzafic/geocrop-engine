@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from . import __version__, applicability, parallel, scenes
+from . import aoi as aoimod
 from . import config as cfgmod
 from .parallel import CGROUP_CPU_FILES, available_cpus  # noqa: F401  (defined in parallel; re-exported)
 
@@ -63,7 +64,10 @@ TRAIN_REFERENCE_CPUS = 8
 RAM_OVERHEAD_BYTES = 1.0 * GB
 WORKER_OVERHEAD_BYTES = 0.5 * GB          # interpreter, GDAL and libraries of one block worker process
 ASSUMPTIONS = [
-    "Rasters are written over the full reference-grid extent (pixels outside the AOI included).",
+    "Rasters are written over the full reference-grid extent. Without an AOI mask the work covers the whole "
+    "bounding box (pixels outside the AOI included); with one (grid.aoi_mask, docs/aoi-aware.md) disk and "
+    "runtime are estimated from the pixels of the 512 px blocks that touch the AOI plus its halo ('work "
+    "pixels'), the area-of-applicability term from the AOI pixels.",
     "Expected on-disk size = uncompressed float32 size x resources.compression_ratio (deflate + "
     "floating-point predictor); the uncompressed size is the upper bound.",
     "Feature count follows the pipeline's naming rules from the config and the sensors found per window.",
@@ -213,10 +217,25 @@ def _grid_info(cfg, s2_scenes) -> dict | None:
     return None
 
 
+def _aoi_layout(cfg, grid) -> tuple[dict | None, str | None]:
+    """AOI mask summary (grid pixels, AOI pixels, active blocks and the pixels inside them) or the reason the
+    configured mask cannot be used. Reads the mask raster once (compressed uint8)."""
+    try:
+        mask = aoimod.from_config(cfg, cfg["paths"]["output"])
+    except (OSError, ValueError) as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    if mask is None:
+        return None, None
+    if grid is not None and (mask.width, mask.height) != (grid["width"], grid["height"]):
+        return None, (f"AOI mask {mask.path} is {mask.width} x {mask.height} px but the study grid is "
+                      f"{grid['width']} x {grid['height']} px; recreate it with geocrop grid")
+    return {"path": str(mask.path), **mask.summary()}, None
+
+
 def plan(cfg) -> dict:
     """Cheap study layout used by preflight and the disk guard: scenes per window, grid, feature counts.
 
-    Reads only scene sidecars and raster headers."""
+    Reads only scene sidecars and raster headers (and the AOI mask, when one is configured or found)."""
     windows = _windows(cfg)
     s2, bad2 = _discover(cfg["paths"]["s2_scenes"])
     s1, bad1 = _discover(cfg["paths"]["s1_scenes"])
@@ -232,11 +251,14 @@ def plan(cfg) -> dict:
     grid_error = grid.pop("error") if grid and "error" in grid else None
     if grid_error:
         grid = None
-    return {"windows": windows, "s2": s2, "s1": s1, "s2_by_window": s2w, "s1_by_window": s1w,
+    aoi, aoi_error = _aoi_layout(cfg, grid)
+    return {"aoi": aoi, "aoi_error": aoi_error, "windows": windows, "s2": s2, "s1": s1, "s2_by_window": s2w, "s1_by_window": s1w,
             "unreadable_sidecars": bad2 + bad1, "use_s2": use_s2, "use_s1": use_s1, "s1_prefixes": prefixes,
             "window_features": feature_count(cfg, n_windows, use_s2, prefixes) if n_windows else 0,
             "timeseries": ts, "grid": grid, "grid_error": grid_error,
-            "pixels": grid["width"] * grid["height"] if grid else None}
+            "pixels": grid["width"] * grid["height"] if grid else None,
+            # what the stages actually read and compute: the grid, or with an AOI mask the blocks touching the AOI
+            "work_pixels": (aoi["work_pixels"] if aoi else (grid["width"] * grid["height"] if grid else None))}
 
 
 def _n_classes(cfg) -> int:
@@ -255,8 +277,9 @@ def _n_classes(cfg) -> int:
 
 
 def stage_bytes(cfg, layout: dict, stage: str, n_classes: int | None = None) -> int:
-    """Uncompressed bytes a stage writes (0 when the grid is unknown)."""
-    px = layout["pixels"] or 0
+    """Uncompressed bytes a stage writes (0 when the grid is unknown); with an AOI mask the pixels of the active
+    blocks (the other blocks of the rasters are sparse and take no space)."""
+    px = layout.get("work_pixels") or layout["pixels"] or 0
     if stage == "composite":
         s2w = sum(bool(v) for v in layout["s2_by_window"].values())
         s1w = sum(bool(v) for v in layout["s1_by_window"].values())
@@ -291,7 +314,8 @@ def check_disk(cfg, stage: str, existing_bytes: int = 0, layout: dict | None = N
         if stage == "predict" and Path(cfg["paths"]["features"]).is_file():
             import rasterio
             with rasterio.open(cfg["paths"]["features"]) as ds:
-                layout = {**layout, "pixels": ds.width * ds.height}
+                if not layout.get("aoi"):
+                    layout = {**layout, "pixels": ds.width * ds.height, "work_pixels": ds.width * ds.height}
         expected = stage_bytes(cfg, layout, stage) * r["compression_ratio"]
     except Exception as exc:  # noqa: BLE001 - an estimate must never mask the stage's own error reporting
         expected, estimate_error = 0.0, f"{type(exc).__name__}: {exc}"
@@ -494,6 +518,33 @@ def _metric(crs) -> bool:
         return False
 
 
+def _check_aoi(layout, rep: _Report, out: dict) -> None:
+    """Info on the AOI share of the grid and on whether stages use an AOI mask to skip the rest."""
+    if layout.get("aoi_error"):
+        rep.add("grid.aoi_mask", "crs", "error", f"The AOI mask cannot be used: {layout['aoi_error']}")
+        return
+    grid, aoi = layout["grid"], layout.get("aoi")
+    if aoi:
+        out["aoi"] = aoi
+        rep.add("grid.aoi_share", "crs", "pass",
+                f"Info: AOI share of grid {aoi['aoi_share_of_grid']:.1%} ({aoi['aoi_km2']} of {aoi['grid_km2']} km2, "
+                f"{aoi['aoi_pixels']} of {aoi['grid_pixels']} px). The AOI mask {aoi['path']} is used: stages "
+                f"read and compute {aoi['blocks_active']} of {aoi['blocks_total']} blocks ({aoi['work_pixels']} px, "
+                f"{aoi['work_share_of_grid']:.1%} of the grid; halo {aoi['halo_px']} px).", **aoi)
+    elif grid["aoi_mask"]:
+        try:
+            summary = aoimod.AoiMask(grid["path"]).summary()
+        except (OSError, ValueError):
+            return
+        out["aoi"] = {"path": None, **summary}
+        rep.add("grid.aoi_share", "crs", "pass",
+                f"Info: AOI share of grid {summary['aoi_share_of_grid']:.1%} ({summary['aoi_km2']} of "
+                f"{summary['grid_km2']} km2), read from the values of the grid raster. No AOI mask is configured, "
+                f"so every stage processes the whole bounding box; create the mask with geocrop grid (it is found "
+                f"next to the grid) to process {summary['work_pixels']} px "
+                f"({summary['work_share_of_grid']:.1%} of the grid) instead.", **summary)
+
+
 def _check_crs(cfg, layout, rep: _Report) -> dict:
     """Grid CRS and the overlap of each reference layer with the study grid footprint."""
     import geopandas as gpd
@@ -508,6 +559,7 @@ def _check_crs(cfg, layout, rep: _Report) -> dict:
                 "grid size, coverage and resources cannot be estimated.")
         return out
     out["grid"] = {k: grid[k] for k in ("source", "path", "crs", "width", "height", "res")}
+    _check_aoi(layout, rep, out)
     metric = grid["crs"] is not None and _metric(grid["crs"])
     rep.add("grid.metric_crs", "crs", "pass" if metric else "error",
             f"Grid CRS {grid['crs']} is a projected metric CRS." if metric else
@@ -690,10 +742,16 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
     """Rough grid, feature, disk, RAM and runtime figures (see ASSUMPTIONS); `cpus` defaults to the usable CPUs."""
     r = cfg["resources"]
     px = layout["pixels"]
+    work = layout.get("work_pixels") or px
+    aoi = layout.get("aoi")
     n_classes = n_classes or _n_classes(cfg)
     fw, ts = layout["window_features"], layout["timeseries"]
     n_features = fw + ts["features"]
     out = {"grid_pixels": px, "grid_megapixels": round(px / 1e6, 2) if px else None,
+           "aoi_pixels": aoi["aoi_pixels"] if aoi else None,
+           "work_pixels": work if aoi else None,
+           "work_megapixels": round(work / 1e6, 2) if aoi and work else None,
+           "aoi_share_of_grid": aoi["aoi_share_of_grid"] if aoi else None,
            "area_km2": (round(px * abs(layout["grid"]["res"][0] * layout["grid"]["res"][1]) / 1e6, 1)
                         if px else None),
            "features": {"windows": fw, "timeseries": ts["features"], "total": n_features},
@@ -712,8 +770,8 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
     train_bytes = 3 * samples_bytes + model_bytes      # samples.npz + aoa.json (~2x samples) + model (upper bound)
     disk["samples+model"] = {"target": cfg["paths"]["output"], "uncompressed_gb": round(train_bytes / GB, 3),
                              "expected_gb": round(train_bytes / GB, 3)}
-    out["stack_gb"] = {"uncompressed": round(px * n_features * 4 / GB, 3),
-                       "expected": round(px * n_features * 4 * r["compression_ratio"] / GB, 3)}
+    out["stack_gb"] = {"uncompressed": round(work * n_features * 4 / GB, 3),
+                       "expected": round(work * n_features * 4 * r["compression_ratio"] / GB, 3)}
     out["disk"] = disk
     max_scenes = max([len(v) for v in layout["s2_by_window"].values()] + [0])
     halo = int(cfg["compositing"]["mask_dilation_px"])
@@ -737,7 +795,8 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
     ram = {k: v + RAM_OVERHEAD_BYTES for k, v in ram.items()}
     out["peak_ram_gb"] = {k: round(v / GB, 2) for k, v in ram.items()}
     out["peak_ram_gb"]["max"] = round(max(ram.values()) / GB, 2)
-    mpx = px / 1e6
+    mpx = work / 1e6                       # blocks touching the AOI (the whole grid without a mask)
+    aoa_mpx = (aoi["aoi_pixels"] if aoi else px) / 1e6   # the dissimilarity index is computed for AOI pixels only
     trees = int(cfg["model"]["n_estimators"] or 100)
     out["cpus"] = round(cpus, 2)
     out["workers"] = workers
@@ -752,7 +811,7 @@ def estimate(cfg, layout, n_samples: int | None = None, n_classes: int | None = 
         "train": n_samples / 1e6 * trees * RUNTIME["train_s_per_msample_tree"] * (cfg["model"]["cv_folds"] + 1)
         * TRAIN_REFERENCE_CPUS / min(TRAIN_REFERENCE_CPUS, max(1.0, cpus)),
         "predict": mpx * trees * RUNTIME["predict_s_per_mpx_tree"]
-        + mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100 / workers,
+        + aoa_mpx * RUNTIME["aoa_s_per_mpx_100_features"] * max(1, n_features) / 100 / workers,
     }
     out["runtime_hours_rough"] = {k: round(v / 3600, 3) for k, v in secs.items()}
     out["runtime_hours_rough"]["total"] = round(sum(secs.values()) / 3600, 3)
@@ -892,6 +951,9 @@ def to_markdown(report: dict) -> str:
     r = report["resources"]
     lines += ["## Resource estimate (ROUGH planning figures)", "",
               f"- Grid: {r.get('grid_megapixels')} Mpx, ~{r.get('area_km2')} km²; features: {r['features']}",
+              *([f"- AOI mask: {r['aoi_pixels']} AOI px ({r['aoi_share_of_grid']:.1%} of the grid); stages work on "
+                 f"{r['work_megapixels']} Mpx (blocks touching the AOI), estimates below use these"]
+                if r.get("aoi_pixels") else []),
               f"- Feature stack: {r.get('stack_gb', {})} GB (expected uses compression ratio {r['compression_ratio']})",
               f"- Peak RAM (GB): {r.get('peak_ram_gb', 'n/a')}",
               f"- Runtime (hours, rough): {r.get('runtime_hours_rough', 'n/a')}", ""]

@@ -29,6 +29,10 @@ Every check has `code`, `section`, `status` (`pass` / `warn` / `error`), a messa
 
 ## Checks
 
+With an AOI mask ([AOI-aware processing](aoi-aware.md)) the resource estimate and the disk guard count the pixels of
+the blocks that touch the AOI instead of the bounding box and report the grid, AOI and work pixels; the check
+`grid.aoi_share` (status `pass`, information only) states the AOI share of the grid.
+
 ### Scenes per window (`scenes.*`)
 Scene folders (`scene.json` sidecars under `paths.s2_scenes` / `paths.s1_scenes`) are assigned to windows
 exactly as the composite stage does. Inventory CSVs from `geocrop catalog` or `geocrop stac-search`

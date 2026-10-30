@@ -27,6 +27,7 @@ import numpy as np
 import rasterio
 
 from . import attribution, contracts, faultinject, indices
+from .aoi import AoiMask, creation_options
 from .raster import (
     NODATA,
     RasterInputError,
@@ -163,8 +164,14 @@ def plan(composites: str | Path, periods=None, s2_bands=indices.S2_BANDS, s2_ind
     return periods, features, {"s2": use_s2, "s1_prefixes": prefixes[0] if use_s1 else []}
 
 
-def build_stack(composites: str | Path, output: str | Path, block_size: int = 512, **options) -> Path:
-    """Compute the feature stack window by window: memory is O(features x block²), not O(AOI)."""
+def build_stack(composites: str | Path, output: str | Path, block_size: int = 512, aoi: AoiMask | None = None,
+                **options) -> Path:
+    """Compute the feature stack window by window: memory is O(features x block²), not O(AOI).
+
+    With an AOI mask (`geocrop.aoi`) only the blocks that touch the AOI (plus its halo) are computed; the rest
+    of the stack stays no-data (sparse, no disk space). Computed blocks are identical to an unmasked run and
+    contain the pixels outside the AOI of those blocks too (neighbourhood operations at the AOI border need
+    them); final products are masked to the AOI pixels."""
     root = Path(composites)
     periods, features, layout = plan(root, **options)
     s2_bands = options.get("s2_bands", indices.S2_BANDS)
@@ -185,13 +192,17 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
             raise RasterInputError(f"Composite {first.name} has no CRS")
         for key, ds in sources.items():
             check_grid(ds, first, f"window {key[0]}, band {key[1]}")
+        if aoi is not None:
+            aoi.check_grid(first, "the composites")
         has_data = dict.fromkeys(sources, False)    # an input without a single valid pixel is a broken composite
         out = ensure_parent(output)
-        with rasterio.open(out, "w", **float_profile(first, count=len(names))) as sink:
+        with rasterio.open(out, "w", **float_profile(first, count=len(names), **creation_options(aoi))) as sink:
             for i, n in enumerate(names, 1):
                 sink.set_band_description(i, n)
             attribution.propagate([ds.name for ds in sources.values()], sink)
             for w in blocks(first.width, first.height, block_size):
+                if aoi is not None and not aoi.active(w):
+                    continue
                 values: dict[str, np.ndarray] = {}
                 for p in periods:
                     raw = {}
@@ -242,11 +253,12 @@ def build_stack(composites: str | Path, output: str | Path, block_size: int = 51
             raise RasterInputError(f"Composite bands without a single valid pixel (all nodata/NaN/inf): {empty[:10]}. "
                                    "Check the window's scenes, cloud masks and min_valid_observations.")
     write_manifest(out, {"stack": out.name, "periods": periods, "nodata": NODATA,
-                         "features": [asdict(f) for f in features]})
+                         "features": [asdict(f) for f in features],
+                         **({"aoi_mask": aoi.path.name, "aoi_halo_px": aoi.halo} if aoi is not None else {})})
     return out
 
 
-def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
+def attach_embeddings(stack: str | Path, embeddings: str | Path, aoi: AoiMask | None = None) -> Path:
     """Append an embeddings raster (group ``emb``, written by geocrop.embeddings) to a stack in place.
 
     A raster with legacy names (``emb_NN``) that collide with features already in the stack (another embedding
@@ -262,7 +274,7 @@ def attach_embeddings(stack: str | Path, embeddings: str | Path) -> Path:
         if existing & {f.name for f in load_manifest(embeddings)}:
             from .embeddings import namespaced_copy
             embeddings = namespaced_copy(embeddings, Path(tmp) / "namespaced" / Path(embeddings).name)
-        merged = merge_stacks([stack, embeddings], Path(tmp) / stack.name)
+        merged = merge_stacks([stack, embeddings], Path(tmp) / stack.name, aoi=aoi)
         shutil.move(merged, stack)
         shutil.move(manifest_path(merged), manifest_path(stack))
     return stack

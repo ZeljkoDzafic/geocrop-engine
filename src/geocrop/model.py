@@ -28,6 +28,7 @@ from scipy.spatial import cKDTree
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
 
 from . import applicability, attribution, contracts, faultinject, metrics, splits, uncertainty
+from .aoi import AoiMask, creation_options
 from .estimators import importances, make_estimator, predict_labels, sequence_params
 from .hashing import sha256
 from .parallel import limit_threads, ordered_map, resolve_workers
@@ -741,10 +742,12 @@ def _uncertainty_bands(proba: np.ndarray, n_classes: int) -> np.ndarray:
     return u
 
 
-def _proba_block(src, bands, model, temperature, w):
-    """(valid mask, calibrated probabilities of the valid pixels or None) of one window."""
+def _proba_block(src, bands, model, temperature, w, inside=None):
+    """(valid mask, calibrated probabilities of the valid pixels or None) of one window; `inside` (AOI) restricts it."""
     cube = read_block(src, bands, window=w)
     ok = valid_mask(cube, src.nodata)
+    if inside is not None:
+        ok &= inside
     proba = None
     if ok.any():
         proba = model.predict_proba(cube[:, ok].T)
@@ -769,13 +772,15 @@ def _predict_init(stack, bands, model_path, temperature):       # runs once in e
     _PREDICT_WORKER.update(src=src, bands=bands, model=model, temperature=temperature)
 
 
-def _predict_worker(w):
+def _predict_worker(item):
+    w, inside = item
     p = _PREDICT_WORKER
-    return _proba_block(p["src"], p["bands"], p["model"], p["temperature"], w)
+    return _proba_block(p["src"], p["bands"], p["model"], p["temperature"], w, inside)
 
 
 def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, block_size: int = 512,
-            smoothing: dict | bool | None = None, shift: dict | None = None, workers: int | None = None) -> dict:
+            smoothing: dict | bool | None = None, shift: dict | None = None, workers: int | None = None,
+            aoi: AoiMask | None = None) -> dict:
     """Blockwise inference -> classes.tif (uint8 index, see class_legend.json), probabilities.tif
     (one band per class) and uncertainty.tif (max probability, top-2 margin, normalised entropy).
 
@@ -789,12 +794,21 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     ``domain_reference.npz`` and writes ``shift_report.json`` (`geocrop.shift`); the manifest then states
     whether conformal coverage is established. Without it the outputs are unchanged.
 
+    `aoi` (`geocrop.aoi.AoiMask`) restricts prediction to the AOI: only AOI pixels are classified, every other
+    pixel of classes / probabilities / uncertainty / AOA map (and of the unsmoothed probabilities) is no-data,
+    and blocks without AOI pixels are neither read nor written. Probabilities of the pixels within the smoothing
+    radius of the AOI are computed first (so smoothing at the AOI border sees the same neighbours as an unmasked
+    run), which needs `aoi.halo` >= the smoothing radius; pixels inside the AOI equal an unmasked run.
     `workers` (default ``min(usable CPUs, 4)``, the `resources.workers` config key; 1 = single process) spreads the
     model blocks and the AOA map over that many processes, each holding its own copy of the model; the main process
     writes all rasters in block order, so the outputs do not depend on `workers` (classes identical, probabilities
     equal to float rounding of the tree sum).
     """
     smooth = smoothing_settings(smoothing)
+    smooth_halo = smooth["window"] // 2 if smooth is not None else 0
+    if aoi is not None and aoi.halo < smooth_halo:
+        raise ValueError(f"AOI halo {aoi.halo} px is smaller than the smoothing radius {smooth_halo} px; "
+                         "pass an AoiMask with halo >= window // 2 (and build the stack with the same halo)")
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     model_sha256 = sha256(model_path)
@@ -817,30 +831,34 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
         prob_prof = {**base, "count": len(classes), "dtype": "float32", "nodata": NODATA, "predictor": 3}
         unc_prof = {**base, "count": 3, "dtype": "float32", "nodata": NODATA, "predictor": 3}
         width, height = src.width, src.height
+        if aoi is not None:
+            aoi.check_grid(src, "the feature stack")
+            cls_prof, prob_prof, unc_prof = ({**p, **creation_options(aoi)} for p in (cls_prof, prob_prof, unc_prof))
 
         def describe(p_dst):
             p_dst.update_tags(model_sha256=model_sha256)
             for i, c in enumerate(classes, 1):
                 p_dst.set_band_description(i, c)
 
-        def model_proba(w):
-            return _proba_block(src, bands, model, temperature, w)
-
-        wins = list(blocks(width, height, block_size))
         n_workers = resolve_workers(workers)
-        use_pool = n_workers > 1 and len(wins) > 1 and width * height >= applicability.POOL_MIN_PIXELS
+        use_pool = n_workers > 1 and width * height >= applicability.POOL_MIN_PIXELS
 
-        def model_results():       # (ok, proba) per window, in window order
-            if use_pool:
-                return ordered_map(_predict_worker, wins, min(n_workers, len(wins)), "process",
+        def model_results(windows, restrict=True):       # (ok, proba) per window, in window order
+            items = ((w, aoi.read(w) if aoi is not None and restrict else None) for w in windows)   # AOI pixels only
+            if use_pool and len(windows) > 1:
+                return ordered_map(_predict_worker, items, min(n_workers, len(windows)), "process",
                                    initializer=_predict_init, initargs=(str(stack), bands, str(model_path), temperature))
-            return (model_proba(w) for w in wins)
+            return (_proba_block(src, bands, model, temperature, w, inside) for w, inside in items)
+
+        all_wins = list(blocks(width, height, block_size))
+        wins = [w for w in all_wins if aoi is None or aoi.active(w, 0)]
 
         if smooth is not None:
             with rasterio.open(raw_path, "w", **prob_prof) as r_dst:
                 describe(r_dst)
                 r_dst.update_tags(smoothing="none (input to smoothing)")
-                for w, (ok, proba) in zip(wins, model_results()):
+                raw_wins = [w for w in all_wins if aoi is None or aoi.active(w, smooth_halo)]
+                for w, (ok, proba) in zip(raw_wins, model_results(raw_wins, restrict=False)):
                     p = np.full((len(classes), *ok.shape), NODATA, dtype="float32")
                     if proba is not None:
                         p[:, ok] = proba.T
@@ -859,8 +877,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                     destination.update_tags(smoothing=json.dumps(smooth))
             for i, n in enumerate(("max_probability", "margin", "entropy"), 1):
                 u_dst.set_band_description(i, n)
-            halo = smooth["window"] // 2 if smooth is not None else 0
-            results = model_results() if smooth is None else None
+            halo = smooth_halo
+            results = model_results(wins) if smooth is None else None
             for w in wins:
                 if smooth is None:
                     ok, proba = next(results)
@@ -874,6 +892,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                     inner = (slice(w.row_off - r0, w.row_off - r0 + w.height),
                              slice(w.col_off - c0, w.col_off - c0 + w.width))
                     ok = big_ok[inner]
+                    if aoi is not None:
+                        ok = ok & aoi.read(w)
                     proba = cube[:, inner[0], inner[1]][:, ok].T if ok.any() else None
                 any_valid = any_valid or bool(ok.any())
                 shape = ok.shape
@@ -888,6 +908,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
                 p_dst.write(p, window=w)
                 u_dst.write(u, window=w)
                 faultinject.point("predict")
+    if aoi is not None and smooth is not None:
+        _mask_raw_probabilities(raw_path, aoi, smooth_halo, block_size)
     if not any_valid:
         for name in ("classes.tif", "probabilities.tif", "uncertainty.tif"):
             (out / name).unlink(missing_ok=True)
@@ -896,7 +918,8 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     legend = {str(i): c for i, c in enumerate(classes)}
     aoa_json = Path(model_path).with_name("aoa.json")
     if aoa_json.exists():
-        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size, workers)
+        applicability.map_aoa(stack, applicability.Applicability.from_json(aoa_json), out / "aoa.tif", block_size, workers,
+                              aoi=aoi)
     (out / "class_legend.json").write_text(json.dumps(legend, indent=2), encoding="utf8")
     manifest = out / "prediction_manifest.json"
     body = {
@@ -905,6 +928,10 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
         "calibration_mode": payload.get("calibration_mode", "oof"),
         "scope": "Artifact identity and inference settings only; not a scientific validity assessment.",
     }
+    if aoi is not None:
+        body["aoi"] = {"mask": aoi.path.name, "halo_px": aoi.halo,
+                       "note": "Only AOI pixels are classified; every pixel outside the AOI is no-data in "
+                               "classes, probabilities, uncertainty, aoa and the unsmoothed probabilities."}
     if smooth is not None:
         body["smoothing"] = {**smooth, "method": "edge-aware Bayesian-style log-odds smoothing",
                              "unsmoothed_probabilities": raw_path.name,
@@ -921,6 +948,21 @@ def predict(stack: str | Path, model_path: str | Path, output_dir: str | Path, b
     if smooth is not None:
         result["probabilities_unsmoothed"] = str(raw_path)
     return result
+
+
+def _mask_raw_probabilities(path: Path, aoi: AoiMask, halo: int, block_size: int) -> None:
+    """After smoothing: set the unsmoothed probabilities of pixels outside the AOI (computed only as smoothing
+    context) to no-data, so no product holds a prediction outside the AOI."""
+    with rasterio.open(path, "r+") as ds:
+        for w in blocks(ds.width, ds.height, block_size):
+            if not aoi.active(w, halo):
+                continue
+            inside = aoi.read(w)
+            if inside.all():
+                continue
+            data = ds.read(window=w)
+            data[:, ~inside] = NODATA
+            ds.write(data, window=w)
 
 
 

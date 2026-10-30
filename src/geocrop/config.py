@@ -40,12 +40,18 @@ FINGERPRINT_NEUTRAL: dict[tuple[str, ...], Any] = {
     ("cbm", "event_markers"): False,
     ("parcel_classify",): PARCEL_CLASSIFY_DEFAULTS,
     ("validation", "group_field"): None,
+    ("grid", "aoi_mask"): None,
+    ("grid", "aoi"): None,
+    ("grid", "aoi_halo_px"): 0,
 }
 
 DEFAULTS: dict[str, Any] = {
     "project": "geocrop-experiment",
     "seed": 42,
-    "grid": {"crs": None, "resolution_m": 10, "reference": None},
+    # aoi_mask: AOI mask raster (null = <reference>_aoi.tif next to the grid when present; false = off);
+    # aoi: optional AOI vector, rasterised onto the grid when no mask file exists; aoi_halo_px: pixels around the
+    # AOI that intermediate products also hold (the smoothing radius is added automatically), see docs/aoi-aware.md
+    "grid": {"crs": None, "resolution_m": 10, "reference": None, "aoi_mask": None, "aoi": None, "aoi_halo_px": 0},
     "cache": {"hash": "content"},
     "windows": {},
     "paths": {
@@ -372,6 +378,7 @@ def validate(cfg: dict) -> dict:
         raise ConfigError(f"cv.strategy must be one of {', '.join(STRATEGIES)}")
     if cv["year_field"] and cv["year"] is not None:
         raise ConfigError("Set cv.year_field or cv.year, not both")
+    _validate_grid(cfg["grid"])
     sm = cfg["predict"]["smoothing"]
     if not isinstance(sm["enabled"], bool):
         raise ConfigError("predict.smoothing.enabled must be true or false")
@@ -409,6 +416,16 @@ def validate(cfg: dict) -> dict:
                                   or any(s not in ("S1", "S2") for s in spec["sensors"])):
             raise ConfigError(f"Experiment {name}.sensors must be a non-empty list of S1 and/or S2")
     return cfg
+
+
+def _validate_grid(g: dict) -> None:
+    for key in ("aoi_mask", "aoi"):
+        value = g[key]
+        if value is not None and not isinstance(value, str) and not (key == "aoi_mask" and value is False):
+            raise ConfigError(f"grid.{key} must be a path{' or false' if key == 'aoi_mask' else ''} (or null)")
+    halo = g["aoi_halo_px"]
+    if isinstance(halo, bool) or not isinstance(halo, int) or halo < 0:
+        raise ConfigError("grid.aoi_halo_px must be a non-negative integer (pixels)")
 
 
 def _validate_model_params(m: dict) -> None:

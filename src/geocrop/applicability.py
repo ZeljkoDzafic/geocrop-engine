@@ -17,6 +17,7 @@ import numpy as np
 import rasterio
 from scipy.spatial import cKDTree
 
+from .aoi import AoiMask, creation_options
 from .parallel import limit_threads, ordered_map, resolve_workers
 from .raster import NODATA, blocks, float_profile, valid_mask
 
@@ -150,10 +151,12 @@ def fit(X, folds_index, features, importance=None, max_points: int = 20000, seed
     return model
 
 
-def _aoa_block(src, bands, model: Applicability, w):
-    """DI and AOA flag of one window (float32 arrays; NODATA where any feature is invalid)."""
+def _aoa_block(src, bands, model: Applicability, w, inside=None):
+    """DI and AOA flag of one window (float32 arrays; NODATA where any feature is invalid or outside the AOI)."""
     cube = src.read(bands, window=w)
     ok = valid_mask(cube, src.nodata)
+    if inside is not None:
+        ok &= inside
     di = np.full(ok.shape, NODATA, dtype="float32")
     flag = np.full(ok.shape, NODATA, dtype="float32")
     if ok.any():
@@ -174,18 +177,23 @@ def _aoa_init(stack, bands, params):       # runs once in every worker process
     _WORKER["model"] = Applicability(*params)
 
 
-def _aoa_worker(w):
-    return _aoa_block(_WORKER["src"], _WORKER["bands"], _WORKER["model"], w)
+def _aoa_worker(item):
+    w, inside = item
+    return _aoa_block(_WORKER["src"], _WORKER["bands"], _WORKER["model"], w, inside)
 
 
 def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_size: int = 512,
-            workers: int | None = None) -> Path:
+            workers: int | None = None, aoi: AoiMask | None = None) -> Path:
     """Write a two-band raster: DI and AOA flag (1 inside, 0 outside).
 
     The nearest-neighbour search is the most expensive step of a prediction (single core: ~100-150 s per
     megapixel with 97 features). With `workers` > 1 (default: min(usable CPUs, 4)) blocks are computed by that many
     processes, each opening the stack and building the k-d tree itself; the main process writes the blocks in
     order, so the output is identical to ``workers=1`` and at most ``2 x workers`` blocks are in memory.
+
+    With an AOI mask (`geocrop.aoi`) the dissimilarity is computed for the AOI pixels only and blocks without AOI
+    pixels are skipped; everything else is no-data. Values inside the AOI are those of an unmasked run (the index
+    is per pixel).
     """
     with rasterio.open(stack) as src:
         names = list(src.descriptions)
@@ -195,14 +203,17 @@ def map_aoa(stack: str | Path, model: Applicability, output: str | Path, block_s
         bands = [names.index(f) + 1 for f in model.features]
         out = Path(output)
         out.parent.mkdir(parents=True, exist_ok=True)
-        wins = list(blocks(src.width, src.height, block_size))
+        if aoi is not None:
+            aoi.check_grid(src, "the feature stack")
+        wins = [w for w in blocks(src.width, src.height, block_size) if aoi is None or aoi.active(w, 0)]
         workers = resolve_workers(workers)
+        items = ((w, aoi.read(w) if aoi is not None else None) for w in wins)     # masks are read lazily, here
         if workers > 1 and len(wins) > 1 and src.width * src.height >= POOL_MIN_PIXELS:
-            results = ordered_map(_aoa_worker, wins, min(workers, len(wins)), "process", initializer=_aoa_init,
+            results = ordered_map(_aoa_worker, items, min(workers, len(wins)), "process", initializer=_aoa_init,
                                   initargs=(str(stack), bands, model.params()))
         else:
-            results = (_aoa_block(src, bands, model, w) for w in wins)
-        with rasterio.open(out, "w", **float_profile(src, count=2)) as dst:
+            results = (_aoa_block(src, bands, model, w, inside) for w, inside in items)
+        with rasterio.open(out, "w", **float_profile(src, count=2, **creation_options(aoi))) as dst:
             dst.set_band_description(1, "dissimilarity_index")
             dst.set_band_description(2, "inside_aoa")
             for w, (di, flag) in zip(wins, results):

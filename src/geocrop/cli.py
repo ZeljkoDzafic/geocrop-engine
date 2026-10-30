@@ -17,6 +17,30 @@ def _json_arg(text):
     return json.loads(text) if text else None
 
 
+def _aoi_args(x, reference: bool = True):
+    """The AOI-mask options shared by every command that reads or computes per block (docs/aoi-aware.md)."""
+    where = " (default: <reference stem>_aoi.tif next to the study grid when it exists)" if reference else ""
+    x.add_argument("--aoi-mask", help="AOI mask raster written by geocrop grid: only blocks that touch the AOI are "
+                                      "read, computed and written" + where)
+    x.add_argument("--no-aoi-mask", action="store_true", help="ignore any AOI mask and process the whole grid")
+    x.add_argument("--aoi-halo-px", type=int, default=0,
+                   help="pixels around the AOI that outputs also hold (smoothing radius is added automatically)")
+
+
+def _aoi_from_args(a, reference=None, smoothing=None):
+    """The `AoiMask` selected by `_aoi_args` (None = whole grid, behaviour as before)."""
+    if getattr(a, "no_aoi_mask", False):
+        return None
+    from .aoi import AoiMask, default_mask_path, required_halo
+    path = getattr(a, "aoi_mask", None)
+    if not path and reference and default_mask_path(reference).is_file():
+        path = default_mask_path(reference)
+    if not path:
+        return None
+    halo = max(int(getattr(a, "aoi_halo_px", 0) or 0), required_halo({"predict": {"smoothing": smoothing}}))
+    return AoiMask(path, halo)
+
+
 #: Built-in estimator names (`geocrop.estimators.ALGORITHMS`, checked by the tests); listed here so that building
 #: the parser does not import scikit-learn.
 BUILTIN_ALGORITHMS = ("rf", "extra_trees", "hist_gb", "lightgbm", "catboost", "tempcnn", "ltae")
@@ -115,11 +139,16 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--resolution", type=float, default=10)
     x.add_argument("--buffer-m", type=float, default=0)
     x.add_argument("--out", required=True)
+    x.add_argument("--no-aoi-mask", action="store_true",
+                   help="do not write <out stem>_aoi.tif (AOI mask) and <out stem>_aoi.json (block index)")
+    x.add_argument("--halo-px", type=int, default=0,
+                   help="pixels of context around the AOI counted in the block index (default 0)")
 
     x = cmd("s2-import", "Sentinel-2 L2A SAFE -> scene folder (reflectance, SCL, CLDPRB, scene.json)")
     x.add_argument("--safe", required=True)
     x.add_argument("--out", required=True)
     x.add_argument("--reference", help="write directly on the study grid (crop to AOI, saves disk)")
+    _aoi_args(x)
 
     x = cmd("stac-import", "Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full downloads)")
     x.add_argument("--reference", required=True, help="study grid GeoTIFF (geocrop grid)")
@@ -131,11 +160,14 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--max-cloud", type=float, default=80, help="tile cloud cover pre-filter (%%)")
     x.add_argument("--min-clear", type=float, default=0.2, help="minimum clear fraction inside the grid")
     x.add_argument("--max-items", type=int, default=500)
+    _aoi_args(x)
     x.add_argument("--workers", type=int, default=4, help="concurrent scene imports, 1-8 (1 = sequential; same output)")
 
     x = cmd("quicklook", "Real Sentinel-2 imagery for an area and period: monthly cloud-free composites for the map")
-    x.add_argument("--bbox", nargs=4, type=float, required=True, metavar=("W", "S", "E", "N"),
-                   help="degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija)")
+    x.add_argument("--bbox", nargs=4, type=float, metavar=("W", "S", "E", "N"),
+                   help="degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija); required unless --aoi is given")
+    x.add_argument("--aoi", help="irregular AOI (GeoJSON/GPKG) instead of --bbox: the grid covers its bounding box "
+                                 "but only blocks that touch the AOI are imported and composited")
     x.add_argument("--start", required=True)
     x.add_argument("--end", required=True)
     x.add_argument("--out", required=True)
@@ -164,6 +196,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--cloud-prob-max", type=float)
     x.add_argument("--dilate", type=int, default=0)
     x.add_argument("--min-obs", type=int, default=1)
+    _aoi_args(x)
 
     x = cmd("snap-graph", "Write a SNAP GPT graph for S1 GRD preprocessing")
     x.add_argument("--out", required=True)
@@ -193,6 +226,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--out", required=True)
     x.add_argument("--separate-orbits", action="store_true")
     x.add_argument("--statistic", choices=["mean", "median"], default="mean")
+    _aoi_args(x)
 
     x = cmd("inventory", "Scene availability per window from imported scene folders")
     x.add_argument("--scenes", required=True)
@@ -203,6 +237,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--composites", required=True)
     x.add_argument("--out", required=True)
     x.add_argument("--config", help="use the features: section of a config")
+    _aoi_args(x, reference=False)
 
     x = cmd("check", "Quality checks for rasters and vector reference data")
     x.add_argument("--raster", nargs="*", default=[])
@@ -289,6 +324,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--smooth-window", type=int, help="odd neighbourhood size in pixels (default 7)")
     x.add_argument("--smoothness", type=float, help="smoothing strength; larger smooths more (default 10)")
     x.add_argument("--registry", help="registry directory for --model registry:<name>@<version|stage>")
+    _aoi_args(x, reference=False)
     x.add_argument("--workers", type=int, help="processes for the model and AOA blocks (default: resources.workers "
                                                "of --config, else min(usable CPUs, 4); 1 = single process)")
 
@@ -454,6 +490,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--tile-size", type=int, default=1024)
     x.add_argument("--no-merge-seams", action="store_true", help="keep segments split at tile borders")
     x.add_argument("--merge-distance", type=float, default=0.08, help="max RMS spectral difference for seam merges")
+    _aoi_args(x, reference=False)
     x.add_argument("--workers", type=int, help="processes for tiles (default min(usable CPUs, 4); 1 = single process)")
 
     x = cmd("segment-unet-train", "Train the boundary U-Net (requires torch)")
@@ -479,6 +516,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--out", required=True)
     x.add_argument("--bands", nargs="*")
     x.add_argument("--overlap", type=int, default=32)
+    _aoi_args(x, reference=False)
 
     x = cmd("boundaries-to-parcels", "Watershed post-processing of boundary probability")
     x.add_argument("--raster", required=True)
@@ -516,6 +554,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
                    help="also write <out>_temporal_support.tif: observed vs interpolated support per pixel")
     x.add_argument("--support-tolerance-days", type=float, default=10,
                    help="a value farther than this from a clear acquisition counts as interpolated")
+    _aoi_args(x)
 
     x = cmd("merge-stacks", "Concatenate feature stacks on one grid")
     x.add_argument("--stacks", nargs="+", required=True)
@@ -1115,14 +1154,24 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(download_manifest(a.manifest, a.out, a.limit))
     elif c == "grid":
         from .raster import make_grid
-        print(make_grid(a.aoi, a.crs, a.resolution, a.out, a.buffer_m))
+        print(make_grid(a.aoi, a.crs, a.resolution, a.out, a.buffer_m, aoi_mask=not a.no_aoi_mask,
+                        halo_px=a.halo_px))
+        if not a.no_aoi_mask:
+            from .aoi import AoiMask, default_mask_path, index_path
+            mask = AoiMask(default_mask_path(a.out), a.halo_px)
+            info = mask.summary()
+            print(f"AOI mask {mask.path} and block index {index_path(mask.path)}: "
+                  f"{info['aoi_share_of_grid']:.1%} of the grid is inside the AOI ({info['aoi_km2']} of "
+                  f"{info['grid_km2']} km2), {info['blocks_active']} of {info['blocks_total']} blocks "
+                  f"({info['block_px']} px) touch it; stages pick it up next to the grid "
+                  f"(or set grid.aoi_mask: {mask.path})", file=sys.stderr)
     elif c == "s2-import":
         from .s2 import import_safe
-        print(import_safe(a.safe, a.out, reference=a.reference))
+        print(import_safe(a.safe, a.out, reference=a.reference, aoi=_aoi_from_args(a, a.reference)))
     elif c == "stac-import":
         from .stac_import import import_season
         res = import_season(a.reference, a.out, a.start, a.end, a.endpoint, a.collection, a.max_cloud, a.min_clear,
-                            a.max_items, workers=a.workers)
+                            a.max_items, workers=a.workers, aoi=_aoi_from_args(a, a.reference))
         counts = {}
         for r in res:
             key = r["status"].split(":")[0]
@@ -1130,8 +1179,10 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print({"items": len(res), "status": counts, "out": a.out})
     elif c == "quicklook":
         from .quicklook import quicklook
+        if not a.bbox and not a.aoi:
+            raise SystemExit("geocrop quicklook: give --bbox or --aoi")
         r = quicklook(a.bbox, a.start, a.end, a.out, max_cloud=a.max_cloud, min_clear=a.min_clear,
-                      max_items=a.max_items)
+                      max_items=a.max_items, aoi=a.aoi)
         _print({k: r[k] for k in ("crs", "area_km2", "acquisitions_found", "acquisitions_used", "composites")})
     elif c == "acceptance":
         from .acceptance import run as acceptance_run
@@ -1144,7 +1195,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "s2-composite":
         from .s2 import composite
         print(composite(a.scenes, a.out, a.reference, a.statistic, cloud_probability_max=a.cloud_prob_max,
-                        mask_dilation_px=a.dilate, min_valid_observations=a.min_obs))
+                        mask_dilation_px=a.dilate, min_valid_observations=a.min_obs,
+                        aoi=_aoi_from_args(a, a.reference)))
     elif c == "snap-graph":
         from .s1 import write_snap_graph
         print(write_snap_graph(a.out, a.backscatter, a.dem, a.pixel_spacing, a.crs, a.speckle))
@@ -1156,7 +1208,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         print(import_geotiff(a.geotiff, a.out, a.product_name, a.orbit, a.backscatter))
     elif c == "s1-composite":
         from .s1 import composite
-        print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic))
+        print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic,
+                        aoi=_aoi_from_args(a, a.reference)))
     elif c == "inventory":
         from . import config, scenes
         windows = config.parse_windows(config.load(a.config)["windows"])
@@ -1169,7 +1222,12 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             cfg = load(a.config)
             opts = {k: cfg["features"][k] for k in ("s2_bands", "s2_indices", "s1", "deltas", "seasonal")}
             opts["periods"] = list(parse_windows(cfg["windows"])) or None
-        out = build_stack(a.composites, a.out, **opts)
+        aoi = None
+        if a.config and not a.aoi_mask and not a.no_aoi_mask:
+            from .aoi import from_config
+            aoi = from_config(cfg)
+        aoi = aoi or _aoi_from_args(a)
+        out = build_stack(a.composites, a.out, aoi=aoi, **opts)
         if a.config:
             from .config import embedding_options
             eo = embedding_options(cfg)
@@ -1287,13 +1345,20 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
             except registry.RegistryError as exc:
                 raise SystemExit(f"geocrop predict: {exc}") from exc
             model_path = resolved["path"]
+        aoi = None
+        if a.config and not a.aoi_mask and not a.no_aoi_mask:
+            from .aoi import from_config
+            aoi = from_config(load(a.config))
+        aoi = aoi or _aoi_from_args(a, smoothing=smoothing)
+        if aoi is not None:       # a smoothing override on the command line may need more context than the config
+            from .aoi import required_halo
+            aoi = aoi.with_halo(max(aoi.halo, required_halo({"predict": {"smoothing": smoothing}})))
         workers = a.workers
         if workers is None and a.config:
             from . import parallel
-            from .config import load
             cfg = load(a.config)
             workers = parallel.resolve_workers(cfg["resources"].get("workers"), cfg["model"].get("n_jobs"))
-        result = predict(a.features, model_path, a.out, smoothing=smoothing, workers=workers)
+        result = predict(a.features, model_path, a.out, smoothing=smoothing, workers=workers, aoi=aoi)
         if resolved:
             registry.annotate_prediction(result["manifest"], resolved)
             result["registry"] = {k: resolved[k] for k in ("name", "version", "stage", "sha256")}
@@ -1402,7 +1467,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "segment-obia":
         from .segmentation import obia
         _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness,
-                    merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance, workers=a.workers))
+                    merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance, workers=a.workers,
+                    aoi=_aoi_from_args(a)))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
         r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,
@@ -1418,7 +1484,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print({"patches": int(len(X)), "groups": int(len(set(G)))})
     elif c == "segment-unet-infer":
         from .segmentation import unet_infer
-        print(unet_infer(a.raster, a.model, a.out, overlap=a.overlap, bands=a.bands))
+        print(unet_infer(a.raster, a.model, a.out, overlap=a.overlap, bands=a.bands, aoi=_aoi_from_args(a)))
     elif c == "boundaries-to-parcels":
         from .segmentation import boundaries_to_parcels
         _print(boundaries_to_parcels(a.raster, a.out, a.threshold))
@@ -1436,7 +1502,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                      a.s2_indices, a.s1_indices, a.step_days, a.output_step_days, a.lam, a.envelope,
                                      min_observed_fraction=a.min_observed_fraction, max_gap_days=a.max_gap_days,
                                      temporal_support=a.temporal_support,
-                                     support_tolerance_days=a.support_tolerance_days))
+                                     support_tolerance_days=a.support_tolerance_days,
+                                     aoi=_aoi_from_args(a, a.reference)))
     elif c == "merge-stacks":
         from .tsfeatures import merge_stacks
         print(merge_stacks(a.stacks, a.out))

@@ -122,6 +122,8 @@ Create the reference analysis grid from an AOI
 | `--resolution` |  | `10` |  |
 | `--buffer-m` |  |  |  |
 | `--out` | yes |  |  |
+| `--no-aoi-mask` |  |  | do not write <out stem>_aoi.tif (AOI mask) and <out stem>_aoi.json (block index) |
+| `--halo-px` |  |  | pixels of context around the AOI counted in the block index (default 0) |
 
 ## `geocrop s2-import`
 
@@ -132,6 +134,9 @@ Sentinel-2 L2A SAFE -> scene folder (reflectance, SCL, CLDPRB, scene.json)
 | `--safe` | yes |  |  |
 | `--out` | yes |  |  |
 | `--reference` |  |  | write directly on the study grid (crop to AOI, saves disk) |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop stac-import`
 
@@ -148,6 +153,9 @@ Windowed import of S2 L2A COGs from a STAC API onto the study grid (no full down
 | `--max-cloud` |  | `80` | tile cloud cover pre-filter (%%) |
 | `--min-clear` |  | `0.2` | minimum clear fraction inside the grid |
 | `--max-items` |  | `500` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--workers` |  | `4` | concurrent scene imports, 1-8 (1 = sequential; same output) |
 
 ## `geocrop quicklook`
@@ -156,7 +164,8 @@ Real Sentinel-2 imagery for an area and period: monthly cloud-free composites fo
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
-| `--bbox` | yes |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija) |
+| `--bbox` |  |  | degrees, e.g. 19.10 44.72 19.16 44.76 (Semberija); required unless --aoi is given |
+| `--aoi` |  |  | irregular AOI (GeoJSON/GPKG) instead of --bbox: the grid covers its bounding box but only blocks that touch the AOI are imported and composited |
 | `--start` | yes |  |  |
 | `--end` | yes |  |  |
 | `--out` | yes |  |  |
@@ -192,6 +201,9 @@ Cloud-masked temporal composite of S2 scene folders
 | `--cloud-prob-max` |  |  |  |
 | `--dilate` |  |  |  |
 | `--min-obs` |  | `1` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop snap-graph`
 
@@ -241,6 +253,9 @@ Linear-domain temporal composite of S1 scene folders on a reference grid
 | `--out` | yes |  |  |
 | `--separate-orbits` |  |  |  |
 | `--statistic` |  | `mean` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop inventory`
 
@@ -260,6 +275,9 @@ Build the multi-temporal feature stack
 | `--composites` | yes |  |  |
 | `--out` | yes |  |  |
 | `--config` |  |  | use the features: section of a config |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop check`
 
@@ -375,6 +393,9 @@ Blockwise prediction: classes, probabilities, uncertainty
 | `--smooth-window` |  |  | odd neighbourhood size in pixels (default 7) |
 | `--smoothness` |  |  | smoothing strength; larger smooths more (default 10) |
 | `--registry` |  |  | registry directory for --model registry:<name>@<version/stage> |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--workers` |  |  | processes for the model and AOA blocks (default: resources.workers of --config, else min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop ablation`
@@ -604,6 +625,9 @@ SLIC superpixel segmentation (tiled, segments merged across tile seams)
 | `--tile-size` |  | `1024` |  |
 | `--no-merge-seams` |  |  | keep segments split at tile borders |
 | `--merge-distance` |  | `0.08` | max RMS spectral difference for seam merges |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
 
 ## `geocrop segment-unet-train`
@@ -644,6 +668,9 @@ Boundary probability with overlapping tiles
 | `--out` | yes |  |  |
 | `--bands` |  |  |  |
 | `--overlap` |  | `32` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop boundaries-to-parcels`
 
@@ -699,6 +726,9 @@ Time-series features (Whittaker, phenology, harmonics) from scene folders
 | `--max-gap-days` |  |  | maximum consecutive empty-bin duration, including edges |
 | `--temporal-support` |  |  | also write <out>_temporal_support.tif: observed vs interpolated support per pixel |
 | `--support-tolerance-days` |  | `10` | a value farther than this from a clear acquisition counts as interpolated |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written (default: <reference stem>_aoi.tif next to the study grid when it exists) |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 
 ## `geocrop merge-stacks`
 
