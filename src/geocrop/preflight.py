@@ -591,19 +591,22 @@ def _check_crs(cfg, layout, rep: _Report) -> dict:
     return out
 
 
-def _check_classes(cfg, layout, rep: _Report) -> dict:
-    """Class support under the configured blocks, folds, calibration split and locked holdout (centroids)."""
+def _check_classes(cfg, layout, rep: _Report, frame=None) -> dict:
+    """Class support under the configured blocks, folds, calibration split and locked holdout (centroids).
+
+    `frame`: an already loaded training layer (default: read ``paths.training``)."""
     import geopandas as gpd
 
     from . import model
     from .samples import Samples
     path, cl, m = Path(cfg["paths"]["training"]), cfg["classes"], cfg["model"]
-    if not path.exists():
-        return {}
-    try:
-        frame = gpd.read_file(path)
-    except Exception:  # noqa: BLE001 - reported elsewhere
-        return {}
+    if frame is None:
+        if not path.exists():
+            return {}
+        try:
+            frame = gpd.read_file(path)
+        except Exception:  # noqa: BLE001 - reported elsewhere
+            return {}
     if frame.crs is None or cl["label_field"] not in frame or cl["id_field"] not in frame:
         return {}
     frame = frame[~(frame.geometry.isna() | frame.geometry.is_empty) & frame[cl["label_field"]].notna()]
@@ -684,6 +687,22 @@ def _check_classes(cfg, layout, rep: _Report) -> dict:
                 f"Classes missing from the training side of some folds (unpredictable there): {untrained}.",
                 classes=untrained)
     return out
+
+
+def class_support(cfg, frame=None, holdout_fraction: float | None = None) -> tuple[dict, list[dict]]:
+    """Class support of a training layer under the configured spatial blocks, folds and locked holdout.
+
+    The checks of preflight (`classes.*`) for `frame` (a loaded layer; default: read ``paths.training``) without
+    the rest of the report; used by ``geocrop intake``. `holdout_fraction` overrides ``model.holdout_fraction``
+    (e.g. to assess an intended holdout while the configuration still has none). Returns the class table and
+    the checks (status pass/warn/error)."""
+    import copy
+    cfg = copy.deepcopy(cfg)
+    if holdout_fraction is not None:
+        cfg["model"]["holdout_fraction"] = holdout_fraction
+    rep = _Report()
+    table = _check_classes(cfg, plan(cfg), rep, frame)
+    return table, rep.checks
 
 
 def _rf_model_bytes(cfg, n_samples, n_classes) -> int:
@@ -844,6 +863,7 @@ def run(cfg, config_path=None, inventories=()) -> dict:
     return {"schema": SCHEMA, "verdict": verdict, "engine": __version__,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "config": str(config_path) if config_path else None, "config_fingerprint": cfgmod.fingerprint(cfg),
+            "intake": "geocrop intake --config " + (str(config_path) if config_path else "<study.yaml>"),
             "summary": counts, "checks": rep.checks, "windows": windows, "coverage": coverage,
             "layers": crs_info, "classes": classes, "resources": est, "assumptions": ASSUMPTIONS,
             "scope": "Read-only planning check: decimated mask reads, polygon centroids and rough resource "
@@ -866,7 +886,10 @@ def to_markdown(report: dict) -> str:
     lines = [f"# GeoCrop preflight: {badge}", "",
              f"Config `{report['config']}` (fingerprint `{report['config_fingerprint']}`), engine {report['engine']}, "
              f"{report['generated_at']}.", "",
-             f"**{s['error']} error(s), {s['warn']} warning(s), {s['pass']} passed.**", ""]
+             f"**{s['error']} error(s), {s['warn']} warning(s), {s['pass']} passed.**", "",
+             f"Reference data (training polygons, parcels, observations) are checked in depth by "
+             f"`{report.get('intake', 'geocrop intake --config <study.yaml>')}`; run it and require PASS before a final run.",
+             ""]
     for status, title in (("error", "Errors (must fix before running)"), ("warn", "Warnings (review)")):
         items = [c for c in report["checks"] if c["status"] == status]
         if items:
