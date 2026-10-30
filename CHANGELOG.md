@@ -6,6 +6,15 @@
   of letting scikit-learn 1.8+ recompute 254 weighted percentiles per feature in Python on every fit; every pipeline
   test (predict runs the shift check) was 10-15x slower on Python 3.11/3.12 (new scikit-learn) than on 3.10. The
   tests workflow now runs the default tier with `pytest-xdist` (`-n 2 --dist loadfile`, added to the `dev` extra).
+- `geocrop intake`: read-only intake of training polygons, declared parcels and field observations (JSON + Markdown
+  report, pass/warn/error, exit code 2 on errors): readability, CRS, geometry repair counts, IDs, class-name
+  spelling/encoding with a suggested normalisation map, crop-mapping coverage, date format and season, AOI overlap,
+  per-municipality counts, class/polygon/pixel support under the configured spatial blocks and holdout, parcel and
+  observation leakage. Reports hold counts and (limited) IDs only. Reuses `audit` and `preflight`.
+- CSV/tabular input (WKT or x/y columns, utf-8/cp1250 detected or `--encoding`, `;` or `,`) for `normalize-parcels`
+  and the new `normalize-observations`; `read_mapping` reads cp1250 and semicolon CSVs.
+- Reference-data intake documentation `docs/intake.md` and a synthetic example under `examples/intake_example/`.
+- `geocrop preflight` points to `geocrop intake`.
 - Dependabot: pip version updates are off (the pinned freeze is regenerated as a whole; security updates stay on).
 - CI: the `audit` job audits the pinned versions in `constraints/py312.txt` without re-resolving them (`--no-deps --disable-pip`).
 
