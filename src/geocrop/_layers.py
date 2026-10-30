@@ -65,6 +65,7 @@ LAYERS: dict[str, frozenset[str]] = {
     }),
     # Workflows that compose core and adapters: configuration, orchestration, provenance, studies.
     APPLICATION: frozenset({
+        "intake",        # reference-data intake report: layers, encodings, mapping, season, AOI, leakage (read-only)
         "acceptance", "audit", "benchmark", "cache", "cleanup", "config", "demo", "experiments", "pipeline", "preflight", "provenance",
         "public_benchmark",  # frozen-protocol public benchmark (EuroCrops + Sentinel-2 STAC)
         "public_transfer",   # frozen-protocol public region/year transfer benchmark

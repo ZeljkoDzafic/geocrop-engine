@@ -120,6 +120,23 @@ acquisitions; median clear observations per pixel (`valid_count`) 5, 7 and 7. Th
 the 2500 km² quicklook limit; the study-area figure of the paper uses two quicklooks (split at 17.40 °E) of the
 fully clear date 2023-07-16.
 
+## Before the final run: intake must PASS
+
+The training polygons, LPIS/RPG declarations and field observations are restricted data and are never committed.
+When they arrive, check them with `geocrop intake` before any multi-hour run; the final run starts only when the
+verdict is **pass** (or **warn** with every warning reviewed and recorded):
+
+```bash
+geocrop intake --config configs/studies/lijevce_polje/study_2023.yaml --require-all \
+    --training data/lijevce_polje/reference/training_2023.gpkg \
+    --parcels data/lijevce_polje/reference/lpis_2023.gpkg \
+    --observations data/lijevce_polje/reference/field_observations_2023.gpkg \
+    --crop-mapping data/lijevce_polje/reference/crop_mapping_rs.csv
+```
+
+What the checks cover and the accepted input formats: [Reference-data intake](../intake.md).
+`geocrop preflight` reminds of this step and still covers scenes, grid and resources.
+
 ## Open items
 
 - Training polygons, LPIS declarations and field observations for 2023 inside the AOI (the 366 polygons of

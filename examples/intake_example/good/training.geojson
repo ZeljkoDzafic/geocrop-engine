@@ -1,0 +1,2112 @@
+{
+"type": "FeatureCollection",
+"name": "synthetic",
+"crs": {
+"type": "name",
+"properties": {
+"name": "urn:ogc:def:crs:EPSG::32633"
+}
+},
+"features": [
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY00",
+"class_name": "soybean",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683800.0,
+4988900.0
+],
+[
+683800.0,
+4989000.0
+],
+[
+683700.0,
+4989000.0
+],
+[
+683700.0,
+4988900.0
+],
+[
+683800.0,
+4988900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY01",
+"class_name": "soybean",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683800.0,
+4990900.0
+],
+[
+683800.0,
+4991000.0
+],
+[
+683700.0,
+4991000.0
+],
+[
+683700.0,
+4990900.0
+],
+[
+683800.0,
+4990900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY02",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678200.0,
+4991300.0
+],
+[
+678200.0,
+4991400.0
+],
+[
+678100.0,
+4991400.0
+],
+[
+678100.0,
+4991300.0
+],
+[
+678200.0,
+4991300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY03",
+"class_name": "soybean",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680600.0,
+4986100.0
+],
+[
+680600.0,
+4986200.0
+],
+[
+680500.0,
+4986200.0
+],
+[
+680500.0,
+4986100.0
+],
+[
+680600.0,
+4986100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY04",
+"class_name": "soybean",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680200.0,
+4988500.0
+],
+[
+680200.0,
+4988600.0
+],
+[
+680100.0,
+4988600.0
+],
+[
+680100.0,
+4988500.0
+],
+[
+680200.0,
+4988500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY05",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677400.0,
+4987700.0
+],
+[
+677400.0,
+4987800.0
+],
+[
+677300.0,
+4987800.0
+],
+[
+677300.0,
+4987700.0
+],
+[
+677400.0,
+4987700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY06",
+"class_name": "soybean",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680600.0,
+4991700.0
+],
+[
+680600.0,
+4991800.0
+],
+[
+680500.0,
+4991800.0
+],
+[
+680500.0,
+4991700.0
+],
+[
+680600.0,
+4991700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY07",
+"class_name": "soybean",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682200.0,
+4986900.0
+],
+[
+682200.0,
+4987000.0
+],
+[
+682100.0,
+4987000.0
+],
+[
+682100.0,
+4986900.0
+],
+[
+682200.0,
+4986900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY08",
+"class_name": "soybean",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681400.0,
+4984100.0
+],
+[
+681400.0,
+4984200.0
+],
+[
+681300.0,
+4984200.0
+],
+[
+681300.0,
+4984100.0
+],
+[
+681400.0,
+4984100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY09",
+"class_name": "soybean",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679000.0,
+4987300.0
+],
+[
+679000.0,
+4987400.0
+],
+[
+678900.0,
+4987400.0
+],
+[
+678900.0,
+4987300.0
+],
+[
+679000.0,
+4987300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY10",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676200.0,
+4984100.0
+],
+[
+676200.0,
+4984200.0
+],
+[
+676100.0,
+4984200.0
+],
+[
+676100.0,
+4984100.0
+],
+[
+676200.0,
+4984100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY11",
+"class_name": "soybean",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683000.0,
+4990500.0
+],
+[
+683000.0,
+4990600.0
+],
+[
+682900.0,
+4990600.0
+],
+[
+682900.0,
+4990500.0
+],
+[
+683000.0,
+4990500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY12",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677000.0,
+4990900.0
+],
+[
+677000.0,
+4991000.0
+],
+[
+676900.0,
+4991000.0
+],
+[
+676900.0,
+4990900.0
+],
+[
+677000.0,
+4990900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY13",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676200.0,
+4989700.0
+],
+[
+676200.0,
+4989800.0
+],
+[
+676100.0,
+4989800.0
+],
+[
+676100.0,
+4989700.0
+],
+[
+676200.0,
+4989700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSOY14",
+"class_name": "soybean",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677800.0,
+4989300.0
+],
+[
+677800.0,
+4989400.0
+],
+[
+677700.0,
+4989400.0
+],
+[
+677700.0,
+4989300.0
+],
+[
+677800.0,
+4989300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN00",
+"class_name": "sunflower",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682200.0,
+4988100.0
+],
+[
+682200.0,
+4988200.0
+],
+[
+682100.0,
+4988200.0
+],
+[
+682100.0,
+4988100.0
+],
+[
+682200.0,
+4988100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN01",
+"class_name": "sunflower",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683400.0,
+4984500.0
+],
+[
+683400.0,
+4984600.0
+],
+[
+683300.0,
+4984600.0
+],
+[
+683300.0,
+4984500.0
+],
+[
+683400.0,
+4984500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN02",
+"class_name": "sunflower",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679000.0,
+4990900.0
+],
+[
+679000.0,
+4991000.0
+],
+[
+678900.0,
+4991000.0
+],
+[
+678900.0,
+4990900.0
+],
+[
+679000.0,
+4990900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN03",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678600.0,
+4986500.0
+],
+[
+678600.0,
+4986600.0
+],
+[
+678500.0,
+4986600.0
+],
+[
+678500.0,
+4986500.0
+],
+[
+678600.0,
+4986500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN04",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677000.0,
+4984500.0
+],
+[
+677000.0,
+4984600.0
+],
+[
+676900.0,
+4984600.0
+],
+[
+676900.0,
+4984500.0
+],
+[
+677000.0,
+4984500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN05",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677000.0,
+4991300.0
+],
+[
+677000.0,
+4991400.0
+],
+[
+676900.0,
+4991400.0
+],
+[
+676900.0,
+4991300.0
+],
+[
+677000.0,
+4991300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN06",
+"class_name": "sunflower",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681400.0,
+4987700.0
+],
+[
+681400.0,
+4987800.0
+],
+[
+681300.0,
+4987800.0
+],
+[
+681300.0,
+4987700.0
+],
+[
+681400.0,
+4987700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN07",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678200.0,
+4988100.0
+],
+[
+678200.0,
+4988200.0
+],
+[
+678100.0,
+4988200.0
+],
+[
+678100.0,
+4988100.0
+],
+[
+678200.0,
+4988100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN08",
+"class_name": "sunflower",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679800.0,
+4986500.0
+],
+[
+679800.0,
+4986600.0
+],
+[
+679700.0,
+4986600.0
+],
+[
+679700.0,
+4986500.0
+],
+[
+679800.0,
+4986500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN09",
+"class_name": "sunflower",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683000.0,
+4987300.0
+],
+[
+683000.0,
+4987400.0
+],
+[
+682900.0,
+4987400.0
+],
+[
+682900.0,
+4987300.0
+],
+[
+683000.0,
+4987300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN10",
+"class_name": "sunflower",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4986900.0
+],
+[
+679400.0,
+4987000.0
+],
+[
+679300.0,
+4987000.0
+],
+[
+679300.0,
+4986900.0
+],
+[
+679400.0,
+4986900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN11",
+"class_name": "sunflower",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681800.0,
+4987300.0
+],
+[
+681800.0,
+4987400.0
+],
+[
+681700.0,
+4987400.0
+],
+[
+681700.0,
+4987300.0
+],
+[
+681800.0,
+4987300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN12",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678600.0,
+4986100.0
+],
+[
+678600.0,
+4986200.0
+],
+[
+678500.0,
+4986200.0
+],
+[
+678500.0,
+4986100.0
+],
+[
+678600.0,
+4986100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN13",
+"class_name": "sunflower",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677400.0,
+4985300.0
+],
+[
+677400.0,
+4985400.0
+],
+[
+677300.0,
+4985400.0
+],
+[
+677300.0,
+4985300.0
+],
+[
+677400.0,
+4985300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TSUN14",
+"class_name": "sunflower",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683400.0,
+4986900.0
+],
+[
+683400.0,
+4987000.0
+],
+[
+683300.0,
+4987000.0
+],
+[
+683300.0,
+4986900.0
+],
+[
+683400.0,
+4986900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI00",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4990100.0
+],
+[
+679400.0,
+4990200.0
+],
+[
+679300.0,
+4990200.0
+],
+[
+679300.0,
+4990100.0
+],
+[
+679400.0,
+4990100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI01",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+680600.0,
+4985300.0
+],
+[
+680600.0,
+4985400.0
+],
+[
+680500.0,
+4985400.0
+],
+[
+680500.0,
+4985300.0
+],
+[
+680600.0,
+4985300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI02",
+"class_name": "maize",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682200.0,
+4988500.0
+],
+[
+682200.0,
+4988600.0
+],
+[
+682100.0,
+4988600.0
+],
+[
+682100.0,
+4988500.0
+],
+[
+682200.0,
+4988500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI03",
+"class_name": "maize",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677400.0,
+4990500.0
+],
+[
+677400.0,
+4990600.0
+],
+[
+677300.0,
+4990600.0
+],
+[
+677300.0,
+4990500.0
+],
+[
+677400.0,
+4990500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI04",
+"class_name": "maize",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683400.0,
+4990100.0
+],
+[
+683400.0,
+4990200.0
+],
+[
+683300.0,
+4990200.0
+],
+[
+683300.0,
+4990100.0
+],
+[
+683400.0,
+4990100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI05",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4988900.0
+],
+[
+679400.0,
+4989000.0
+],
+[
+679300.0,
+4989000.0
+],
+[
+679300.0,
+4988900.0
+],
+[
+679400.0,
+4988900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI06",
+"class_name": "maize",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683000.0,
+4986500.0
+],
+[
+683000.0,
+4986600.0
+],
+[
+682900.0,
+4986600.0
+],
+[
+682900.0,
+4986500.0
+],
+[
+683000.0,
+4986500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI07",
+"class_name": "maize",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676200.0,
+4987700.0
+],
+[
+676200.0,
+4987800.0
+],
+[
+676100.0,
+4987800.0
+],
+[
+676100.0,
+4987700.0
+],
+[
+676200.0,
+4987700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI08",
+"class_name": "maize",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683400.0,
+4989700.0
+],
+[
+683400.0,
+4989800.0
+],
+[
+683300.0,
+4989800.0
+],
+[
+683300.0,
+4989700.0
+],
+[
+683400.0,
+4989700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI09",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681000.0,
+4991700.0
+],
+[
+681000.0,
+4991800.0
+],
+[
+680900.0,
+4991800.0
+],
+[
+680900.0,
+4991700.0
+],
+[
+681000.0,
+4991700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI10",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681400.0,
+4984500.0
+],
+[
+681400.0,
+4984600.0
+],
+[
+681300.0,
+4984600.0
+],
+[
+681300.0,
+4984500.0
+],
+[
+681400.0,
+4984500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI11",
+"class_name": "maize",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4986100.0
+],
+[
+679400.0,
+4986200.0
+],
+[
+679300.0,
+4986200.0
+],
+[
+679300.0,
+4986100.0
+],
+[
+679400.0,
+4986100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI12",
+"class_name": "maize",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678200.0,
+4984100.0
+],
+[
+678200.0,
+4984200.0
+],
+[
+678100.0,
+4984200.0
+],
+[
+678100.0,
+4984100.0
+],
+[
+678200.0,
+4984100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI13",
+"class_name": "maize",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683400.0,
+4990500.0
+],
+[
+683400.0,
+4990600.0
+],
+[
+683300.0,
+4990600.0
+],
+[
+683300.0,
+4990500.0
+],
+[
+683400.0,
+4990500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TMAI14",
+"class_name": "maize",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677000.0,
+4988500.0
+],
+[
+677000.0,
+4988600.0
+],
+[
+676900.0,
+4988600.0
+],
+[
+676900.0,
+4988500.0
+],
+[
+677000.0,
+4988500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA00",
+"class_name": "grassland",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682200.0,
+4989700.0
+],
+[
+682200.0,
+4989800.0
+],
+[
+682100.0,
+4989800.0
+],
+[
+682100.0,
+4989700.0
+],
+[
+682200.0,
+4989700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA01",
+"class_name": "grassland",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679000.0,
+4990100.0
+],
+[
+679000.0,
+4990200.0
+],
+[
+678900.0,
+4990200.0
+],
+[
+678900.0,
+4990100.0
+],
+[
+679000.0,
+4990100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA02",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+676600.0,
+4989700.0
+],
+[
+676600.0,
+4989800.0
+],
+[
+676500.0,
+4989800.0
+],
+[
+676500.0,
+4989700.0
+],
+[
+676600.0,
+4989700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA03",
+"class_name": "grassland",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683800.0,
+4985300.0
+],
+[
+683800.0,
+4985400.0
+],
+[
+683700.0,
+4985400.0
+],
+[
+683700.0,
+4985300.0
+],
+[
+683800.0,
+4985300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA04",
+"class_name": "grassland",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4987700.0
+],
+[
+679400.0,
+4987800.0
+],
+[
+679300.0,
+4987800.0
+],
+[
+679300.0,
+4987700.0
+],
+[
+679400.0,
+4987700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA05",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677000.0,
+4990100.0
+],
+[
+677000.0,
+4990200.0
+],
+[
+676900.0,
+4990200.0
+],
+[
+676900.0,
+4990100.0
+],
+[
+677000.0,
+4990100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA06",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677400.0,
+4989700.0
+],
+[
+677400.0,
+4989800.0
+],
+[
+677300.0,
+4989800.0
+],
+[
+677300.0,
+4989700.0
+],
+[
+677400.0,
+4989700.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA07",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677800.0,
+4991300.0
+],
+[
+677800.0,
+4991400.0
+],
+[
+677700.0,
+4991400.0
+],
+[
+677700.0,
+4991300.0
+],
+[
+677800.0,
+4991300.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA08",
+"class_name": "grassland",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+681400.0,
+4984900.0
+],
+[
+681400.0,
+4985000.0
+],
+[
+681300.0,
+4985000.0
+],
+[
+681300.0,
+4984900.0
+],
+[
+681400.0,
+4984900.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA09",
+"class_name": "grassland",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+682600.0,
+4988100.0
+],
+[
+682600.0,
+4988200.0
+],
+[
+682500.0,
+4988200.0
+],
+[
+682500.0,
+4988100.0
+],
+[
+682600.0,
+4988100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA10",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+678600.0,
+4990100.0
+],
+[
+678600.0,
+4990200.0
+],
+[
+678500.0,
+4990200.0
+],
+[
+678500.0,
+4990100.0
+],
+[
+678600.0,
+4990100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA11",
+"class_name": "grassland",
+"municipality": "Gradiška"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+677800.0,
+4984100.0
+],
+[
+677800.0,
+4984200.0
+],
+[
+677700.0,
+4984200.0
+],
+[
+677700.0,
+4984100.0
+],
+[
+677800.0,
+4984100.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA12",
+"class_name": "grassland",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683000.0,
+4988500.0
+],
+[
+683000.0,
+4988600.0
+],
+[
+682900.0,
+4988600.0
+],
+[
+682900.0,
+4988500.0
+],
+[
+683000.0,
+4988500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA13",
+"class_name": "grassland",
+"municipality": "Srbac"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+683800.0,
+4986500.0
+],
+[
+683800.0,
+4986600.0
+],
+[
+683700.0,
+4986600.0
+],
+[
+683700.0,
+4986500.0
+],
+[
+683800.0,
+4986500.0
+]
+]
+]
+}
+},
+{
+"type": "Feature",
+"properties": {
+"polygon_id": "TGRA14",
+"class_name": "grassland",
+"municipality": "Laktaši"
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+679400.0,
+4986500.0
+],
+[
+679400.0,
+4986600.0
+],
+[
+679300.0,
+4986600.0
+],
+[
+679300.0,
+4986500.0
+],
+[
+679400.0,
+4986500.0
+]
+]
+]
+}
+}
+]
+}

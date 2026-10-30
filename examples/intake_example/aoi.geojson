@@ -1,0 +1,43 @@
+{
+"type": "FeatureCollection",
+"features": [
+{
+"type": "Feature",
+"properties": {
+"name": "SYNTHETIC example AOI",
+"municipalities": [
+"Gradiška",
+"Laktaši",
+"Srbac"
+]
+},
+"geometry": {
+"type": "Polygon",
+"coordinates": [
+[
+[
+17.231285,
+44.986746
+],
+[
+17.335217,
+44.984667
+],
+[
+17.338219,
+45.058421
+],
+[
+17.234153,
+45.060505
+],
+[
+17.231285,
+44.986746
+]
+]
+]
+}
+}
+]
+}

@@ -540,6 +540,55 @@ Map external parcel fields to the neutral schema
 | `--declared-field` |  |  |  |
 | `--crop-mapping` |  |  |  |
 | `--pseudonymise` |  |  |  |
+| `--wkt-field` |  |  | CSV column with WKT geometry (training/parcels tables) |
+| `--x-field` |  |  | CSV column with x / longitude (point tables) |
+| `--y-field` |  |  | CSV column with y / latitude (point tables) |
+| `--crs` |  |  | CRS of CSV coordinates/WKT, e.g. EPSG:4326 or EPSG:32633 |
+| `--encoding` |  |  | text encoding of CSV/Shapefile attributes (utf-8, cp1250); default: detected |
+| `--delimiter` |  |  | CSV delimiter (default: detected, ; or ,) |
+
+## `geocrop normalize-observations`
+
+Write field observations (vector or CSV table) as the neutral class_name/observed_at layer
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--input` | yes |  |  |
+| `--out` | yes |  |  |
+| `--label-field` | yes |  | column with the observed class |
+| `--date-field` | yes |  | column with the observation date (ISO or day.month.year) |
+| `--group-field` |  |  | column with the field/block identifier (written as group_id) |
+| `--wkt-field` |  |  | CSV column with WKT geometry (training/parcels tables) |
+| `--x-field` |  |  | CSV column with x / longitude (point tables) |
+| `--y-field` |  |  | CSV column with y / latitude (point tables) |
+| `--crs` |  |  | CRS of CSV coordinates/WKT, e.g. EPSG:4326 or EPSG:32633 |
+| `--encoding` |  |  | text encoding of CSV/Shapefile attributes (utf-8, cp1250); default: detected |
+| `--delimiter` |  |  | CSV delimiter (default: detected, ; or ,) |
+
+## `geocrop intake`
+
+Check restricted reference data (training polygons, parcels, observations) before a run; read-only
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--config` | yes |  | study configuration (YAML) |
+| `--training` |  |  | training polygons (default: paths.training when it exists) |
+| `--parcels` |  |  | declared parcels (default: paths.parcels when it exists) |
+| `--observations` |  |  | independent field observations (default: paths.observations) |
+| `--crop-mapping` |  |  | declaration code -> class CSV (default: parcels.crop_mapping) |
+| `--aoi` |  |  | AOI GeoJSON/GPKG (default: aoi.geojson next to the configuration) |
+| `--municipalities` |  |  | municipality boundaries with a name column, for per-municipality counts |
+| `--out` |  |  | output directory for intake_report.json and intake_report.md (default: <paths.output>/intake) |
+| `--list-offenders` |  | `20` | list at most N feature IDs/rows per failed check, 0 for none (default 20) |
+| `--inner-buffer-m` |  |  | interior buffer applied to training polygons when counting pixels (pipeline default 0) |
+| `--require-all` |  |  | a missing layer is an error, not a warning |
+| `--strict` |  |  | exit 2 on warnings as well |
+| `--wkt-field` |  |  | CSV column with WKT geometry (training/parcels tables) |
+| `--x-field` |  |  | CSV column with x / longitude (point tables) |
+| `--y-field` |  |  | CSV column with y / latitude (point tables) |
+| `--crs` |  |  | CRS of CSV coordinates/WKT, e.g. EPSG:4326 or EPSG:32633 |
+| `--encoding` |  |  | text encoding of CSV/Shapefile attributes (utf-8, cp1250); default: detected |
+| `--delimiter` |  |  | CSV delimiter (default: detected, ; or ,) |
 
 ## `geocrop segment-obia`
 
