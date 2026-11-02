@@ -100,6 +100,14 @@ def run(samples: Samples, manifest: list[Feature], output_dir: str | Path, exper
                "mcnemar_n_units": test_p["n_units"], "mcnemar_unit": test_p["unit"]}
         for t in targets or []:
             row[f"f1_{t}"] = cv["per_class"].get(t, {}).get("f1")
+        tf = [row[f"f1_{t}"] for t in targets or [] if row[f"f1_{t}"] is not None]
+        if tf:
+            row["target_macro_f1"] = float(sum(tf) / len(tf))  # mean F1 of the target classes only (pixels)
+        if targets:
+            yp, pp = metrics.polygon_majority(samples.y, oof, samples.polygon)
+            par = metrics.summary(yp, pp, labels=np.unique(samples.y))
+            row.update({"parcel_overall_accuracy": par["overall_accuracy"], "parcel_kappa": par["kappa"],
+                        "parcel_target_macro_f1": metrics.target_macro_f1(par, targets), "parcel_n": int(len(yp))})
         if tv is not None:
             row.update({"transfer_strategy": cv_strategy,
                         "transfer_overall_accuracy": tv["out_of_domain"]["overall_accuracy"],

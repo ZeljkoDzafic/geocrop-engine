@@ -266,6 +266,20 @@ Scene availability per window from imported scene folders
 | `--scenes` | yes |  |  |
 | `--config` | yes |  |  |
 
+## `geocrop separability`
+
+Jeffries-Matusita separability of class pairs per period and feature (parcel means)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--stack` | yes |  | feature stack GeoTIFF (with its .features.json) |
+| `--polygons` | yes |  | reference polygons |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `polygon_id` |  |
+| `--classes` | yes |  | classes to compare pairwise, e.g. maize soybean sunflower |
+| `--groups` |  |  | feature groups to include (default: all period features) |
+| `--out` | yes |  |  |
+
 ## `geocrop features`
 
 Build the multi-temporal feature stack

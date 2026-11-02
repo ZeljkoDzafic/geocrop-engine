@@ -43,6 +43,7 @@ FINGERPRINT_NEUTRAL: dict[tuple[str, ...], Any] = {
     ("grid", "aoi_mask"): None,
     ("grid", "aoi"): None,
     ("grid", "aoi_halo_px"): 0,
+    ("compositing", "allow_window_overlap"): False,
 }
 
 DEFAULTS: dict[str, Any] = {
@@ -71,6 +72,7 @@ DEFAULTS: dict[str, Any] = {
         "mask_dilation_px": 0,
         "min_valid_observations": 1,
         "temporal_screening": False,
+        "allow_window_overlap": False,
     },
     "s1": {"separate_orbits": False, "statistic": "mean"},
     "features": {
@@ -304,7 +306,10 @@ def _merge(base: dict, override: dict, path: str = "") -> dict:
     return out
 
 
-def parse_windows(raw: dict) -> dict[str, tuple[date, date]]:
+def parse_windows(raw: dict, allow_overlap: bool = False) -> dict[str, tuple[date, date]]:
+    """Parse `windows:`. Overlapping windows are refused unless `allow_overlap` (config
+    `compositing.allow_window_overlap`): a scene then enters every window it falls in, so the period
+    composites, and the metrics of models built on them, are not independent of each other."""
     windows = {}
     for name, spec in (raw or {}).items():
         try:
@@ -316,13 +321,21 @@ def parse_windows(raw: dict) -> dict[str, tuple[date, date]]:
         windows[str(name)] = (start, end)
     ordered = sorted(windows.items(), key=lambda kv: kv[1][0])
     for (a, (_, a_end)), (b, (b_start, _)) in zip(ordered, ordered[1:]):
-        if b_start <= a_end:
-            raise ConfigError(f"Windows {a} and {b} overlap")
+        if b_start <= a_end and not allow_overlap:
+            raise ConfigError(f"Windows {a} and {b} overlap (set compositing.allow_window_overlap: true to "
+                              "allow overlapping candidate windows)")
     return dict(ordered)
 
 
+def windows_of(cfg: dict) -> dict[str, tuple[date, date]]:
+    """Windows of a resolved configuration, honouring `compositing.allow_window_overlap`."""
+    return parse_windows(cfg["windows"], bool(cfg.get("compositing", {}).get("allow_window_overlap", False)))
+
+
 def validate(cfg: dict) -> dict:
-    parse_windows(cfg["windows"])
+    if not isinstance(cfg["compositing"]["allow_window_overlap"], bool):
+        raise ConfigError("compositing.allow_window_overlap must be true or false")
+    windows_of(cfg)
     t = cfg["timeseries"]
     for key in ("step_days", "output_step_days"):
         if isinstance(t[key], bool) or not isinstance(t[key], int) or t[key] < 1:

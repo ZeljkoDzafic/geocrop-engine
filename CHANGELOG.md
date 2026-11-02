@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Class separability ([docs/separability.md](docs/separability.md)): `geocrop separability` computes parcel-mean
+  Jeffries-Matusita distances per period, feature and class pair (new module `geocrop.separability`). Experiments
+  now report `target_macro_f1` (mean F1 of `classes.targets`). `compositing.allow_window_overlap` (default false)
+  permits overlapping candidate windows for window-design studies; `scenes.assign` now places a scene in every
+  window it falls in (previously only the first, which only mattered for overlapping windows).
 - AOI-aware processing ([docs/aoi-aware.md](docs/aoi-aware.md)): for an irregular AOI the engine no longer imports,
   composites, featurises, classifies or writes the part of the bounding-box grid outside the AOI. `geocrop grid`
   also writes the AOI mask `<grid>_aoi.tif` and the 512 px block index `<grid>_aoi.json` (`--no-aoi-mask`,

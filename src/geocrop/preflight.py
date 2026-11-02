@@ -94,7 +94,7 @@ class DiskSpaceError(RuntimeError):
 
 # ----------------------------------------------------------------------------------------- helpers
 def _windows(cfg) -> dict:
-    return cfgmod.parse_windows(cfg["windows"])
+    return cfgmod.windows_of(cfg)
 
 
 def _existing_ancestor(path: Path) -> Path:
