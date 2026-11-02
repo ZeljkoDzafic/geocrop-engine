@@ -75,3 +75,26 @@ def test_polygon_majority_and_target_macro_f1():
     s = metrics.summary(["a", "a", "b"], ["a", "b", "b"])
     assert metrics.target_macro_f1(s, ["a", "b"]) == pytest.approx((s["per_class"]["a"]["f1"] + s["per_class"]["b"]["f1"]) / 2)
     assert metrics.target_macro_f1(s, ["zzz"]) is None
+
+
+def test_parcel_means_use_each_features_own_valid_pixels(tmp_path):
+    path = tmp_path / "s.tif"
+    data = np.array([[[1, 9]], [[2, -9999]]], dtype="float32")   # P1 valid 2 px, P2 valid 1 px
+    with rasterio.open(path, "w", driver="GTiff", height=1, width=2, count=2, dtype="float32", crs="EPSG:32633",
+                       transform=from_origin(500000, 4900010, 10, 10), nodata=-9999) as ds:
+        ds.write(data)
+        ds.set_band_description(1, "P1_A")
+        ds.set_band_description(2, "P2_A")
+    poly = gpd.GeoDataFrame([{"polygon_id": "x", "class_name": "a", "geometry": box(500000, 4900000, 500020, 4900010)}],
+                            crs="EPSG:32633")
+    m = separability.parcel_means(path, poly, "class_name", ["a"], features=["P1_A", "P2_A"])
+    assert m.loc[0, "P1_A"] == pytest.approx(5.0) and m.loc[0, "P2_A"] == pytest.approx(2.0)
+
+
+def test_empty_group_selection_is_rejected(tmp_path):
+    stack = tmp_path / "s.tif"
+    _stack(stack)
+    with pytest.raises(ValueError, match="No period features match"):
+        separability.run(stack, tmp_path / "none.gpkg", "class_name", ["a", "b"], tmp_path / "o", groups=["seasonal"])
+    with pytest.raises(ValueError, match="No features selected"):
+        separability.parcel_means(stack, tmp_path / "none.gpkg", "class_name", ["a"], features=[])

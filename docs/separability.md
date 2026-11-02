@@ -16,6 +16,8 @@ Outputs (`out/separability/`): `parcel_means.csv`, `jm_all.csv` (feature x class
   are compared over polygons. A large parcel gets no more weight than a small one.
 - **Formula.** For univariate Gaussian classes, `B = (m1-m2)^2/(8v) + 0.5 ln(v/sqrt(v1 v2))` with
   `v = (v1+v2)/2`, and `JM = 2 (1 - exp(-B))`, in 0 (identical) to 2 (fully separable).
+- Validity is judged per feature: the mean of a feature uses only the pixels valid for that feature, so a cloudy
+  window does not change the scores of other windows. A polygon with no valid pixel of a feature gets NaN.
 - Pairs with fewer than 3 polygons in a class, or zero variance, give NaN, not a number.
 
 ## How to read it
