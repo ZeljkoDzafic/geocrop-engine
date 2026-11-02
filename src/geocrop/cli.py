@@ -1230,7 +1230,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .features import build_stack
         opts = {}
         if a.config:
-            from .config import load, parse_windows, windows_of
+            from .config import load, windows_of
             cfg = load(a.config)
             opts = {k: cfg["features"][k] for k in ("s2_bands", "s2_indices", "s1", "deltas", "seasonal")}
             opts["periods"] = list(windows_of(cfg)) or None
@@ -1835,7 +1835,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
 def _cube(a):
     """`geocrop cube load|import|export` (external data cubes; xarray, odc-stac, zarr are optional)."""
     from . import datacube as dc
-    from .config import load, parse_windows, windows_of
+    from .config import load, windows_of
     cfg = load(a.config) if getattr(a, "config", None) else None
     d = cfg["data"] if cfg else {}
     reference = getattr(a, "reference", None) or (cfg["grid"]["reference"] if cfg else None)
