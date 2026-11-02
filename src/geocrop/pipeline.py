@@ -262,7 +262,7 @@ class Runner:
     # ------------------------------------------------------------------ stages
     def composite(self):
         from . import s1, s2
-        windows = cfgmod.parse_windows(self.cfg["windows"])
+        windows = cfgmod.windows_of(self.cfg)
         if not windows:
             raise cfgmod.ConfigError("Define windows: in the configuration")
         c = self.cfg["compositing"]
@@ -405,7 +405,7 @@ class Runner:
     def features(self):
         from . import features
         f = self.cfg["features"]
-        periods = list(cfgmod.parse_windows(self.cfg["windows"])) or None
+        periods = list(cfgmod.windows_of(self.cfg)) or None
         comp = self.paths["composites"]
         inputs = sorted(p for p in comp.rglob("*.tif")) if comp.exists() else []
         t = self.cfg["timeseries"]

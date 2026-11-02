@@ -72,13 +72,13 @@ def discover(root: str | Path) -> list[dict]:
 
 
 def assign(scenes: list[dict], windows: dict[str, tuple[date, date]]) -> dict[str, list[dict]]:
-    """Group scenes by window (inclusive bounds). Scenes outside every window are dropped."""
+    """Group scenes by window (inclusive bounds). Scenes outside every window are dropped; with overlapping
+    windows (`compositing.allow_window_overlap`) a scene belongs to every window it falls in."""
     out = {name: [] for name in windows}
     for scene in scenes:
         for name, (start, end) in windows.items():
             if start <= scene["date"] <= end:
                 out[name].append(scene)
-                break
     return out
 
 

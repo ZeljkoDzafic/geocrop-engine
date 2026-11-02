@@ -33,6 +33,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "indices", "metrics", "model", "parcels", "plugins", "presto_encoder", "raster", "s1", "s2", "samples", "scenes",
         "parallel", "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
+        "separability",  # Jeffries-Matusita class separability from parcel means
         "calendars",     # data-driven crop calendars and phenological windows
         "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
         "cachedirs",     # download cache root and subfolders (environment variables only)

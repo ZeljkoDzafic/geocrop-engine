@@ -22,6 +22,26 @@ def summary(y_true, y_pred, labels=None) -> dict:
     return from_confusion(cm, labels)
 
 
+def polygon_majority(y_true, y_pred, polygon):
+    """One (reference label, majority predicted label) per polygon; ties go to the alphabetically first class.
+
+    Parcel-level scoring as used in many crop-mapping studies: pixels of a polygon vote, each polygon counts
+    once. A polygon has a single reference label; if it had several, the first one is kept."""
+    import pandas as pd
+    df = pd.DataFrame({"y": np.asarray(y_true).astype(str), "p": np.asarray(y_pred).astype(str),
+                       "g": np.asarray(polygon).astype(str)})
+    ref = df.groupby("g", sort=True)["y"].first()
+    pred = df.groupby("g", sort=True)["p"].agg(lambda v: sorted(v.value_counts().sort_index().items(),
+                                                                key=lambda kv: -kv[1])[0][0])
+    return ref.to_numpy(), pred.to_numpy()
+
+
+def target_macro_f1(summary_dict: dict, targets) -> float | None:
+    """Mean F1 over the target classes of a `summary`/`from_confusion` result (None if none is present)."""
+    f1 = [summary_dict["per_class"][t]["f1"] for t in targets or [] if t in summary_dict["per_class"]]
+    return float(sum(f1) / len(f1)) if f1 else None
+
+
 def from_confusion(cm, labels) -> dict:
     cm = np.asarray(cm, dtype=float)
     n = cm.sum()

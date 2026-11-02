@@ -232,6 +232,15 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--scenes", required=True)
     x.add_argument("--config", required=True)
 
+    x = cmd("separability", "Jeffries-Matusita separability of class pairs per period and feature (parcel means)")
+    x.add_argument("--stack", required=True, help="feature stack GeoTIFF (with its .features.json)")
+    x.add_argument("--polygons", required=True, help="reference polygons")
+    x.add_argument("--label-field", default="class_name")
+    x.add_argument("--id-field", default="polygon_id")
+    x.add_argument("--classes", nargs="+", required=True, help="classes to compare pairwise, e.g. maize soybean sunflower")
+    x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
+    x.add_argument("--out", required=True)
+
     # modelling
     x = cmd("features", "Build the multi-temporal feature stack")
     x.add_argument("--composites", required=True)
@@ -1210,18 +1219,21 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .s1 import composite
         print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic,
                         aoi=_aoi_from_args(a, a.reference)))
+    elif c == "separability":
+        from . import separability
+        _print(separability.run(a.stack, a.polygons, a.label_field, a.classes, a.out, a.id_field, a.groups))
     elif c == "inventory":
         from . import config, scenes
-        windows = config.parse_windows(config.load(a.config)["windows"])
+        windows = config.windows_of(config.load(a.config))
         _print(scenes.inventory(scenes.assign(scenes.discover(a.scenes), windows)))
     elif c == "features":
         from .features import build_stack
         opts = {}
         if a.config:
-            from .config import load, parse_windows
+            from .config import load, windows_of
             cfg = load(a.config)
             opts = {k: cfg["features"][k] for k in ("s2_bands", "s2_indices", "s1", "deltas", "seasonal")}
-            opts["periods"] = list(parse_windows(cfg["windows"])) or None
+            opts["periods"] = list(windows_of(cfg)) or None
         aoi = None
         if a.config and not a.aoi_mask and not a.no_aoi_mask:
             from .aoi import from_config
@@ -1823,7 +1835,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
 def _cube(a):
     """`geocrop cube load|import|export` (external data cubes; xarray, odc-stac, zarr are optional)."""
     from . import datacube as dc
-    from .config import load, parse_windows
+    from .config import load, windows_of
     cfg = load(a.config) if getattr(a, "config", None) else None
     d = cfg["data"] if cfg else {}
     reference = getattr(a, "reference", None) or (cfg["grid"]["reference"] if cfg else None)
@@ -1869,7 +1881,7 @@ def _cube(a):
                 if not out:
                     raise SystemExit("--out (or paths.composites in --config) is required")
                 c = cfg["compositing"] if cfg else {}
-                windows = parse_windows(cfg["windows"]) if cfg else None
+                windows = windows_of(cfg) if cfg else None
                 opts = {k: c[k] for k in ("statistic", "scl_invalid", "mask_dilation_px", "min_valid_observations",
                                           "temporal_screening") if k in c}
                 res = dc.cube_to_composites(a.cube, reference, out, windows, scenes_dir=a.keep_scenes, **opts, **kw)
@@ -1882,7 +1894,7 @@ def _cube(a):
             if a.kind == "scenes":
                 ds = dc.scenes_to_cube(src, a.start, a.end)
             elif a.kind == "composites":
-                ds = dc.composites_to_cube(src, parse_windows(cfg["windows"]) if cfg else None)
+                ds = dc.composites_to_cube(src, windows_of(cfg) if cfg else None)
             else:
                 ds = dc.stack_to_cube(src)
             path = dc.write_cube(ds, a.out, overwrite=a.overwrite)
