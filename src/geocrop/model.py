@@ -107,8 +107,11 @@ def check_params(params: dict, extra: dict, where: str = "model.params") -> None
                              "factory that forwards its parameters")
 
 
-def spatial_blocks(samples: Samples, block_m: float | None) -> np.ndarray:
-    """Block id per sample; every polygon is assigned to the block containing its pixel centroid."""
+def spatial_blocks(samples: Samples, block_m: float | None, offset_m: tuple[float, float] = (0.0, 0.0)) -> np.ndarray:
+    """Block id per sample; every polygon is assigned to the block containing its pixel centroid.
+
+    ``offset_m`` shifts the block grid origin (east, north) to build alternative partitions of the same size
+    (see `geocrop.stability`); the default (0, 0) is the standard grid."""
     if not block_m:
         return samples.polygon.copy()
     crs = CRS.from_user_input(samples.crs)
@@ -116,8 +119,8 @@ def spatial_blocks(samples: Samples, block_m: float | None) -> np.ndarray:
         raise ValueError("Spatial blocks require a projected CRS in metres (e.g. UTM)")
     frame = pd.DataFrame({"p": samples.polygon, "x": samples.x, "y": samples.yy})
     centre = frame.groupby("p")[["x", "y"]].mean()
-    block = (np.floor(centre.x / block_m).astype(int).astype(str) + ":" +
-             np.floor(centre.y / block_m).astype(int).astype(str))
+    block = (np.floor((centre.x - offset_m[0]) / block_m).astype(int).astype(str) + ":" +
+             np.floor((centre.y - offset_m[1]) / block_m).astype(int).astype(str))
     return block.reindex(samples.polygon).to_numpy()
 
 
@@ -227,9 +230,29 @@ def folds(y, groups, n_splits: int, seed: int, *, polygon=None, coordinates=None
         spatial_buffer_m=spatial_buffer_m, strategy=strategy)]
 
 
+def train_mask(polygon, exclude=(), max_per_polygon: int | None = None, seed: int = 42) -> np.ndarray:
+    """Samples eligible for TRAINING under the sensitivity controls; the test folds are never touched.
+
+    ``exclude`` removes whole polygons from training; ``max_per_polygon`` keeps a seeded random subset of each
+    polygon's pixels. The fold plan is built from all samples first, so the held-out polygons (and their pixels)
+    are identical with and without the control and the scores stay directly comparable.
+    """
+    polygon = np.asarray(polygon).astype(str)
+    keep = ~np.isin(polygon, [str(e) for e in exclude])
+    if max_per_polygon:
+        if max_per_polygon < 1:
+            raise ValueError("train_max_samples_per_polygon must be >= 1")
+        rng = np.random.default_rng(seed)
+        for pid in np.unique(polygon):
+            idx = np.flatnonzero(keep & (polygon == pid))
+            if len(idx) > max_per_polygon:
+                keep[rng.choice(idx, size=len(idx) - max_per_polygon, replace=False)] = False
+    return keep
+
+
 def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed: int = 42,
                    bootstrap: int = 0, *, coordinates=None, crs=None, spatial_buffer_m: float = 0,
-                   strategy: str = "spatial_blocks") -> dict:
+                   strategy: str = "spatial_blocks", train_ok=None) -> dict:
     """Out-of-fold predictions across spatial folds; metrics pooled over all folds plus per-fold spread.
 
     With a group `strategy` (region, year, region_year) `groups` must hold those group ids (see `cv_groups`);
@@ -244,6 +267,9 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
     plan = _fold_plan(y, groups, n_splits, seed, polygon=polygon, coordinates=coordinates, crs=crs,
                       spatial_buffer_m=spatial_buffer_m, strategy=strategy)
     for k, (tr, te, diagnostics) in enumerate(plan):
+        if train_ok is not None:      # sensitivity controls act on the training side only (see `train_mask`)
+            tr = tr[np.asarray(train_ok)[tr]]
+            diagnostics["n_train"] = int(len(tr))
         rf = make_rf(params, seed + k).fit(X[tr], y[tr])
         oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
@@ -508,7 +534,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
           conformal_alphas=(0.05, 0.1, 0.2), spatial_buffer_m: float = 0,
           calibration_mode: str = "oof", calibration_fraction: float = 0.2, holdout_fraction: float = 0.0,
           refit_all: bool = True, inner_splits: int = 3, cv_strategy: str = "spatial_blocks",
-          allow_missing_classes: bool = False) -> dict:
+          allow_missing_classes: bool = False, train_exclude=(), train_max_samples_per_polygon: int | None = None) -> dict:
     """Spatial CV (optionally after tuning), then fit the mapping model on its proper-training samples.
 
     From the out-of-fold probabilities it also fits a temperature (calibration), empirical
@@ -548,12 +574,23 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     y = samples.y
     params = dict(params or {"n_estimators": 500, "max_features": "sqrt", "class_weight": "balanced_subsample", "n_jobs": -1})
     params = sequence_params(params, features)
+    controls = bool(len(train_exclude) or train_max_samples_per_polygon)
+    if controls and tune_grid:
+        raise ValueError("train_exclude / train_max_samples_per_polygon cannot be combined with a tuning grid: "
+                         "the inner folds would not keep the fixed test polygons")
+    train_ok = train_mask(samples.polygon, train_exclude, train_max_samples_per_polygon, seed) if controls else None
     report: dict = {"features": len(features), "samples": int(len(y)), "polygons": int(len(np.unique(samples.polygon))),
                     "spatial_groups": int(len(np.unique(groups))), "spatial_block_m": spatial_block_m,
                     "class_counts": pd.Series(y).value_counts().to_dict(),
                     "polygon_counts": pd.Series(samples.polygon).groupby(y).nunique().to_dict()}
     if missing_classes:
         report["reference_classes_without_samples"] = missing_classes
+    if controls:
+        report["train_controls"] = {
+            "excluded_polygons": sorted(map(str, train_exclude)),
+            "max_samples_per_polygon": train_max_samples_per_polygon,
+            "training_samples_kept": int(train_ok.sum()), "samples_total": int(len(y)),
+            "note": "Applied to training only; test folds are the unchanged plan of all samples."}
     spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
                "spatial_buffer_m": spatial_buffer_m}
     report["spatial_buffer_m"] = spatial_buffer_m
@@ -571,7 +608,8 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
         report["tuning"] = tune(X, y, samples.polygon, groups, params, tune_grid, n_splits, seed, **spatial)
         params.update(report["tuning"]["best_params"])
     report["params"] = params
-    cv = cross_validate(X, y, samples.polygon, groups, params, n_splits, seed, bootstrap, **spatial)
+    cv = cross_validate(X, y, samples.polygon, groups, params, n_splits, seed, bootstrap,
+                        train_ok=train_ok, **spatial)
     if tune_grid:
         cv["note"] += " Parameters were tuned on these folds: use nested_cv for performance."
     report["cross_validation"] = cv
@@ -600,7 +638,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     poly.to_csv(out / "oof_polygons.csv", index=False)
     oof_pixels(samples, groups, oof, oof_proba, classes).to_csv(out / "oof_pixels.csv", index=False)
     suspects = uncertainty.suspect_labels(poly)
-    model = make_estimator(params, seed).fit(X, y)
+    model = make_estimator(params, seed).fit(*((X, y) if train_ok is None else (X[train_ok], y[train_ok])))
     if calibration is not None:
         cp = uncertainty.apply_temperature(model.predict_proba(calibration.subset(features)), temperature)
         poly = uncertainty.polygon_oof(cp, calibration.y, calibration.polygon, classes)
@@ -656,7 +694,9 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
             groups = spatial_blocks(samples, spatial_block_m)
             spatial = {"coordinates": np.column_stack([samples.x, samples.yy]), "crs": samples.crs,
                        "spatial_buffer_m": spatial_buffer_m}
-            model = make_estimator(params, seed).fit(X, y)
+            if controls:
+                train_ok = train_mask(samples.polygon, train_exclude, train_max_samples_per_polygon, seed)
+            model = make_estimator(params, seed).fit(*((X, y) if train_ok is None else (X[train_ok], y[train_ok])))
         report["refit_after_holdout"] = bool(refit_all and calibration_mode == "oof")
     report["final_model_samples"] = int(len(y))
     imp = importances(model, len(features))

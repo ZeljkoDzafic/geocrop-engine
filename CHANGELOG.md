@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Sensitivity and review tools ([docs/sensitivity.md](docs/sensitivity.md)): `model.train_exclude_polygons` and
+  `model.train_max_samples_per_polygon` change training only while the test folds stay fixed; the samples stage
+  writes `skipped_polygons.csv` with a reason per skipped polygon; new commands `cv-stability` (CV over alternative
+  block partitions), `parcel-aggregate` (majority, mean probability and thresholded parcel decisions, threshold fitted
+  on the other spatial groups), `profiles` (temporal profiles of chosen polygons against class bands) and
+  `cloud-score` (attach Cloud Score+ style clearness rasters as `CLDPRB.tif`). `model.spatial_blocks` accepts a grid
+  offset.
 - `geocrop train` also writes `model/oof_pixels.csv`: one row per training pixel with coordinates, spatial group,
   label, out-of-fold prediction and (temperature-scaled) class probabilities, next to `oof_polygons.csv`.
 - Class separability ([docs/separability.md](docs/separability.md)): `geocrop separability` computes parcel-mean

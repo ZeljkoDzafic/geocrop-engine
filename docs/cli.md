@@ -280,6 +280,60 @@ Jeffries-Matusita separability of class pairs per period and feature (parcel mea
 | `--groups` |  |  | feature groups to include (default: all period features) |
 | `--out` | yes |  |  |
 
+## `geocrop cv-stability`
+
+Spatial-block CV repeated over alternative block partitions (sensitivity to the split)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  | samples.npz written by the samples stage |
+| `--block-sizes` |  | `[5000]` | block sizes in metres |
+| `--offsets` |  | `4` | shifted grid origins per block size |
+| `--n-estimators` |  | `300` |  |
+| `--cv-folds` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--targets` |  | `[]` | target classes for the target macro F1 |
+| `--train-exclude` |  | `[]` | polygon ids left out of training only |
+| `--train-max-samples` |  |  | cap pixels per polygon in training only |
+| `--out` | yes |  |  |
+
+## `geocrop parcel-aggregate`
+
+Compare majority, mean-probability and thresholded parcel decisions from oof_pixels.csv
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--oof-pixels` | yes |  | model/oof_pixels.csv written by train |
+| `--targets` |  | `[]` |  |
+| `--target-accuracy` |  | `0.95` | accuracy the accepted polygons should reach |
+| `--threshold` |  |  | fixed confidence threshold instead of fitting it per group |
+| `--out` | yes |  |  |
+
+## `geocrop profiles`
+
+Temporal profiles of selected polygons against class bands (label review)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--stack` | yes |  | time-series stack with <family>_d<day> features |
+| `--polygons` | yes |  |  |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `polygon_id` |  |
+| `--highlight` | yes |  | polygon ids to plot against the class bands |
+| `--classes` | yes |  | classes forming the bands |
+| `--families` |  |  | feature families, e.g. ts_NDVI ts_NDRE (default: all) |
+| `--out` | yes |  |  |
+
+## `geocrop cloud-score`
+
+Attach Cloud Score+ style clearness rasters to Sentinel-2 scenes as CLDPRB masks
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  | imported scene folders (each with SCL.tif) |
+| `--scores` | yes |  | folder with <scene folder name>.tif clearness rasters (0-1) |
+| `--overwrite` |  |  |  |
+
 ## `geocrop features`
 
 Build the multi-temporal feature stack

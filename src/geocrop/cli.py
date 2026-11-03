@@ -241,6 +241,40 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
     x.add_argument("--out", required=True)
 
+    x = cmd("cv-stability", "Spatial-block CV repeated over alternative block partitions (sensitivity to the split)")
+    x.add_argument("--samples", required=True, help="samples.npz written by the samples stage")
+    x.add_argument("--block-sizes", type=float, nargs="+", default=[5000], help="block sizes in metres")
+    x.add_argument("--offsets", type=int, default=4, help="shifted grid origins per block size")
+    x.add_argument("--n-estimators", type=int, default=300)
+    x.add_argument("--cv-folds", type=int, default=5)
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--targets", nargs="*", default=[], help="target classes for the target macro F1")
+    x.add_argument("--train-exclude", nargs="*", default=[], help="polygon ids left out of training only")
+    x.add_argument("--train-max-samples", type=int, help="cap pixels per polygon in training only")
+    x.add_argument("--out", required=True)
+
+    x = cmd("parcel-aggregate", "Compare majority, mean-probability and thresholded parcel decisions from oof_pixels.csv")
+    x.add_argument("--oof-pixels", required=True, help="model/oof_pixels.csv written by train")
+    x.add_argument("--targets", nargs="*", default=[])
+    x.add_argument("--target-accuracy", type=float, default=0.95, help="accuracy the accepted polygons should reach")
+    x.add_argument("--threshold", type=float, help="fixed confidence threshold instead of fitting it per group")
+    x.add_argument("--out", required=True)
+
+    x = cmd("profiles", "Temporal profiles of selected polygons against class bands (label review)")
+    x.add_argument("--stack", required=True, help="time-series stack with <family>_d<day> features")
+    x.add_argument("--polygons", required=True)
+    x.add_argument("--label-field", default="class_name")
+    x.add_argument("--id-field", default="polygon_id")
+    x.add_argument("--highlight", nargs="+", required=True, help="polygon ids to plot against the class bands")
+    x.add_argument("--classes", nargs="+", required=True, help="classes forming the bands")
+    x.add_argument("--families", nargs="*", help="feature families, e.g. ts_NDVI ts_NDRE (default: all)")
+    x.add_argument("--out", required=True)
+
+    x = cmd("cloud-score", "Attach Cloud Score+ style clearness rasters to Sentinel-2 scenes as CLDPRB masks")
+    x.add_argument("--scenes", required=True, help="imported scene folders (each with SCL.tif)")
+    x.add_argument("--scores", required=True, help="folder with <scene folder name>.tif clearness rasters (0-1)")
+    x.add_argument("--overwrite", action="store_true")
+
     # modelling
     x = cmd("features", "Build the multi-temporal feature stack")
     x.add_argument("--composites", required=True)
@@ -1219,6 +1253,27 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .s1 import composite
         print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic,
                         aoi=_aoi_from_args(a, a.reference)))
+    elif c == "cv-stability":
+        from . import stability
+        from .samples import Samples
+        r = stability.run(Samples.load(a.samples), {"n_estimators": a.n_estimators, "class_weight": "balanced_subsample",
+                          "max_features": "sqrt", "n_jobs": -1}, a.block_sizes, a.offsets, a.cv_folds, a.seed, a.targets,
+                          train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out)
+        r.pop("table")
+        _print(r)
+    elif c == "parcel-aggregate":
+        import pandas as pd
+
+        from . import aggregation
+        r = aggregation.compare(pd.read_csv(a.oof_pixels), a.targets, a.target_accuracy, a.threshold, a.out)
+        r.pop("table")
+        _print(r)
+    elif c == "profiles":
+        from . import profiles
+        _print(profiles.run(a.stack, a.polygons, a.label_field, a.highlight, a.classes, a.out, a.id_field, a.families))
+    elif c == "cloud-score":
+        from . import cloudscore
+        _print(cloudscore.attach(a.scenes, a.scores, a.overwrite))
     elif c == "separability":
         from . import separability
         _print(separability.run(a.stack, a.polygons, a.label_field, a.classes, a.out, a.id_field, a.groups))

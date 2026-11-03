@@ -506,7 +506,7 @@ class Runner:
                 selected = select(load_manifest(self.paths["features"]), groups=m["feature_groups"])
             s = extract(self.paths["features"], self.paths["training"], label_field=cl["label_field"],
                         id_field=cl["id_field"], max_per_polygon=m["max_samples_per_polygon"], seed=self.cfg["seed"],
-                        features=selected, **groups)
+                        features=selected, skipped_report=self.out / "skipped_polygons.csv", **groups)
             s.save(target)
             return {"samples": int(len(s.y)), "polygons": int(len(set(s.polygon)))}
         return self.stage("samples", fp, [target], run)
@@ -539,7 +539,9 @@ class Runner:
                             calibration_mode=m.get("calibration_mode", "oof"),
                             calibration_fraction=m.get("calibration_fraction", 0.2),
                             holdout_fraction=m["holdout_fraction"], inner_splits=m["inner_splits"],
-                            allow_missing_classes=m.get("allow_missing_classes", False), **extra)
+                            allow_missing_classes=m.get("allow_missing_classes", False),
+                            train_exclude=m.get("train_exclude_polygons", []),
+                            train_max_samples_per_polygon=m.get("train_max_samples_per_polygon"), **extra)
             info = {"cv_macro_f1": r["cross_validation"]["macro_f1"],
                     "cv_oa": r["cross_validation"]["overall_accuracy"]}
             if "transfer_validation" in r:

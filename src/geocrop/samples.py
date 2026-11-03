@@ -207,7 +207,8 @@ def check_classes(samples: Samples, allow_missing: bool = False, where: str = "s
 def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_field: str = "class_name",
             id_field: str = "polygon_id", max_per_polygon: int | None = 250, inner_buffer_m: float = 0.0,
             seed: int = 42, region_field: str | None = None, year_field: str | None = None,
-            year: str | int | None = None, features: list[str] | None = None) -> Samples:
+            year: str | int | None = None, features: list[str] | None = None,
+            skipped_report: str | Path | None = None) -> Samples:
     """Sample valid pixels whose centres fall inside each reference polygon.
 
     max_per_polygon caps large polygons so they do not dominate a class; inner_buffer_m
@@ -248,6 +249,7 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
     X, y, pid, xs, ys, regions, years = [], [], [], [], [], [], []
     intersecting = 0
     emptied: dict[str, int] = {}          # class -> polygons inside the stack without any fully valid pixel
+    skipped: list[tuple] = []             # (polygon, class, reason, area_m2, pixel centres inside)
     with open_input(stack, "Feature stack") as ds:
         gdf = gdf.to_crs(ds.crs)
         if inner_buffer_m:
@@ -264,10 +266,13 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
         intersecting_classes: set[str] = set()
         for row in gdf.itertuples():
             geom = row.geometry
+            ident0, label0 = str(getattr(row, id_field)), str(getattr(row, label_field))
             if geom is None or geom.is_empty:
+                skipped.append((ident0, label0, "empty geometry", 0.0, 0))
                 continue
             win = polygon_window(geom, ds)
             if win is None:
+                skipped.append((ident0, label0, "outside the feature-stack extent", float(geom.area), 0))
                 continue
             intersecting += 1
             intersecting_classes.add(str(getattr(row, label_field)))
@@ -278,6 +283,11 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             if len(rr) == 0:
                 cls = str(getattr(row, label_field))
                 emptied[cls] = emptied.get(cls, 0) + 1
+                n_inside = int(inside.sum())
+                skipped.append((ident0, cls, ("no pixel centre inside the polygon (smaller than one pixel)"
+                                              if n_inside == 0 else
+                                              "no pixel valid for every selected feature (nodata/NaN)"),
+                                float(geom.area), n_inside))
                 continue
             if max_per_polygon and len(rr) > max_per_polygon:
                 keep = rng.choice(len(rr), size=max_per_polygon, replace=False)
@@ -295,6 +305,11 @@ def extract(stack: str | Path, polygons: str | Path | gpd.GeoDataFrame, label_fi
             ys.append(np.asarray(py))
         crs = ds.crs.to_string()
         stack_name, bounds = ds.name, tuple(round(b, 1) for b in ds.bounds)
+    if skipped_report is not None:
+        import pandas as pd
+        Path(skipped_report).parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(skipped, columns=["polygon", "class", "reason", "area_m2", "pixel_centres_inside"]
+                     ).to_csv(skipped_report, index=False)
     if not X:
         if not intersecting:
             raise ValueError(f"No {source} intersect feature stack {stack_name} (bounds {bounds}, {crs}); "
