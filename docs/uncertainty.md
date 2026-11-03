@@ -78,6 +78,11 @@ extrapolating there, e.g. on crops, soils or management absent from the referenc
 another class exceeds 0.6 (confident-learning principle; Northcutt et al., 2021). They are candidates for
 re-interpretation by the analyst, not automatic corrections.
 
+`oof_pixels.csv` holds the pixel-level out-of-fold result behind it: per training pixel the coordinates, spatial
+group, label, out-of-fold prediction and temperature-scaled probabilities. Use it to see why a polygon is flagged
+(how many of its pixels were misclassified) and to compare out-of-fold predictions with the final map, which is
+trained on every polygon and therefore reproduces the training labels by construction.
+
 ## Spatial autocorrelation and block size
 `geocrop variogram --samples samples.npz --out variogram.json` fits a spherical semivariogram to the first
 principal component of the polygon-mean features. Its range is an exploratory covariate diagnostic,

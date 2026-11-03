@@ -66,6 +66,12 @@ def test_train_and_predict(samples, stack, tmp_path):
         assert set(np.unique(ds.read(1))) <= set(range(len(out["legend"])))
     rep_json = json.loads((tmp_path / "m" / "train_report.json").read_text())
     assert "_oof" not in rep_json["cross_validation"]
+    import pandas as pd
+    px = pd.read_csv(tmp_path / "m" / "oof_pixels.csv")
+    assert len(px) == len(samples.y) and {"x", "y", "spatial_group", "label", "predicted", "oof_done"} <= set(px)
+    pcols = [c for c in px if c.startswith("p_")]
+    assert pcols and np.allclose(px.loc[px.oof_done, pcols].sum(axis=1), 1, atol=1e-4)
+    assert (px.predicted[px.oof_done] != "").all()
 
 
 def test_tuning_grid(samples, tmp_path):

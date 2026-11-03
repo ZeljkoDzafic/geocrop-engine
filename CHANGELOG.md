@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `geocrop train` also writes `model/oof_pixels.csv`: one row per training pixel with coordinates, spatial group,
+  label, out-of-fold prediction and (temperature-scaled) class probabilities, next to `oof_polygons.csv`.
 - Class separability ([docs/separability.md](docs/separability.md)): `geocrop separability` computes parcel-mean
   Jeffries-Matusita distances per period, feature and class pair (new module `geocrop.separability`). Experiments
   now report `target_macro_f1` (mean F1 of `classes.targets`). `compositing.allow_window_overlap` (default false)

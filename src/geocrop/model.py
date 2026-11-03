@@ -487,6 +487,21 @@ def selection_samples(samples: Samples, spatial_block_m: float | None = 5000, se
     return samples.take(fit), split
 
 
+def oof_pixels(samples: Samples, groups, oof, oof_proba, classes) -> pd.DataFrame:
+    """One row per training pixel: coordinates, spatial group, label, out-of-fold prediction and probabilities.
+
+    ``oof_proba`` is the (temperature-scaled) out-of-fold probability matrix. A pixel left out of every test fold
+    (spatial buffer) has ``oof_done`` False and no prediction.
+    """
+    done = np.asarray(oof) != "None"
+    table = pd.DataFrame({"polygon": samples.polygon, "x": samples.x, "y": samples.yy,
+                          "spatial_group": np.asarray(groups), "label": samples.y,
+                          "predicted": np.where(done, np.asarray(oof), ""), "oof_done": done})
+    for k, c in enumerate(classes):
+        table[f"p_{c}"] = np.where(done, oof_proba[:, k], np.nan)
+    return table
+
+
 def train(samples: Samples, output_dir: str | Path, features: list[str] | None = None, params: dict | None = None,
           n_splits: int = 5, spatial_block_m: float | None = 5000, seed: int = 42, tune_grid: dict | None = None,
           bootstrap: int = 1000, provenance: dict | None = None, calibrate: bool = True,
@@ -573,7 +588,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
         pd.DataFrame([{k: v for k, v in r.items() if not isinstance(v, (list, dict))} for r in tv["per_group"]]
                      ).to_csv(out / "transfer_per_group.csv", index=False)
     report["cv_strategy"] = cv_strategy
-    cv.pop("_oof")
+    oof = cv.pop("_oof")
     oof_proba, classes = cv.pop("_oof_proba"), cv.pop("_classes")
     temperature = 1.0
     if calibrate:
@@ -583,6 +598,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     cv["temperature"] = temperature
     poly = uncertainty.polygon_oof(oof_proba, y, samples.polygon, classes)
     poly.to_csv(out / "oof_polygons.csv", index=False)
+    oof_pixels(samples, groups, oof, oof_proba, classes).to_csv(out / "oof_pixels.csv", index=False)
     suspects = uncertainty.suspect_labels(poly)
     model = make_estimator(params, seed).fit(X, y)
     if calibration is not None:
