@@ -71,6 +71,18 @@ def test_stability_reports_spread(samples, tmp_path):
         stability.partitions([500], 0)
 
 
+def test_stability_polygon_cv_and_watch(samples, tmp_path):
+    pid = str(samples.polygon[0])
+    r = stability.run(samples, {"n_estimators": 8, "n_jobs": 1}, block_sizes_m=(500,), n_offsets=1, n_splits=2,
+                      targets=[str(samples.y[0])], out=tmp_path, polygon_repeats=2, watch=[pid, "missing"],
+                      radii_m=(100, 1000))
+    kinds = set(r["table"]["kind"])
+    assert "polygon_stratified" in kinds
+    w = r["watch_table"]
+    assert set(w["polygon_id"]) == {pid} and "same_class_training_within_1000m" in w
+    assert (tmp_path / "watch_polygons.csv").exists() and list((tmp_path / "confusion").glob("*.csv"))
+
+
 def _pixels():
     rng = np.random.default_rng(0)
     rows = []

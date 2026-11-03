@@ -251,6 +251,9 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--targets", nargs="*", default=[], help="target classes for the target macro F1")
     x.add_argument("--train-exclude", nargs="*", default=[], help="polygon ids left out of training only")
     x.add_argument("--train-max-samples", type=int, help="cap pixels per polygon in training only")
+    x.add_argument("--polygon-repeats", type=int, default=0, help="repeats of stratified polygon-grouped k-fold CV")
+    x.add_argument("--watch", nargs="*", default=[], help="polygon ids whose OOF decision and nearby training data are recorded")
+    x.add_argument("--radii", type=float, nargs="+", default=[2000, 5000, 10000], help="radii (m) for nearby same-class training polygons")
     x.add_argument("--out", required=True)
 
     x = cmd("parcel-aggregate", "Compare majority, mean-probability and thresholded parcel decisions from oof_pixels.csv")
@@ -1258,8 +1261,10 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .samples import Samples
         r = stability.run(Samples.load(a.samples), {"n_estimators": a.n_estimators, "class_weight": "balanced_subsample",
                           "max_features": "sqrt", "n_jobs": -1}, a.block_sizes, a.offsets, a.cv_folds, a.seed, a.targets,
-                          train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out)
+                          train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out,
+                          polygon_repeats=a.polygon_repeats, watch=a.watch, radii_m=a.radii)
         r.pop("table")
+        r.pop("watch_table")
         _print(r)
     elif c == "parcel-aggregate":
         import pandas as pd

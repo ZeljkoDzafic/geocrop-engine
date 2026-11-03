@@ -295,6 +295,9 @@ Spatial-block CV repeated over alternative block partitions (sensitivity to the 
 | `--targets` |  | `[]` | target classes for the target macro F1 |
 | `--train-exclude` |  | `[]` | polygon ids left out of training only |
 | `--train-max-samples` |  |  | cap pixels per polygon in training only |
+| `--polygon-repeats` |  |  | repeats of stratified polygon-grouped k-fold CV |
+| `--watch` |  | `[]` | polygon ids whose OOF decision and nearby training data are recorded |
+| `--radii` |  | `[2000, 5000, 10000]` | radii (m) for nearby same-class training polygons |
 | `--out` | yes |  |  |
 
 ## `geocrop parcel-aggregate`

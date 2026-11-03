@@ -8,7 +8,8 @@
   block partitions), `parcel-aggregate` (majority, mean probability and thresholded parcel decisions, threshold fitted
   on the other spatial groups), `profiles` (temporal profiles of chosen polygons against class bands) and
   `cloud-score` (attach Cloud Score+ style clearness rasters as `CLDPRB.tif`). `model.spatial_blocks` accepts a grid
-  offset.
+  offset. `cv-stability` also writes per-variant confusion matrices, can add stratified polygon-grouped CV
+  (`--polygon-repeats`) and tracks chosen polygons (`--watch`, `--radii`) in `watch_polygons.csv`.
 - `geocrop train` also writes `model/oof_pixels.csv`: one row per training pixel with coordinates, spatial group,
   label, out-of-fold prediction and (temperature-scaled) class probabilities, next to `oof_polygons.csv`.
 - Class separability ([docs/separability.md](docs/separability.md)): `geocrop separability` computes parcel-mean

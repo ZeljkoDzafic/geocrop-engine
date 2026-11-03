@@ -40,6 +40,18 @@ block in every partition. The spread is sensitivity to the partition, not a conf
     geocrop cv-stability --samples out/samples.npz --block-sizes 3000 5000 8000 --offsets 4 \
         --targets maize soybean sunflower --out out/stability
 
+Further outputs: `confusion/<variant>.csv` (pixel confusion matrix of every variant) and per-class F1 columns for the
+targets. `--polygon-repeats N` adds N repeats of stratified polygon-grouped k-fold CV (whole polygons held out,
+neighbouring polygons stay in training, so it is less strict than block CV); it shows whether a result depends on
+how blocks group the polygons. The table also lists, per variant, the smallest number of test polygons of any class
+in a fold and how many folds lack a class completely.
+
+`--watch ID ...` writes `watch_polygons.csv`: for each variant and watched polygon the out-of-fold majority
+decision, the share of pixels predicted as the true class, the fold and group, how many other watched polygons were
+held out in the same fold, how many same-class polygons share its group, and how many same-class polygons remain in
+training within `--radii` metres of its centroid. This separates "misclassified whenever its neighbours are held
+out too" from "misclassified in every configuration".
+
 ## Parcel-level aggregation: `geocrop parcel-aggregate`
 
 From `oof_pixels.csv` it compares, on the same polygons: `majority` (pixel votes), `mean_prob` (mean pixel
