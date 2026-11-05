@@ -52,6 +52,24 @@ held out in the same fold, how many same-class polygons share its group, and how
 training within `--radii` metres of its centroid. This separates "misclassified whenever its neighbours are held
 out too" from "misclassified in every configuration".
 
+## Relabelling for training only: `--train-relabel ID=CLASS`
+
+A sensitivity experiment for atypical samples: in `cv-stability` the listed polygons are treated as another class
+*in training only*. Fold plans, test pixels and every score keep the true labels, so the run can be compared with the
+untouched one fold by fold. The table adds `*_unrelabelled` columns (overall accuracy, precision, recall and F1 of the
+target classes on the polygons that were not relabelled), which show whether the other polygons of those classes are
+affected. It measures sensitivity of the model, not which label is correct, and it is not used to change reference
+labels.
+
+## Timing of seasonal curves: `geocrop phenology-timing`
+
+From the `profiles.csv` of `geocrop profiles` it computes for every polygon and family the start (`sos`), peak,
+end (`eos`) and length (`gsl`) of the seasonal curve (days where the interpolated curve crosses a fraction of its
+amplitude, default 0.5), the offset of highlighted polygons from each class median and their rank within their own
+class, and a time alignment: the shift (days, ±`--max-shift-days`) that minimises the RMSE to each class median curve
+with the RMSE before and after it. Resolution is the composite step. The output is descriptive; it does not show that a
+label is wrong.
+
 ## Parcel-level aggregation: `geocrop parcel-aggregate`
 
 From `oof_pixels.csv` it compares, on the same polygons: `majority` (pixel votes), `mean_prob` (mean pixel

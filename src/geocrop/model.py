@@ -250,9 +250,31 @@ def train_mask(polygon, exclude=(), max_per_polygon: int | None = None, seed: in
     return keep
 
 
+def train_labels(y, polygon, relabel: dict) -> np.ndarray:
+    """Training labels with whole polygons temporarily assigned another class (sensitivity experiment).
+
+    Only for training inside cross-validation: the fold plan and every score keep using the true labels, so the
+    result shows how sensitive the model is to atypical samples, not which label is right. Unknown polygon ids
+    or a class absent from the labels raise ``ValueError``.
+    """
+    y = np.asarray(y).astype(str)
+    polygon = np.asarray(polygon).astype(str)
+    relabel = {str(k): str(v) for k, v in relabel.items()}
+    unknown = sorted(set(relabel) - set(polygon))
+    if unknown:
+        raise ValueError(f"train_relabel: polygons not in the samples: {unknown}")
+    absent = sorted(set(relabel.values()) - set(y))
+    if absent:
+        raise ValueError(f"train_relabel: classes not present in the samples: {absent}")
+    out = y.copy()
+    for pid, cls in relabel.items():
+        out[polygon == pid] = cls
+    return out
+
+
 def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed: int = 42,
                    bootstrap: int = 0, *, coordinates=None, crs=None, spatial_buffer_m: float = 0,
-                   strategy: str = "spatial_blocks", train_ok=None) -> dict:
+                   strategy: str = "spatial_blocks", train_ok=None, train_y=None) -> dict:
     """Out-of-fold predictions across spatial folds; metrics pooled over all folds plus per-fold spread.
 
     With a group `strategy` (region, year, region_year) `groups` must hold those group ids (see `cv_groups`);
@@ -270,7 +292,8 @@ def cross_validate(X, y, polygon, groups, params: dict, n_splits: int = 5, seed:
         if train_ok is not None:      # sensitivity controls act on the training side only (see `train_mask`)
             tr = tr[np.asarray(train_ok)[tr]]
             diagnostics["n_train"] = int(len(tr))
-        rf = make_rf(params, seed + k).fit(X[tr], y[tr])
+        fit_y = y if train_y is None else np.asarray(train_y)   # relabelled classes reach the fit only
+        rf = make_rf(params, seed + k).fit(X[tr], fit_y[tr])
         oof[te] = predict_labels(rf, X[te])
         proba = np.zeros((len(te), len(classes)), dtype="float32")
         proba[:, np.searchsorted(classes, rf.classes_)] = rf.predict_proba(X[te])

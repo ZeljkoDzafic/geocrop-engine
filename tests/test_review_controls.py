@@ -156,3 +156,38 @@ def test_cloud_score_attach(tmp_path):
         prob = d.read(1)
     assert prob[3, 3] == 10 and prob[0, 0] == 50
     assert cloudscore.attach(tmp_path / "scenes", scores)["already_present"] == 1
+
+
+def test_train_labels_and_relabel_in_stability(samples, tmp_path):
+    pid = str(samples.polygon[0])
+    other = next(c for c in np.unique(samples.y) if c != samples.y[0])
+    y2 = model.train_labels(samples.y, samples.polygon, {pid: other})
+    assert (y2[samples.polygon == pid] == other).all() and (y2[samples.polygon != pid] == samples.y[samples.polygon != pid]).all()
+    with pytest.raises(ValueError):
+        model.train_labels(samples.y, samples.polygon, {"nope": other})
+    with pytest.raises(ValueError):
+        model.train_labels(samples.y, samples.polygon, {pid: "not_a_class"})
+    r = stability.run(samples, {"n_estimators": 8, "n_jobs": 1}, block_sizes_m=(500,), n_offsets=1, n_splits=2,
+                      targets=[str(samples.y[0])], train_relabel={pid: other}, watch=[pid], out=tmp_path)
+    assert r["train_controls"]["relabelled_for_training_only"] == {pid: other}
+    assert any(c.endswith("_unrelabelled") for c in r["table"].columns)
+    assert any(c.startswith("mean_p_") for c in r["watch_table"].columns)
+
+
+def test_phenology_timing_and_alignment(tmp_path):
+    from geocrop import phenotiming
+    days = list(range(91, 280, 15))
+    rows = []
+    for pid, cls, role, shift in [("a", "x", "reference", 0), ("b", "x", "reference", 3),
+                                  ("c", "x", "highlight", -30), ("d", "y", "reference", 40)]:
+        for d in days:
+            v = np.exp(-((d - 190 - shift) / 35.0) ** 2)
+            rows.append({"polygon": pid, "class": cls, "value": v, "family": "ts_NDVI", "doy": d, "role": role})
+    pd.DataFrame(rows).to_csv(tmp_path / "p.csv", index=False)
+    r = phenotiming.run(tmp_path / "p.csv", ["x", "y"], tmp_path / "o")
+    rel = pd.read_csv(tmp_path / "o" / "phenology_highlight_vs_classes.csv").iloc[0]
+    assert r["polygons"] == 4
+    assert rel["peak_doy_minus_x_median"] < -20
+    assert abs(rel["best_shift_days_x"] - 30) <= 3 and rel["rmse_aligned_x"] < rel["rmse_x"]
+    with pytest.raises(ValueError):
+        phenotiming.run(tmp_path / "p.csv", ["x"], tmp_path / "o2", fraction=1.5)

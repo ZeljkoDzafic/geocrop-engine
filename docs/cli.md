@@ -295,9 +295,22 @@ Spatial-block CV repeated over alternative block partitions (sensitivity to the 
 | `--targets` |  | `[]` | target classes for the target macro F1 |
 | `--train-exclude` |  | `[]` | polygon ids left out of training only |
 | `--train-max-samples` |  |  | cap pixels per polygon in training only |
+| `--train-relabel` |  | `[]` | training-only sensitivity: treat polygon ID as CLASS in training; scores keep the true labels |
 | `--polygon-repeats` |  |  | repeats of stratified polygon-grouped k-fold CV |
 | `--watch` |  | `[]` | polygon ids whose OOF decision and nearby training data are recorded |
 | `--radii` |  | `[2000, 5000, 10000]` | radii (m) for nearby same-class training polygons |
+| `--out` | yes |  |  |
+
+## `geocrop phenology-timing`
+
+Start, peak, end and length of the seasonal curve and time alignment, from profiles.csv
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--profiles` | yes |  | profiles.csv written by `geocrop profiles` |
+| `--classes` | yes |  |  |
+| `--fraction` |  | `0.5` | share of the amplitude that defines start and end |
+| `--max-shift-days` |  | `45` |  |
 | `--out` | yes |  |  |
 
 ## `geocrop parcel-aggregate`

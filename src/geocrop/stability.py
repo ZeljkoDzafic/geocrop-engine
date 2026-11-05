@@ -37,7 +37,8 @@ def _centroids(samples: Samples) -> pd.DataFrame:
     return pd.DataFrame({"p": samples.polygon, "x": samples.x, "y": samples.yy}).groupby("p")[["x", "y"]].mean()
 
 
-def _watch_rows(variant: dict, samples: Samples, groups, oof, folds, watch, radii_m, train_ok) -> list[dict]:
+def _watch_rows(variant: dict, samples: Samples, groups, oof, folds, watch, radii_m, train_ok,
+                proba=None, classes=()) -> list[dict]:
     """OOF decision of each watched polygon plus how much same-class training data stayed nearby."""
     centre = _centroids(samples)
     poly_class = pd.Series(samples.y, index=samples.polygon).groupby(level=0).first()
@@ -62,6 +63,9 @@ def _watch_rows(variant: dict, samples: Samples, groups, oof, folds, watch, radi
                "watched_polygons_in_same_fold": int(sum(fold_of.get(str(w), -1) == fold for w in watch if str(w) != pid)),
                "same_class_polygons_in_same_group": int(((poly_class == true) & (group_of == group_of[pid])).sum() - 1),
                "same_class_training_polygons": int(len(same))}
+        if proba is not None:
+            for c, v in zip(classes, proba[mask].mean(axis=0)):
+                row[f"mean_p_{c}"] = float(v)
         for r in radii_m:
             row[f"same_class_training_within_{int(r)}m"] = int((dist <= r).sum())
         rows.append(row)
@@ -71,7 +75,7 @@ def _watch_rows(variant: dict, samples: Samples, groups, oof, folds, watch, radi
 def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 4, n_splits: int = 5,
         seed: int = 42, targets=(), features: list[str] | None = None, train_exclude=(),
         train_max_samples_per_polygon: int | None = None, out: str | Path | None = None,
-        polygon_repeats: int = 0, watch=(), radii_m=(2000, 5000, 10000)) -> dict:
+        polygon_repeats: int = 0, watch=(), radii_m=(2000, 5000, 10000), train_relabel: dict | None = None) -> dict:
     """Spatial-block CV over alternative partitions, optionally plus stratified polygon-grouped CV.
 
     ``polygon_repeats`` > 0 adds that many repeats of stratified polygon-grouped k-fold CV (whole polygons are held
@@ -80,6 +84,7 @@ def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 
     """
     X = samples.subset(features or samples.features)
     y = samples.y
+    train_y = model.train_labels(y, samples.polygon, train_relabel) if train_relabel else None
     train_ok = None
     if len(train_exclude) or train_max_samples_per_polygon:
         train_ok = model.train_mask(samples.polygon, train_exclude, train_max_samples_per_polygon, seed)
@@ -98,7 +103,8 @@ def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 
         if len(np.unique(groups)) < n_splits:
             rows.append({**meta, "status": f"skipped: {len(np.unique(groups))} groups"})
             continue
-        cv = model.cross_validate(X, y, samples.polygon, groups, params, n_splits, v["seed"], train_ok=train_ok)
+        cv = model.cross_validate(X, y, samples.polygon, groups, params, n_splits, v["seed"], train_ok=train_ok,
+                                  train_y=train_y)
         oof = cv["_oof"]
         plan = model._fold_plan(y, groups, n_splits, v["seed"], polygon=samples.polygon)
         folds = np.zeros(len(y), dtype=int)
@@ -117,6 +123,16 @@ def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 
             (fc.reindex(polygons_per_class.index, fill_value=0) == 0).any() for fc in per_fold_classes))
         for t in targets:
             row[f"f1_{t}"] = cv["per_class"][t]["f1"] if t in cv["per_class"] else None
+        if train_relabel:     # scores on the polygons that were NOT relabelled: did the others change?
+            rest = ~np.isin(samples.polygon, [str(k) for k in train_relabel])
+            other = metrics.summary(y[rest], oof[rest], labels=np.unique(y))
+            row["overall_accuracy_unrelabelled"] = other["overall_accuracy"]
+            row["kappa"] = cv["kappa"]
+            for t in targets:
+                pc = other["per_class"].get(t, {})
+                row[f"precision_{t}_unrelabelled"] = pc.get("users_accuracy")
+                row[f"recall_{t}_unrelabelled"] = pc.get("producers_accuracy")
+                row[f"f1_{t}_unrelabelled"] = pc.get("f1")
         if targets:
             row["target_macro_f1"] = metrics.target_macro_f1(cv, targets)
             row["parcel_target_macro_f1"] = metrics.target_macro_f1(par, targets)
@@ -124,7 +140,7 @@ def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 
         labels = np.unique(y)
         confusions[v["variant"]] = pd.DataFrame(pd.crosstab(pd.Categorical(y, labels), pd.Categorical(oof, labels),
                                                             dropna=False).to_numpy(), index=labels, columns=labels)
-        watch_rows += _watch_rows(meta, samples, groups, oof, folds, watch, radii_m, train_ok)
+        watch_rows += _watch_rows(meta, samples, groups, oof, folds, watch, radii_m, train_ok, cv["_oof_proba"], cv["_classes"])
     table = pd.DataFrame(rows)
     ok = table[table["status"] == "ok"]
     cols = [c for c in ("overall_accuracy", "macro_f1", "target_macro_f1", "parcel_target_macro_f1")
@@ -134,7 +150,8 @@ def run(samples: Samples, params: dict, block_sizes_m=(5000,), n_offsets: int = 
     watch_table = pd.DataFrame(watch_rows)
     result = {"partitions": int(len(ok)), "summary": summary, "train_controls": {
         "excluded_polygons": sorted(map(str, train_exclude)),
-        "max_samples_per_polygon": train_max_samples_per_polygon},
+        "max_samples_per_polygon": train_max_samples_per_polygon,
+        "relabelled_for_training_only": {str(k): str(v) for k, v in (train_relabel or {}).items()}},
         "note": ("Spread over alternative partitions of the same samples. It shows sensitivity to the "
                  "partition, not a confidence interval; folds of different partitions are not independent. "
                  "Polygon-grouped CV keeps neighbouring polygons in training and is therefore optimistic "
