@@ -52,7 +52,7 @@ def test_methods_and_status(tmp_path):
     t = gpd.read_file(res["gpkg"], layer="parcels").set_index("parcel_id")
     assert t.loc["P1", "preliminary_status"] == "supported"
     # P2: soybean is 30 % of the parcel but 100 % of its agricultural part: the whole-parcel majority fails, the agricultural part passes
-    assert t.loc["P2", "a_match_whole"] == False and t.loc["P2", "a_match_agricultural"] == True  # noqa: E712
+    assert t.loc["P2", "p1_match_whole"] == False and t.loc["P2", "p1_match_agricultural"] == True  # noqa: E712
     assert t.loc["P2", "agricultural_area_ha"] == pytest.approx(1.2)
     assert t.loc["P2", "soft_vote_agricultural"] > 0.9 > t.loc["P2", "soft_vote_whole"]
     assert t.loc["P2", "preliminary_status"] == "supported"

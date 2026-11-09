@@ -8,10 +8,10 @@ exists, *does the mapped area agree with it?* (reported, never merged into one d
 Per parcel (pixels whose centres fall inside the parcel; optional inward buffer):
 
     composition          area and share of every mapped class; ``agricultural_area_ha`` and ``non_agricultural_area_ha``
-    A  pixel majority    dominant class of all pixels and of the agricultural part (reference method)
-    B  soft vote         S(c) = sum_i A_i P_i(c) / sum_i A_i  for the declared crop c, over the whole parcel and over the
+    P1 pixel majority    dominant class of all pixels and of the agricultural part (reference method)
+    P2 soft vote         S(c) = sum_i A_i P_i(c) / sum_i A_i  for the declared crop c, over the whole parcel and over the
                          agricultural part (pixel area A_i; equal weights on a regular grid)
-    C  evidence fusion   segments (OBIA polygons clipped to the parcel, or connected same-class pixels when none are
+    P3 evidence fusion   segments (OBIA polygons clipped to the parcel, or connected same-class pixels when none are
                          given) with mean probability, dominant class, area and homogeneity; supported segments
                          (mean P(declared) >= ``support_prob``, area >= ``min_segment_ha``), the largest connected
                          area of pixels supporting the declared crop, the declared crop's share of the agricultural
@@ -96,8 +96,8 @@ def analyse_parcel(z: np.ndarray, segment_ids: np.ndarray | None, inside: np.nda
     p = z[d]
     row["soft_vote_whole"] = float(p[inside].mean())                        # area-weighted: equal pixel areas
     row["soft_vote_agricultural"] = float(p[agri].mean()) if n_agri else None
-    row["a_match_whole"] = row["pixel_majority"] == declared
-    row["a_match_agricultural"] = row["pixel_majority_agricultural"] == declared
+    row["p1_match_whole"] = row["pixel_majority"] == declared
+    row["p1_match_agricultural"] = row["pixel_majority_agricultural"] == declared
     row["crop_area_ha"] = float(counts[d] * pixel_ha)
     row["crop_share_agricultural"] = _fraction(counts[d], n_agri)
     # segments: given OBIA polygons or connected same-class pixels
