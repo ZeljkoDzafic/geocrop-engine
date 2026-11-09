@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.0rc3 — 2026-11-09
+
+Pre-release. Highlights: `geocrop crop-presence` (presence of a declared crop in heterogeneous parcels with three comparable methods P1 pixel majority, P2 area-weighted soft vote, P3 segment-based evidence; preliminary status with unvalidated thresholds), review fixes (in-season feature sets by window names, combined parcel threshold fitted on agreeing parcels, training controls in transfer validation), updated website and `.mailmap`. The main experiments of the 2023 case study were re-executed from a clean commit contained in this release with identical results (see the reproducibility package). All accuracy figures produced by the tools are internal cross-validation results, a recommendation for human review and not independent validation.
+
 - `geocrop crop-presence` (module `crop_presence`, [docs/crop-presence.md](docs/crop-presence.md)): presence of the declared crop in heterogeneous parcels with three comparable methods (pixel majority, area-weighted soft vote, segment-based evidence fusion), composition and agricultural part, connected supported area, optional declared-area comparison, CSV/GeoPackage (parcels and segments) and a manifest; the preliminary status uses unvalidated thresholds and is satellite support, not an administrative finding.
 - The project website is https://geocropengine.rs.ba/ (README, `CITATION.cff`, `website/README.md`).
 - `CITATION.cff` carries the Zenodo DOIs of 1.0.0rc2 (record and concept DOI) and the ORCID of D. Adžić; `AUTHORS.md` likewise.
