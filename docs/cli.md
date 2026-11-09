@@ -557,6 +557,32 @@ Parcel aggregation, decision and declaration comparison
 | `--markers` |  |  | markers.csv from geocrop markers |
 | `--calendar` |  |  | crop calendar YAML |
 
+## `geocrop crop-presence`
+
+Presence of the declared crop in heterogeneous parcels: pixel majority, area-weighted soft vote, segment evidence (preliminary, unvalidated status)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--probabilities` | yes |  | probabilities.tif with class-name band descriptions |
+| `--parcels` | yes |  |  |
+| `--out` | yes |  |  |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` |  |
+| `--declared-area-field` |  |  | declared area in hectares (optional) |
+| `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--segments` |  |  | OBIA segment polygons (optional; else connected same-class pixels) |
+| `--segment-id-field` |  |  |  |
+| `--agricultural` |  | `['maize', 'soybean', 'sunflower', 'vegetables', 'winter_crops']` | classes that form the agricultural part (the declared class is always included) |
+| `--buffer-px` |  |  |  |
+| `--support-prob` |  | `0.5` | mean probability of the declared crop that supports a segment |
+| `--min-segment-ha` |  | `0.03` |  |
+| `--min-connected-ha` |  | `0.05` |  |
+| `--min-supported-share` |  | `0.5` |  |
+| `--low-score` |  | `0.1` |  |
+| `--min-confidence` |  | `0.6` |  |
+| `--area-tolerance` |  | `0.5` |  |
+| `--min-pixels` |  | `4` |  |
+
 ## `geocrop parcel-model`
 
 Second-stage parcel classifier on aggregated descriptors

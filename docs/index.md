@@ -8,6 +8,7 @@
 6. [Classification and validation](classification-validation.md)
 7. [Parcels and declaration verification](parcels.md)
    - [Parcel-level classification on signatures, LightTAE/TempCNN](parcel-classification.md)
+   - [Presence of a declared crop in heterogeneous parcels](crop-presence.md)
 8. [Clouds, shadows and time series](timeseries.md)
    - [Class separability (JM) and window design](separability.md)
    - [Sensitivity and review tools: training-only controls, partition stability, parcel aggregation, profiles, Cloud Score+](sensitivity.md)
