@@ -288,7 +288,7 @@ td span { display: block; font-size: 12px; color: var(--text-3); }
 .codes > p { margin-top: 24px; font-size: 12px; color: var(--text-3); }
 
 /* Reliability */
-.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: .5px solid var(--hairline-strong); }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: .5px solid var(--hairline-strong); }
 .stat { padding: 32px 24px 0 0; min-width: 0; }
 .stat + .stat { padding-left: 24px; border-left: .5px solid var(--hairline); }
 .stat-label { font-size: 13px; font-weight: 600; color: var(--text-3); }

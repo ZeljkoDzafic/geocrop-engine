@@ -178,7 +178,11 @@
         <article class="card"><svg class="icon card-icon"><use href="#i-sparkle"/></svg><h3>Conformal prediction sets</h3><p>Temperature-scaled probabilities and class-conditional conformal sets: an ambiguous parcel says which crops it could be.</p></article>
         <article class="card"><svg class="icon card-icon"><use href="#i-pin"/></svg><h3>Area of Applicability</h3><p>Flags predictions in feature space the model never saw. Parcels below the AOA threshold go to review instead of being accepted.</p></article>
         <article class="card"><svg class="icon card-icon"><use href="#i-check"/></svg><h3>Independent evaluation</h3><p>Field points near training polygons are excluded automatically; bootstrap CIs, area-adjusted estimates and calibration error.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-layers"/></svg><h3>Partition sensitivity</h3><p><code>cv-stability</code> repeats the evaluation over block sizes and shifted grid origins, adds polygon-grouped CV, writes a confusion matrix per partition and tracks chosen polygons across all of them.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-lock"/></svg><h3>Training-only controls</h3><p>Exclude, cap or relabel polygons in training only while the test folds stay fixed, so a suspect label can be examined without changing the reference data.</p></article>
+        <article class="card"><svg class="icon card-icon"><use href="#i-flow"/></svg><h3>Phenology features and timing</h3><p><code>phenology-features</code> derives season metrics and time-aligned profiles, with post-season and in-season (cutoff) feature sets; <code>phenology-timing</code> reports start, peak, end and length. <code>separability</code> adds Jeffries-Matusita distances for window design.</p></article>
       </div>
+      <p class="fineprint">These tools report internal cross-validation results. They are diagnostics for review, not independent validation.</p>
 
       <div class="benchmark">
         <div class="benchmark-copy">
@@ -212,6 +216,7 @@
         <ul class="list">
           <li><strong>Sentinel-2 and Sentinel-1 markers.</strong> Harvest, told apart from senescence when radar is available; tillage; dated mowing events; within-parcel homogeneity. Each with confidence and data-sufficiency fields.</li>
           <li><strong>A traffic light for Checks by Monitoring.</strong> Optional rules can only escalate a colour, and absence rules fire only on confident, sufficient data.</li>
+          <li><strong>Heterogeneous cadastral parcels.</strong> <code>crop-presence</code> separates the agricultural part from forest, grass and built-up land and compares three methods on the same parcels: pixel majority, an area-weighted soft vote and segment-based evidence with the largest connected supported area. The status it gives is satellite support with unvalidated thresholds, and a declared area is compared, never merged into the decision.</li>
           <li><strong>A review aid, not a verdict.</strong> A reason describes the configured rule, not a verified crop error or a legal finding.</li>
         </ul>
       </div>
@@ -222,6 +227,8 @@
           <dd><code>low_confidence</code> <code>low_margin</code> <code>strategies_disagree</code> <code>insufficient_valid_pixels</code> <code>aoa_below_threshold</code></dd>
           <dt>traffic_light_reasons</dt>
           <dd><code>conformal_discrepancy</code> <code>declaration_discrepancy</code> <code>ambiguous_prediction_set</code> <code>calendar_inconsistent</code></dd>
+          <dt>crop_presence reasons</dt>
+          <dd><code>declared_crop_not_supported</code> <code>no_connected_support</code> <code>low_supported_share</code> <code>pixel_segment_disagree</code> <code>area_difference</code> <code>insufficient_agricultural_area</code></dd>
           <dt>marker codes</dt>
           <dd><code>no_harvest_evidence</code> <code>tillage_detected</code> <code>insufficient_mowing_events</code> <code>heterogeneous_parcel</code></dd>
         </dl>
@@ -257,6 +264,7 @@
         <article class="stat"><p class="stat-label">Preflight</p><p class="stat-value">Ready, warn or blocked</p><p>Scenes per window and orbit, clear-sky coverage, class support under the spatial blocks, CRS overlap, and disk, RAM and runtime estimates before a long run starts.</p></article>
         <article class="stat"><p class="stat-label">Acceptance · Semberija 2023</p><p class="stat-value">21 of 21 checks</p><p>One versioned run of the whole chain on real Sentinel-2 and Sentinel-1 data over about 4&nbsp;km²: radiometry, S1/S2 co-registration, reproducibility, COG, STAC and GeoParquet validity.</p></article>
         <article class="stat"><p class="stat-label">Reliability gate</p><p class="stat-value">Killed, then recovered</p><p>A real run is killed inside features, train and predict and must recover to the uninterrupted result. Partial outputs are quarantined; a disk guard stops before writing.</p></article>
+        <article class="stat"><p class="stat-label">Irregular areas · parallel I/O</p><p class="stat-value">Only the AOI is processed</p><p>An AOI mask and block index skip every block outside the area; scene imports and blockwise steps run in parallel. Results inside the AOI equal the unmasked, sequential run.</p></article>
       </div>
       <p class="fineprint">Report: <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/acceptance/acceptance-0.10-dev-2026-10-26.md">acceptance-0.10-dev-2026-10-26</a>. The acceptance checks cover the technical integrity of the chain on that area, not crop-map accuracy.</p>
     </div>
@@ -405,6 +413,8 @@ py -3.12 -m venv .venv
       <a href="https://github.com/ZeljkoDzafic/geocrop-engine">GitHub</a>
       <a href="https://github.com/ZeljkoDzafic/geocrop-engine/blob/main/docs/index.md">Documentation</a>
       <a href="https://github.com/ZeljkoDzafic/geocrop-engine/issues">Issues</a>
+      <a href="https://doi.org/10.5281/zenodo.24078771">Zenodo (v1.0.0rc2)</a>
+      <a href="https://github.com/ZeljkoDzafic/geocrop-reproducibility">Reproducibility package</a>
       <a href="LICENSE.txt">Apache-2.0 licence</a>
       <a href="NOTICE.txt">Notice</a>
       <a href="assets/screenshots.json">Screenshot provenance</a>

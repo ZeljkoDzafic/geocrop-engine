@@ -440,6 +440,29 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--markers", help="markers.csv from geocrop markers")
     x.add_argument("--calendar", help="crop calendar YAML")
 
+    x = cmd("crop-presence", "Presence of the declared crop in heterogeneous parcels: pixel majority, area-weighted soft vote, "
+                             "segment evidence (preliminary, unvalidated status)")
+    x.add_argument("--probabilities", required=True, help="probabilities.tif with class-name band descriptions")
+    x.add_argument("--parcels", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--declared-field", default="declared_crop")
+    x.add_argument("--declared-area-field", help="declared area in hectares (optional)")
+    x.add_argument("--crop-mapping", help="CSV source_code,class_name")
+    x.add_argument("--segments", help="OBIA segment polygons (optional; else connected same-class pixels)")
+    x.add_argument("--segment-id-field")
+    x.add_argument("--agricultural", nargs="+", default=["maize", "soybean", "sunflower", "vegetables", "winter_crops"],
+                   help="classes that form the agricultural part (the declared class is always included)")
+    x.add_argument("--buffer-px", type=float, default=0.0)
+    x.add_argument("--support-prob", type=float, default=0.5, help="mean probability of the declared crop that supports a segment")
+    x.add_argument("--min-segment-ha", type=float, default=0.03)
+    x.add_argument("--min-connected-ha", type=float, default=0.05)
+    x.add_argument("--min-supported-share", type=float, default=0.5)
+    x.add_argument("--low-score", type=float, default=0.1)
+    x.add_argument("--min-confidence", type=float, default=0.6)
+    x.add_argument("--area-tolerance", type=float, default=0.5)
+    x.add_argument("--min-pixels", type=int, default=4)
+
     x = cmd("parcel-model", "Second-stage parcel classifier on aggregated descriptors")
     x.add_argument("--parcels", required=True, help="output of geocrop parcels with a reference label column")
     x.add_argument("--label-field", required=True)
@@ -1301,6 +1324,15 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         replace(smp, X=X, features=all_names).save(a.out)
         Path(a.sets_out).write_text(json.dumps(flat, indent=1))
         _print({"samples": a.out, "feature_sets": {k: len(v) for k, v in flat.items()}, "derived": len(derived)})
+    elif c == "crop-presence":
+        from . import crop_presence
+        from .adapters import read_mapping
+        _print(crop_presence.analyse(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.declared_area_field,
+                                     read_mapping(a.crop_mapping) or None, a.segments,
+                                     a.segment_id_field, tuple(a.agricultural), a.buffer_px, a.support_prob,
+                                     a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
+                                     min_supported_share=a.min_supported_share, low_score=a.low_score,
+                                     min_confidence=a.min_confidence, area_tolerance=a.area_tolerance))
     elif c == "cv-stability":
         from . import stability
         from .samples import Samples

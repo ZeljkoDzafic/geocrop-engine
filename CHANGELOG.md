@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `geocrop crop-presence` (module `crop_presence`, [docs/crop-presence.md](docs/crop-presence.md)): presence of the declared crop in heterogeneous parcels with three comparable methods (pixel majority, area-weighted soft vote, segment-based evidence fusion), composition and agricultural part, connected supported area, optional declared-area comparison, CSV/GeoPackage (parcels and segments) and a manifest; the preliminary status uses unvalidated thresholds and is satellite support, not an administrative finding.
 - The project website is https://geocropengine.rs.ba/ (README, `CITATION.cff`, `website/README.md`).
 - `CITATION.cff` carries the Zenodo DOIs of 1.0.0rc2 (record and concept DOI) and the ORCID of D. Adžić; `AUTHORS.md` likewise.
 - Review fixes: `phenology-features` in-season sets now match columns against the configured window names (any name,
