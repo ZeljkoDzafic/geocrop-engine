@@ -398,7 +398,7 @@ def nested_cross_validate(X, y, polygon, groups, base: dict, grid: dict, n_outer
 
 def transfer_validation(X, y, polygon, groups, in_domain_groups, params: dict, strategy: str,
                         n_splits: int = 5, seed: int = 42, *, coordinates=None, crs=None,
-                        spatial_buffer_m: float = 0, in_domain: dict | None = None) -> dict:
+                        spatial_buffer_m: float = 0, in_domain: dict | None = None, train_ok=None, train_y=None) -> dict:
     """Out-of-domain (leave-one-region/year-out) vs in-domain (spatial-block CV) accuracy on the same samples.
 
     `groups` are the strategy's group ids, `in_domain_groups` the spatial blocks. `in_domain` may be a
@@ -411,9 +411,10 @@ def transfer_validation(X, y, polygon, groups, in_domain_groups, params: dict, s
         raise ValueError("transfer_validation needs a group strategy: region, year or region_year")
     y, polygon, groups = np.asarray(y), np.asarray(polygon), np.asarray(groups).astype(str)
     spatial = {"coordinates": coordinates, "crs": crs, "spatial_buffer_m": spatial_buffer_m}
+    controls = {"train_ok": train_ok, "train_y": train_y}   # same training controls in and out of domain
     if in_domain is None:
-        in_domain = cross_validate(X, y, polygon, in_domain_groups, params, n_splits, seed, **spatial)
-    out = cross_validate(X, y, polygon, groups, params, n_splits, seed, strategy=strategy, **spatial)
+        in_domain = cross_validate(X, y, polygon, in_domain_groups, params, n_splits, seed, **controls, **spatial)
+    out = cross_validate(X, y, polygon, groups, params, n_splits, seed, strategy=strategy, **controls, **spatial)
     classes = out["_classes"]
     done = out["_evaluated"]
     keys = ("overall_accuracy", "kappa", "macro_f1")
@@ -639,7 +640,7 @@ def train(samples: Samples, output_dir: str | Path, features: list[str] | None =
     if cv_strategy != "spatial_blocks":
         tgroups = cv_groups(samples, cv_strategy, spatial_block_m)
         tv = transfer_validation(X, y, samples.polygon, tgroups, groups, params, cv_strategy, n_splits, seed,
-                                 in_domain=cv, **spatial)
+                                 in_domain=cv, train_ok=train_ok, **spatial)
         tv.pop("_oof")
         if tune_grid:
             tv["nested"] = nested_cross_validate(X, y, samples.polygon, tgroups, params, tune_grid, n_splits,

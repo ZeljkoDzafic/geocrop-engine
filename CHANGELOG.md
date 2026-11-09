@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Review fixes: `phenology-features` in-season sets now match columns against the configured window names (any name,
+  not only `P<digit>`), require `--windows` with `--cutoffs`, and drop `phen_*` and unrecognised columns; the combined
+  parcel rule fits its threshold on the training parcels where majority and mean-probability decisions agree (the
+  parcels it can accept), which can change `parcel-aggregate` thresholds and reported accepted shares;
+  `transfer_validation` applies the training controls (`train_ok`, `train_y`) to its in-domain and out-of-domain fits.
+
 ## 1.0.0rc2 — 2026-11-09
 
 Pre-release. Highlights: sensitivity and review tools for spatial cross-validation (alternative block partitions,

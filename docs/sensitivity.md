@@ -112,9 +112,11 @@ partitions, folds and Random Forest parameters.
 - `rel_<idx>_sos+N` / `rel_<idx>_pk+N`: curve normalised to the season amplitude, read N days after the start
   (`--sos-offsets`) or from the peak (`--peak-offsets`, post-season only).
 - Sets per group: `A` reference (every original column), `B` = A + `ph_*`, `C` = A + `rel_*`.
-- `--cutoffs 196 226 --windows P1=151 P2=196 ...` adds in-season groups: curves are cut at that day of year before any
-  feature is derived, A keeps only columns observable by then (window columns of finished windows, `ts_` up to the
-  cutoff, deltas between them; `season_*` and `harm_*` dropped), end/length/senescence are not produced.
+- `--cutoffs 196 226 --windows NAME=END_DOY ...` adds in-season groups (the window names and end days of the
+  configuration are required): curves are cut at that day of year before any feature is derived, and A keeps only
+  columns recognised as observable by then: columns of windows ending on or before the cutoff (matched against the
+  given window names), `ts_` columns up to it and deltas between such windows. Whole-season columns (`season_*`,
+  `harm_*`, `phen_*`) and columns that match no window are dropped. End, length and senescence are not produced.
 - `--indices` selects the series (default NDVI NDRE); undefined values are written as `--fill` (default -1).
 
 Limits: the `ts_` curves were smoothed over the whole season, so in-season groups are an optimistic proxy; a strictly

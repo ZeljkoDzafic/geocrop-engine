@@ -104,24 +104,32 @@ def feature_sets(names: list[str], derived: list[str], cutoff: float | None = No
                  windows: dict[str, float] | None = None) -> dict[str, list[str]]:
     """Reference (A), + season metrics (B) and + relative profiles (C) sets.
 
-    Without ``cutoff`` A is every original column. With a cutoff A keeps only what is observable by then: window
-    columns (``P1_`` ...) of windows ending on or before it, ``ts_`` columns up to it and the deltas between those
-    windows; whole-season columns (``season_``, ``harm_``) are dropped. ``windows`` maps window name to end day.
+    Without ``cutoff`` A is every original column. With a cutoff A keeps only columns recognised as observable by
+    then and drops everything else: columns of windows ending on or before it (``<window>_...``, matched against
+    the names in ``windows``, which maps window name to end day and is required with a cutoff), ``ts_`` columns up
+    to it and the deltas between such windows. Whole-season columns (``season_*``, ``harm_*``, ``phen_*``) and
+    columns that match no window are dropped, so no future observation can enter.
     """
     orig = [n for n in names if n not in set(derived)]
     if cutoff is not None:
-        ok = {w for w, end in (windows or {}).items() if end <= cutoff}
+        if not windows:
+            raise ValueError("an in-season cutoff needs the window names and end days (windows=...)")
+        ok = {w for w, end in windows.items() if end <= cutoff}
+        by_length = sorted(windows, key=len, reverse=True)
 
         def keep(n: str) -> bool:
-            if n.startswith(("season_", "harm_")):
+            if n.startswith(("season_", "harm_", "phen_")):
                 return False
             m = _TS.match(n)
             if m:
                 return int(m["doy"]) <= cutoff
             if n.startswith("delta_"):
-                return all(w in ok for w in re.findall(r"P\d", n))
-            m = re.match(r"^(P\d)_", n)
-            return m is None or m[1] in ok
+                used = [w for w in by_length if re.search(rf"(?<![A-Za-z0-9]){re.escape(w)}(?![A-Za-z0-9])", n[6:])]
+                return bool(used) and all(w in ok for w in used)
+            for w in by_length:
+                if n.startswith(w + "_"):
+                    return w in ok
+            return False
 
         orig = [n for n in orig if keep(n)]
     mine = [n for n in derived if n.endswith(f"_c{int(cutoff)}")] if cutoff is not None else \

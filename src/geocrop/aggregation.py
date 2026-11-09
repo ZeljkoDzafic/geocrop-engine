@@ -71,7 +71,7 @@ def compare(pixels: pd.DataFrame, targets=(), target_accuracy: float = 0.95, thr
         if threshold is not None:
             thr[test] = threshold
             continue
-        train = ~test
+        train = ~test & agree     # the combined rule only accepts parcels on which both decisions agree
         ok = (table.loc[train, "mean_prob_class"] == table.loc[train, "reference"]).to_numpy()
         thr[test] = choose_threshold(table.loc[train, "mean_prob"].to_numpy(), ok, target_accuracy)
     table["threshold"] = thr
