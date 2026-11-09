@@ -48,6 +48,7 @@ A synthetic example with known truth is in the reproducibility package of the pa
 area are three different questions: a small connected supported part can support the claim that the crop exists without
 confirming that the whole declared area is under that crop. `soft_vote_*` is computed on the valid pixels whose centres
 fall inside the parcel (after the optional inward buffer); pixels with missing or invalid probabilities are excluded, not
-counted as zero; every pixel has the same area on the regular grid; no minimum supported area enters the soft vote (the
-minimum area applies to supported segments and to `connected_support_ha`). A mean probability is not a validated
+counted as zero; every pixel has the same area on the regular grid; no minimum area enters the soft vote (`--min-segment-ha` applies only to
+the segments counted as supported; `--min-connected-ha` is a threshold of the preliminary status rule, and
+`connected_support_ha` itself is computed without a minimum). A mean probability is not a validated
 estimate of the crop's area.
