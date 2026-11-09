@@ -5,6 +5,14 @@ type: software
 version: 1.0.0rc2
 date-released: 2026-11-09
 license: Apache-2.0
+doi: 10.5281/zenodo.24078244
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24078771
+    description: "Zenodo record of version 1.0.0rc2"
+  - type: doi
+    value: 10.5281/zenodo.24078244
+    description: "Zenodo concept DOI (all versions)"
 repository-code: "https://github.com/ZeljkoDzafic/geocrop-engine"
 authors:
   - family-names: "Džafić"
@@ -14,6 +22,7 @@ authors:
     affiliation: "HTEC Group; Faculty of Technical Sciences, University of Novi Sad"
   - family-names: "Adžić"
     given-names: "Dragutin"
+    orcid: "https://orcid.org/0009-0003-0858-4143"
     affiliation: "Faculty of Natural Sciences and Mathematics, University of Banja Luka"
 keywords:
   - remote sensing

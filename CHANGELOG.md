@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `CITATION.cff` carries the Zenodo DOIs of 1.0.0rc2 (record and concept DOI) and the ORCID of D. Adžić; `AUTHORS.md` likewise.
 - Review fixes: `phenology-features` in-season sets now match columns against the configured window names (any name,
   not only `P<digit>`), require `--windows` with `--cutoffs`, and drop `phen_*` and unrecognised columns; the combined
   parcel rule fits its threshold on the training parcels where majority and mean-probability decisions agree (the
