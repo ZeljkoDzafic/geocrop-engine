@@ -212,3 +212,47 @@ def test_phenology_features_sets_and_cutoff():
     assert "P3_NDVI" not in sets["A"] and "season_NDVI_max" not in sets["A"] and "P1_NDVI" in sets["A"]
     assert all(n.endswith("_c181") for n in sets["B"] if n.startswith("ph_"))
     assert set(pf.feature_sets(nc, new + newc)["A"]) == set(names)
+
+
+def test_in_season_sets_use_window_names_and_drop_full_season_columns():
+    import pytest
+
+    from geocrop import phenofeatures as pf
+    names = ["early_NDVI", "late_NDVI", "delta_NDVI_early_late", "delta_NDVI_early_mid", "mid_NDVI", "phen_NDVI_eos",
+             "season_NDVI_max", "harm_NDVI_a0", "ts_NDVI_d121", "ts_NDVI_d271", "unknown_column"]
+    sets = pf.feature_sets(names, [], 150, {"early": 130, "mid": 140, "late": 250})
+    assert sets["A"] == ["early_NDVI", "delta_NDVI_early_mid", "mid_NDVI", "ts_NDVI_d121"]
+    with pytest.raises(ValueError):
+        pf.feature_sets(names, [], 150)
+
+
+def test_combined_threshold_is_fitted_on_agreeing_parcels():
+    import pytest
+
+    from geocrop import aggregation
+    rows = []
+    for g in ("g1", "g2"):
+        for k in range(20):   # decisions disagree, the mean-probability class is right: never accepted by "combined"
+            for p in ((0.95, 0.05), (0.35, 0.65), (0.35, 0.65)):
+                rows.append({"polygon": f"{g}_d{k}", "label": "a", "spatial_group": g, "p_a": p[0], "p_b": p[1]})
+        for k in range(5):    # decisions agree, both wrong
+            for _ in range(3):
+                rows.append({"polygon": f"{g}_w{k}", "label": "b", "spatial_group": g, "p_a": 0.55, "p_b": 0.45})
+    r = aggregation.compare(pd.DataFrame(rows), target_accuracy=0.75)
+    assert r["methods"]["combined"]["mean_threshold"] == pytest.approx(0.95)   # fitting on all parcels would give 0.40
+
+
+def test_transfer_validation_applies_training_controls():
+    from geocrop import model
+    rng = np.random.default_rng(0)
+    n = 240
+    polygon = np.repeat([f"p{i}" for i in range(24)], 10)
+    y = np.where(np.repeat(np.arange(24) % 2, 10) == 0, "a", "b")
+    X = rng.normal(size=(n, 3)) + (y == "b")[:, None]
+    region = np.where(np.repeat(np.arange(24) < 12, 10), "r1", "r2")
+    blocks = np.repeat(np.arange(24) // 4, 10).astype(str)
+    params = {"n_estimators": 10}
+    full = model.transfer_validation(X, y, polygon, region, blocks, params, "region", 3, 1)
+    thin = np.arange(n) % 10 < 3        # three pixels per polygon in training only
+    cut = model.transfer_validation(X, y, polygon, region, blocks, params, "region", 3, 1, train_ok=thin)
+    assert max(r["n_train"] for r in cut["per_group"]) < min(r["n_train"] for r in full["per_group"])
