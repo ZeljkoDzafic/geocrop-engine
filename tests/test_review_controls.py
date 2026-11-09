@@ -191,3 +191,24 @@ def test_phenology_timing_and_alignment(tmp_path):
     assert abs(rel["best_shift_days_x"] - 30) <= 3 and rel["rmse_aligned_x"] < rel["rmse_x"]
     with pytest.raises(ValueError):
         phenotiming.run(tmp_path / "p.csv", ["x"], tmp_path / "o2", fraction=1.5)
+
+
+def test_phenology_features_sets_and_cutoff():
+    from geocrop import phenofeatures as pf
+    days = np.arange(91, 272, 15)
+    names = [f"ts_NDVI_d{d}" for d in days] + ["P1_NDVI", "P3_NDVI", "season_NDVI_max"]
+    t = np.linspace(0, 1, len(days))
+    early = 0.2 + 0.7 * np.exp(-((t - 0.4) / 0.2) ** 2)
+    late = 0.2 + 0.7 * np.exp(-((t - 0.6) / 0.2) ** 2)
+    X = np.zeros((2, len(names)))
+    X[0, :len(days)], X[1, :len(days)] = early, late
+    Xn, nn, new = pf.add_features(X, names, ("NDVI",), sos_offsets=(0, 30), peak_offsets=(-30,), fill=-9)
+    col = {n: Xn[:, i] for i, n in enumerate(nn)}
+    assert col["ph_NDVI_peak_doy"][0] < col["ph_NDVI_peak_doy"][1]
+    assert col["ph_NDVI_sos"][0] < col["ph_NDVI_sos"][1] and "rel_NDVI_pk-30" in col
+    Xc, nc, newc = pf.add_features(Xn, nn, ("NDVI",), 181, sos_offsets=(0, 30))
+    assert "ph_NDVI_eos_c181" not in nc and "ph_NDVI_sos_c181" in nc
+    sets = pf.feature_sets(nc, new + newc, 181, {"P1": 151, "P3": 243})
+    assert "P3_NDVI" not in sets["A"] and "season_NDVI_max" not in sets["A"] and "P1_NDVI" in sets["A"]
+    assert all(n.endswith("_c181") for n in sets["B"] if n.startswith("ph_"))
+    assert set(pf.feature_sets(nc, new + newc)["A"]) == set(names)

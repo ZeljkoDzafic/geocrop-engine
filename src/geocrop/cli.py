@@ -253,11 +253,26 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--train-max-samples", type=int, help="cap pixels per polygon in training only")
     x.add_argument("--train-relabel", nargs="*", default=[], metavar="ID=CLASS",
                    help="training-only sensitivity: treat polygon ID as CLASS in training; scores keep the true labels")
+    x.add_argument("--feature-sets", help="JSON written by `phenology-features` (name -> feature list)")
+    x.add_argument("--feature-set", help="run on this named set from --feature-sets instead of every feature")
     x.add_argument("--polygon-repeats", type=int, default=0, help="repeats of stratified polygon-grouped k-fold CV")
     x.add_argument("--watch", nargs="*", default=[], help="polygon ids whose OOF decision and nearby training data are recorded")
     x.add_argument("--radii", type=float, nargs="+", default=[2000, 5000, 10000], help="radii (m) for nearby same-class training polygons")
     x.add_argument("--out", required=True)
 
+    x = cmd("phenology-features", "Add season metrics and time-aligned profile columns to a samples file; write A/B/C feature sets")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True, help="augmented samples.npz")
+    x.add_argument("--sets-out", required=True, help="JSON with the feature sets per cutoff")
+    x.add_argument("--indices", nargs="+", default=["NDVI", "NDRE"])
+    x.add_argument("--cutoffs", type=float, nargs="*", default=[], help="in-season cutoffs (day of year)")
+    x.add_argument("--windows", nargs="*", default=[], metavar="NAME=END_DOY", help="window end days, e.g. P1=151")
+    x.add_argument("--threshold", type=float, default=0.5, help="share of the amplitude that defines start and end")
+    x.add_argument("--min-amplitude", type=float, default=0.1, help="smallest amplitude that counts as a season")
+    x.add_argument("--sos-offsets", type=int, nargs="*", default=[0, 15, 30, 45, 60, 90], help="days after start of season")
+    x.add_argument("--peak-offsets", type=int, nargs="*", default=[-60, -45, -30, -15, 15, 30, 45, 60],
+                   help="days from the peak (post-season only)")
+    x.add_argument("--fill", type=float, default=-1.0, help="value written where a metric is undefined")
     x = cmd("phenology-timing", "Start, peak, end and length of the seasonal curve and time alignment, from profiles.csv")
     x.add_argument("--profiles", required=True, help="profiles.csv written by `geocrop profiles`")
     x.add_argument("--classes", nargs="+", required=True)
@@ -1265,12 +1280,36 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .s1 import composite
         print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic,
                         aoi=_aoi_from_args(a, a.reference)))
+    elif c == "phenology-features":
+        from dataclasses import replace
+
+        from . import phenofeatures
+        from .samples import Samples
+        smp = Samples.load(a.samples)
+        names = list(map(str, smp.features))
+        opts = {"threshold": a.threshold, "min_amplitude": a.min_amplitude, "sos_offsets": a.sos_offsets,
+                "peak_offsets": a.peak_offsets, "fill": a.fill}
+        X, all_names, derived = phenofeatures.add_features(smp.X, names, a.indices, **opts)
+        for cut in a.cutoffs:
+            X, all_names, d = phenofeatures.add_features(X, all_names, a.indices, cut, **opts)
+            derived += d
+        windows = {k: float(v) for k, v in (w.split("=", 1) for w in a.windows)}
+        sets = {"post_season": phenofeatures.feature_sets(all_names, derived)}
+        for cut in a.cutoffs:
+            sets[f"in_season_d{int(cut)}"] = phenofeatures.feature_sets(all_names, derived, cut, windows)
+        flat = {f"{g}:{k}": v for g, d_ in sets.items() for k, v in d_.items()}
+        replace(smp, X=X, features=all_names).save(a.out)
+        Path(a.sets_out).write_text(json.dumps(flat, indent=1))
+        _print({"samples": a.out, "feature_sets": {k: len(v) for k, v in flat.items()}, "derived": len(derived)})
     elif c == "cv-stability":
         from . import stability
         from .samples import Samples
+        sel = None
+        if a.feature_set:
+            sel = json.loads(Path(a.feature_sets).read_text())[a.feature_set]
         r = stability.run(Samples.load(a.samples), {"n_estimators": a.n_estimators, "class_weight": "balanced_subsample",
                           "max_features": "sqrt", "n_jobs": -1}, a.block_sizes, a.offsets, a.cv_folds, a.seed, a.targets,
-                          train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out,
+                          features=sel, train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out,
                           polygon_repeats=a.polygon_repeats, watch=a.watch, radii_m=a.radii,
                           train_relabel=dict(x.split("=", 1) for x in a.train_relabel))
         r.pop("table")

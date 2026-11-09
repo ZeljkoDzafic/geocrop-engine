@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `geocrop phenology-features` adds configurable season metrics and time-aligned profile columns to a samples file and writes post-season / in-season A, B, C feature sets; `cv-stability --feature-sets/--feature-set` runs on one of them ([docs/sensitivity.md](docs/sensitivity.md)).
 - Sensitivity and review tools ([docs/sensitivity.md](docs/sensitivity.md)): `model.train_exclude_polygons` and
   `model.train_max_samples_per_polygon` change training only while the test folds stay fixed; the samples stage
   writes `skipped_polygons.csv` with a reason per skipped polygon; new commands `cv-stability` (CV over alternative

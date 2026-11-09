@@ -98,3 +98,26 @@ scene's `SCL.tif`: `CLDPRB = round((1 - score) * 100)`, and no score means maske
 `cloud_probability_max: 40`. The engine does not download Cloud Score+; export it for the same scenes beforehand.
 Comparing the SCL-only, SCL + Cloud Score+ and SCL + Cloud Score+ + shadow variants is three configurations over
 identical windows, polygons, folds and parameters.
+
+## Phenology features and time-aligned profiles: `geocrop phenology-features`
+
+Question: does a model generalise better to crops whose development is shifted in time when it also sees the *timing*
+of the season (start, peak, end, length) or the curve in *relative* phenological time? The command reads a samples file
+with `ts_<index>_d<day>` columns and writes (a) an augmented samples file and (b) a JSON of named feature sets, so that
+`geocrop cv-stability --feature-sets sets.json --feature-set post_season:B` compares them over identical polygons,
+partitions, folds and Random Forest parameters.
+
+- `ph_<idx>_*`: season start, peak day, peak value, amplitude, green-up rate, integral and, post-season only, end,
+  length and senescence rate (`timeseries.phenology`, `--threshold`, `--min-amplitude`).
+- `rel_<idx>_sos+N` / `rel_<idx>_pk+N`: curve normalised to the season amplitude, read N days after the start
+  (`--sos-offsets`) or from the peak (`--peak-offsets`, post-season only).
+- Sets per group: `A` reference (every original column), `B` = A + `ph_*`, `C` = A + `rel_*`.
+- `--cutoffs 196 226 --windows P1=151 P2=196 ...` adds in-season groups: curves are cut at that day of year before any
+  feature is derived, A keeps only columns observable by then (window columns of finished windows, `ts_` up to the
+  cutoff, deltas between them; `season_*` and `harm_*` dropped), end/length/senescence are not produced.
+- `--indices` selects the series (default NDVI NDRE); undefined values are written as `--fill` (default -1).
+
+Limits: the `ts_` curves were smoothed over the whole season, so in-season groups are an optimistic proxy; a strictly
+causal test recomputes the curves with the season ended at the cutoff. Where the season amplitude is below
+`--min-amplitude` (bare, forest, water) the metrics are undefined and filled. Internal cross-validation only; a
+recommendation for human review, not a definitive conclusion.

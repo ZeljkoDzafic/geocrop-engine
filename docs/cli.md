@@ -296,10 +296,30 @@ Spatial-block CV repeated over alternative block partitions (sensitivity to the 
 | `--train-exclude` |  | `[]` | polygon ids left out of training only |
 | `--train-max-samples` |  |  | cap pixels per polygon in training only |
 | `--train-relabel` |  | `[]` | training-only sensitivity: treat polygon ID as CLASS in training; scores keep the true labels |
+| `--feature-sets` |  |  | JSON written by `phenology-features` (name -> feature list) |
+| `--feature-set` |  |  | run on this named set from --feature-sets instead of every feature |
 | `--polygon-repeats` |  |  | repeats of stratified polygon-grouped k-fold CV |
 | `--watch` |  | `[]` | polygon ids whose OOF decision and nearby training data are recorded |
 | `--radii` |  | `[2000, 5000, 10000]` | radii (m) for nearby same-class training polygons |
 | `--out` | yes |  |  |
+
+## `geocrop phenology-features`
+
+Add season metrics and time-aligned profile columns to a samples file; write A/B/C feature sets
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  | augmented samples.npz |
+| `--sets-out` | yes |  | JSON with the feature sets per cutoff |
+| `--indices` |  | `['NDVI', 'NDRE']` |  |
+| `--cutoffs` |  | `[]` | in-season cutoffs (day of year) |
+| `--windows` |  | `[]` | window end days, e.g. P1=151 |
+| `--threshold` |  | `0.5` | share of the amplitude that defines start and end |
+| `--min-amplitude` |  | `0.1` | smallest amplitude that counts as a season |
+| `--sos-offsets` |  | `[0, 15, 30, 45, 60, 90]` | days after start of season |
+| `--peak-offsets` |  | `[-60, -45, -30, -15, 15, 30, 45, 60]` | days from the peak (post-season only) |
+| `--fill` |  | `-1.0` | value written where a metric is undefined |
 
 ## `geocrop phenology-timing`
 

@@ -82,6 +82,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `aggregation` | parcel-level aggregation of pixel OOF predictions (majority, mean probability, threshold) |
 | `profiles` | temporal profiles of selected polygons against class bands |
 | `phenotiming` | start, peak, end and length of seasonal curves and time alignment of selected polygons to class medians |
+| `phenofeatures` | season metrics and relative-phase profile columns from ts_ columns, post-season and in-season (cutoff) feature sets |
 | `cloudscore` | attach external cloud-clearness rasters (Cloud Score+) to scenes as `CLDPRB.tif` masks |
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
 | `export` | COG, GeoParquet, STAC items, HCAT mapping |
