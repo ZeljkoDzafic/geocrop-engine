@@ -8,7 +8,7 @@ declaration verification — fully local, provider-neutral, Apache-2.0.**
 ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 [Source](https://github.com/ZeljkoDzafic/geocrop-engine) ·
-[Website](https://geocrop.calm-silence-b9f5.workers.dev) ·
+[Website](https://geocropengine.rs.ba/) ·
 [Documentation](docs/index.md) ·
 [CLI reference](docs/cli.md) ·
 [Limitations](docs/limitations.md)
