@@ -2,14 +2,15 @@ cff-version: 1.2.0
 message: "If you use GeoCrop Engine in your research, please cite it as below."
 title: "GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and parcel-level declaration verification"
 type: software
-version: 1.0.0rc1
-date-released: 2026-10-27
+version: 1.0.0rc2
+date-released: 2026-11-09
 license: Apache-2.0
 repository-code: "https://github.com/ZeljkoDzafic/geocrop-engine"
 authors:
   - family-names: "Džafić"
     given-names: "Željko"
     email: "zeljkodzafic@gmail.com"
+    orcid: "https://orcid.org/0009-0004-0839-1920"
     affiliation: "HTEC Group; Faculty of Technical Sciences, University of Novi Sad"
   - family-names: "Adžić"
     given-names: "Dragutin"

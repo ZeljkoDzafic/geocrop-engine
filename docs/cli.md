@@ -280,6 +280,96 @@ Jeffries-Matusita separability of class pairs per period and feature (parcel mea
 | `--groups` |  |  | feature groups to include (default: all period features) |
 | `--out` | yes |  |  |
 
+## `geocrop cv-stability`
+
+Spatial-block CV repeated over alternative block partitions (sensitivity to the split)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  | samples.npz written by the samples stage |
+| `--block-sizes` |  | `[5000]` | block sizes in metres |
+| `--offsets` |  | `4` | shifted grid origins per block size |
+| `--n-estimators` |  | `300` |  |
+| `--cv-folds` |  | `5` |  |
+| `--seed` |  | `42` |  |
+| `--targets` |  | `[]` | target classes for the target macro F1 |
+| `--train-exclude` |  | `[]` | polygon ids left out of training only |
+| `--train-max-samples` |  |  | cap pixels per polygon in training only |
+| `--train-relabel` |  | `[]` | training-only sensitivity: treat polygon ID as CLASS in training; scores keep the true labels |
+| `--feature-sets` |  |  | JSON written by `phenology-features` (name -> feature list) |
+| `--feature-set` |  |  | run on this named set from --feature-sets instead of every feature |
+| `--polygon-repeats` |  |  | repeats of stratified polygon-grouped k-fold CV |
+| `--watch` |  | `[]` | polygon ids whose OOF decision and nearby training data are recorded |
+| `--radii` |  | `[2000, 5000, 10000]` | radii (m) for nearby same-class training polygons |
+| `--out` | yes |  |  |
+
+## `geocrop phenology-features`
+
+Add season metrics and time-aligned profile columns to a samples file; write A/B/C feature sets
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--samples` | yes |  |  |
+| `--out` | yes |  | augmented samples.npz |
+| `--sets-out` | yes |  | JSON with the feature sets per cutoff |
+| `--indices` |  | `['NDVI', 'NDRE']` |  |
+| `--cutoffs` |  | `[]` | in-season cutoffs (day of year) |
+| `--windows` |  | `[]` | window end days, e.g. P1=151 |
+| `--threshold` |  | `0.5` | share of the amplitude that defines start and end |
+| `--min-amplitude` |  | `0.1` | smallest amplitude that counts as a season |
+| `--sos-offsets` |  | `[0, 15, 30, 45, 60, 90]` | days after start of season |
+| `--peak-offsets` |  | `[-60, -45, -30, -15, 15, 30, 45, 60]` | days from the peak (post-season only) |
+| `--fill` |  | `-1.0` | value written where a metric is undefined |
+
+## `geocrop phenology-timing`
+
+Start, peak, end and length of the seasonal curve and time alignment, from profiles.csv
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--profiles` | yes |  | profiles.csv written by `geocrop profiles` |
+| `--classes` | yes |  |  |
+| `--fraction` |  | `0.5` | share of the amplitude that defines start and end |
+| `--max-shift-days` |  | `45` |  |
+| `--out` | yes |  |  |
+
+## `geocrop parcel-aggregate`
+
+Compare majority, mean-probability and thresholded parcel decisions from oof_pixels.csv
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--oof-pixels` | yes |  | model/oof_pixels.csv written by train |
+| `--targets` |  | `[]` |  |
+| `--target-accuracy` |  | `0.95` | accuracy the accepted polygons should reach |
+| `--threshold` |  |  | fixed confidence threshold instead of fitting it per group |
+| `--out` | yes |  |  |
+
+## `geocrop profiles`
+
+Temporal profiles of selected polygons against class bands (label review)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--stack` | yes |  | time-series stack with <family>_d<day> features |
+| `--polygons` | yes |  |  |
+| `--label-field` |  | `class_name` |  |
+| `--id-field` |  | `polygon_id` |  |
+| `--highlight` | yes |  | polygon ids to plot against the class bands |
+| `--classes` | yes |  | classes forming the bands |
+| `--families` |  |  | feature families, e.g. ts_NDVI ts_NDRE (default: all) |
+| `--out` | yes |  |  |
+
+## `geocrop cloud-score`
+
+Attach Cloud Score+ style clearness rasters to Sentinel-2 scenes as CLDPRB masks
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--scenes` | yes |  | imported scene folders (each with SCL.tif) |
+| `--scores` | yes |  | folder with <scene folder name>.tif clearness rasters (0-1) |
+| `--overwrite` |  |  |  |
+
 ## `geocrop features`
 
 Build the multi-temporal feature stack

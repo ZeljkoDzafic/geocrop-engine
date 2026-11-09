@@ -10,6 +10,7 @@
    - [Parcel-level classification on signatures, LightTAE/TempCNN](parcel-classification.md)
 8. [Clouds, shadows and time series](timeseries.md)
    - [Class separability (JM) and window design](separability.md)
+   - [Sensitivity and review tools: training-only controls, partition stability, parcel aggregation, profiles, Cloud Score+](sensitivity.md)
 9. [Uncertainty, calibration and applicability](uncertainty.md)
    - [Domain shift: detection, coverage statements, safeguards](domain-shift.md)
 10. [Checks-by-Monitoring: signatures, markers, traffic light](cbm.md)

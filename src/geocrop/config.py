@@ -140,6 +140,9 @@ DEFAULTS: dict[str, Any] = {
         "feature_groups": None,
         # Train although a class of the reference polygons has no sample left (default: the run fails).
         "allow_missing_classes": False,
+        # Sensitivity controls applied to TRAINING only; the test folds stay those of all samples (docs/sensitivity.md).
+        "train_exclude_polygons": [],
+        "train_max_samples_per_polygon": None,
         # Estimator-specific hyperparameters passed through unchanged (e.g. for plugin estimators), validated
         # against the parameters the selected estimator accepts; they override the shared keys above.
         "params": {},
@@ -239,6 +242,8 @@ FINGERPRINT_NEUTRAL[("resources", "import_workers")] = 4
 FINGERPRINT_NEUTRAL[("resources", "workers")] = None
 FINGERPRINT_NEUTRAL[("model", "feature_groups")] = None
 FINGERPRINT_NEUTRAL[("model", "allow_missing_classes")] = False
+FINGERPRINT_NEUTRAL[("model", "train_exclude_polygons")] = []
+FINGERPRINT_NEUTRAL[("model", "train_max_samples_per_polygon")] = None
 # Domain-shift settings (docs/domain-shift.md) at their defaults.
 FINGERPRINT_NEUTRAL[("uncertainty",)] = copy.deepcopy(shift.DEFAULTS)
 
@@ -363,6 +368,14 @@ def validate(cfg: dict) -> dict:
     h = cfg["model"]["holdout_fraction"]
     if isinstance(h, bool) or not isinstance(h, (int, float)) or not 0 <= h < 0.5:
         raise ConfigError("model.holdout_fraction must be in [0, 0.5)")
+    excl = cfg["model"]["train_exclude_polygons"]
+    if not isinstance(excl, list) or not all(isinstance(e, (str, int)) and not isinstance(e, bool) for e in excl):
+        raise ConfigError("model.train_exclude_polygons must be a list of polygon ids")
+    cap = cfg["model"]["train_max_samples_per_polygon"]
+    if cap is not None and (isinstance(cap, bool) or not isinstance(cap, int) or cap < 1):
+        raise ConfigError("model.train_max_samples_per_polygon must be null or a positive integer")
+    if (excl or cap) and cfg["model"].get("tune_grid"):
+        raise ConfigError("model.train_exclude_polygons / train_max_samples_per_polygon cannot be combined with tune_grid")
     if cfg["model"]["calibration_mode"] not in ("oof", "holdout"):
         raise ConfigError("model.calibration_mode must be oof or holdout")
     fraction = cfg["model"]["calibration_fraction"]

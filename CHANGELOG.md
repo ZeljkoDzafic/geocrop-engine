@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 1.0.0rc2 — 2026-11-09
+
+Pre-release. Highlights: sensitivity and review tools for spatial cross-validation (alternative block partitions,
+polygon-grouped CV, watched polygons, training-only controls such as relabelling or exclusion, parcel aggregation,
+temporal profiles, phenology timing and configurable phenology-derived and time-aligned features), AOI-aware and
+parallel processing for irregular areas, Jeffries-Matusita class separability with overlapping candidate windows,
+reference-data intake, pixel-level out-of-fold predictions, and validation fixes. All accuracy figures produced by
+these tools are internal cross-validation results, a recommendation for human review and not independent validation.
+See the entries below, including *Validation fixes*, for changes in reported statistics.
+
+- `geocrop phenology-features` adds configurable season metrics and time-aligned profile columns to a samples file and writes post-season / in-season A, B, C feature sets; `cv-stability --feature-sets/--feature-set` runs on one of them ([docs/sensitivity.md](docs/sensitivity.md)).
+- Sensitivity and review tools ([docs/sensitivity.md](docs/sensitivity.md)): `model.train_exclude_polygons` and
+  `model.train_max_samples_per_polygon` change training only while the test folds stay fixed; the samples stage
+  writes `skipped_polygons.csv` with a reason per skipped polygon; new commands `cv-stability` (CV over alternative
+  block partitions), `parcel-aggregate` (majority, mean probability and thresholded parcel decisions, threshold fitted
+  on the other spatial groups), `profiles` (temporal profiles of chosen polygons against class bands) and
+  `cloud-score` (attach Cloud Score+ style clearness rasters as `CLDPRB.tif`). `model.spatial_blocks` accepts a grid
+  offset. `cv-stability` also writes per-variant confusion matrices, can add stratified polygon-grouped CV
+  (`--polygon-repeats`) and tracks chosen polygons (`--watch`, `--radii`) in `watch_polygons.csv` with their mean class probabilities; `--train-relabel ID=CLASS`
+  relabels polygons for training only. New command `phenology-timing` (start, peak, end, length and time alignment).
+- `geocrop train` also writes `model/oof_pixels.csv`: one row per training pixel with coordinates, spatial group,
+  label, out-of-fold prediction and (temperature-scaled) class probabilities, next to `oof_polygons.csv`.
 - Class separability ([docs/separability.md](docs/separability.md)): `geocrop separability` computes parcel-mean
   Jeffries-Matusita distances per period, feature and class pair (new module `geocrop.separability`). Experiments
   now report `target_macro_f1` (mean F1 of `classes.targets`). `compositing.allow_window_overlap` (default false)

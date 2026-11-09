@@ -241,6 +241,67 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
     x.add_argument("--out", required=True)
 
+    x = cmd("cv-stability", "Spatial-block CV repeated over alternative block partitions (sensitivity to the split)")
+    x.add_argument("--samples", required=True, help="samples.npz written by the samples stage")
+    x.add_argument("--block-sizes", type=float, nargs="+", default=[5000], help="block sizes in metres")
+    x.add_argument("--offsets", type=int, default=4, help="shifted grid origins per block size")
+    x.add_argument("--n-estimators", type=int, default=300)
+    x.add_argument("--cv-folds", type=int, default=5)
+    x.add_argument("--seed", type=int, default=42)
+    x.add_argument("--targets", nargs="*", default=[], help="target classes for the target macro F1")
+    x.add_argument("--train-exclude", nargs="*", default=[], help="polygon ids left out of training only")
+    x.add_argument("--train-max-samples", type=int, help="cap pixels per polygon in training only")
+    x.add_argument("--train-relabel", nargs="*", default=[], metavar="ID=CLASS",
+                   help="training-only sensitivity: treat polygon ID as CLASS in training; scores keep the true labels")
+    x.add_argument("--feature-sets", help="JSON written by `phenology-features` (name -> feature list)")
+    x.add_argument("--feature-set", help="run on this named set from --feature-sets instead of every feature")
+    x.add_argument("--polygon-repeats", type=int, default=0, help="repeats of stratified polygon-grouped k-fold CV")
+    x.add_argument("--watch", nargs="*", default=[], help="polygon ids whose OOF decision and nearby training data are recorded")
+    x.add_argument("--radii", type=float, nargs="+", default=[2000, 5000, 10000], help="radii (m) for nearby same-class training polygons")
+    x.add_argument("--out", required=True)
+
+    x = cmd("phenology-features", "Add season metrics and time-aligned profile columns to a samples file; write A/B/C feature sets")
+    x.add_argument("--samples", required=True)
+    x.add_argument("--out", required=True, help="augmented samples.npz")
+    x.add_argument("--sets-out", required=True, help="JSON with the feature sets per cutoff")
+    x.add_argument("--indices", nargs="+", default=["NDVI", "NDRE"])
+    x.add_argument("--cutoffs", type=float, nargs="*", default=[], help="in-season cutoffs (day of year)")
+    x.add_argument("--windows", nargs="*", default=[], metavar="NAME=END_DOY", help="window end days, e.g. P1=151")
+    x.add_argument("--threshold", type=float, default=0.5, help="share of the amplitude that defines start and end")
+    x.add_argument("--min-amplitude", type=float, default=0.1, help="smallest amplitude that counts as a season")
+    x.add_argument("--sos-offsets", type=int, nargs="*", default=[0, 15, 30, 45, 60, 90], help="days after start of season")
+    x.add_argument("--peak-offsets", type=int, nargs="*", default=[-60, -45, -30, -15, 15, 30, 45, 60],
+                   help="days from the peak (post-season only)")
+    x.add_argument("--fill", type=float, default=-1.0, help="value written where a metric is undefined")
+    x = cmd("phenology-timing", "Start, peak, end and length of the seasonal curve and time alignment, from profiles.csv")
+    x.add_argument("--profiles", required=True, help="profiles.csv written by `geocrop profiles`")
+    x.add_argument("--classes", nargs="+", required=True)
+    x.add_argument("--fraction", type=float, default=0.5, help="share of the amplitude that defines start and end")
+    x.add_argument("--max-shift-days", type=int, default=45)
+    x.add_argument("--out", required=True)
+
+    x = cmd("parcel-aggregate", "Compare majority, mean-probability and thresholded parcel decisions from oof_pixels.csv")
+    x.add_argument("--oof-pixels", required=True, help="model/oof_pixels.csv written by train")
+    x.add_argument("--targets", nargs="*", default=[])
+    x.add_argument("--target-accuracy", type=float, default=0.95, help="accuracy the accepted polygons should reach")
+    x.add_argument("--threshold", type=float, help="fixed confidence threshold instead of fitting it per group")
+    x.add_argument("--out", required=True)
+
+    x = cmd("profiles", "Temporal profiles of selected polygons against class bands (label review)")
+    x.add_argument("--stack", required=True, help="time-series stack with <family>_d<day> features")
+    x.add_argument("--polygons", required=True)
+    x.add_argument("--label-field", default="class_name")
+    x.add_argument("--id-field", default="polygon_id")
+    x.add_argument("--highlight", nargs="+", required=True, help="polygon ids to plot against the class bands")
+    x.add_argument("--classes", nargs="+", required=True, help="classes forming the bands")
+    x.add_argument("--families", nargs="*", help="feature families, e.g. ts_NDVI ts_NDRE (default: all)")
+    x.add_argument("--out", required=True)
+
+    x = cmd("cloud-score", "Attach Cloud Score+ style clearness rasters to Sentinel-2 scenes as CLDPRB masks")
+    x.add_argument("--scenes", required=True, help="imported scene folders (each with SCL.tif)")
+    x.add_argument("--scores", required=True, help="folder with <scene folder name>.tif clearness rasters (0-1)")
+    x.add_argument("--overwrite", action="store_true")
+
     # modelling
     x = cmd("features", "Build the multi-temporal feature stack")
     x.add_argument("--composites", required=True)
@@ -1219,6 +1280,57 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         from .s1 import composite
         print(composite(a.scenes, a.out, a.reference, a.separate_orbits, a.statistic,
                         aoi=_aoi_from_args(a, a.reference)))
+    elif c == "phenology-features":
+        from dataclasses import replace
+
+        from . import phenofeatures
+        from .samples import Samples
+        smp = Samples.load(a.samples)
+        names = list(map(str, smp.features))
+        opts = {"threshold": a.threshold, "min_amplitude": a.min_amplitude, "sos_offsets": a.sos_offsets,
+                "peak_offsets": a.peak_offsets, "fill": a.fill}
+        X, all_names, derived = phenofeatures.add_features(smp.X, names, a.indices, **opts)
+        for cut in a.cutoffs:
+            X, all_names, d = phenofeatures.add_features(X, all_names, a.indices, cut, **opts)
+            derived += d
+        windows = {k: float(v) for k, v in (w.split("=", 1) for w in a.windows)}
+        sets = {"post_season": phenofeatures.feature_sets(all_names, derived)}
+        for cut in a.cutoffs:
+            sets[f"in_season_d{int(cut)}"] = phenofeatures.feature_sets(all_names, derived, cut, windows)
+        flat = {f"{g}:{k}": v for g, d_ in sets.items() for k, v in d_.items()}
+        replace(smp, X=X, features=all_names).save(a.out)
+        Path(a.sets_out).write_text(json.dumps(flat, indent=1))
+        _print({"samples": a.out, "feature_sets": {k: len(v) for k, v in flat.items()}, "derived": len(derived)})
+    elif c == "cv-stability":
+        from . import stability
+        from .samples import Samples
+        sel = None
+        if a.feature_set:
+            sel = json.loads(Path(a.feature_sets).read_text())[a.feature_set]
+        r = stability.run(Samples.load(a.samples), {"n_estimators": a.n_estimators, "class_weight": "balanced_subsample",
+                          "max_features": "sqrt", "n_jobs": -1}, a.block_sizes, a.offsets, a.cv_folds, a.seed, a.targets,
+                          features=sel, train_exclude=a.train_exclude, train_max_samples_per_polygon=a.train_max_samples, out=a.out,
+                          polygon_repeats=a.polygon_repeats, watch=a.watch, radii_m=a.radii,
+                          train_relabel=dict(x.split("=", 1) for x in a.train_relabel))
+        r.pop("table")
+        r.pop("watch_table")
+        _print(r)
+    elif c == "phenology-timing":
+        from . import phenotiming
+        _print(phenotiming.run(a.profiles, a.classes, a.out, a.fraction, a.max_shift_days))
+    elif c == "parcel-aggregate":
+        import pandas as pd
+
+        from . import aggregation
+        r = aggregation.compare(pd.read_csv(a.oof_pixels), a.targets, a.target_accuracy, a.threshold, a.out)
+        r.pop("table")
+        _print(r)
+    elif c == "profiles":
+        from . import profiles
+        _print(profiles.run(a.stack, a.polygons, a.label_field, a.highlight, a.classes, a.out, a.id_field, a.families))
+    elif c == "cloud-score":
+        from . import cloudscore
+        _print(cloudscore.attach(a.scenes, a.scores, a.overwrite))
     elif c == "separability":
         from . import separability
         _print(separability.run(a.stack, a.polygons, a.label_field, a.classes, a.out, a.id_field, a.groups))

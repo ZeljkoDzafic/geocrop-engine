@@ -34,6 +34,12 @@ LAYERS: dict[str, frozenset[str]] = {
         "parallel", "segmentation", "segmentation_metrics", "segmenters", "spatial", "splits", "timeseries", "tsfeatures",
         "uncertainty", "unet", "validation", "_layers",
         "separability",  # Jeffries-Matusita class separability from parcel means
+        "stability",     # spread of spatial-block CV scores over alternative block partitions
+        "aggregation",   # parcel-level aggregation of pixel OOF predictions (majority, mean probability, threshold)
+        "profiles",      # temporal profiles of selected polygons against class bands
+        "phenotiming",   # start/peak/end/length of seasonal curves and time alignment
+        "phenofeatures",   # season metrics and time-aligned profile columns for samples; A/B/C feature sets
+        "cloudscore",    # attach external cloud-clearness rasters (Cloud Score+) as CLDPRB masks
         "calendars",     # data-driven crop calendars and phenological windows
         "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
         "cachedirs",     # download cache root and subfolders (environment variables only)
