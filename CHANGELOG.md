@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.0.0rc2 — 2026-11-09
+
+Pre-release. Highlights: sensitivity and review tools for spatial cross-validation (alternative block partitions,
+polygon-grouped CV, watched polygons, training-only controls such as relabelling or exclusion, parcel aggregation,
+temporal profiles, phenology timing and configurable phenology-derived and time-aligned features), AOI-aware and
+parallel processing for irregular areas, Jeffries-Matusita class separability with overlapping candidate windows,
+reference-data intake, pixel-level out-of-fold predictions, and validation fixes. All accuracy figures produced by
+these tools are internal cross-validation results, a recommendation for human review and not independent validation.
+See the entries below, including *Validation fixes*, for changes in reported statistics.
+
 - `geocrop phenology-features` adds configurable season metrics and time-aligned profile columns to a samples file and writes post-season / in-season A, B, C feature sets; `cv-stability --feature-sets/--feature-set` runs on one of them ([docs/sensitivity.md](docs/sensitivity.md)).
 - Sensitivity and review tools ([docs/sensitivity.md](docs/sensitivity.md)): `model.train_exclude_polygons` and
   `model.train_max_samples_per_polygon` change training only while the test folds stay fixed; the samples stage
