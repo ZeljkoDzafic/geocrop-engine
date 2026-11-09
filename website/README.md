@@ -58,7 +58,7 @@ commands target the public main branch.
 
 ### Cloudflare (current deployment)
 
-The site is published as Cloudflare static assets at <https://geocrop.calm-silence-b9f5.workers.dev>.
+The site is published as Cloudflare static assets at <https://geocropengine.rs.ba/> (also reachable at <https://geocrop.calm-silence-b9f5.workers.dev>).
 After `npx wrangler login` (or with `CLOUDFLARE_API_TOKEN` set), run:
 
 ```bash
