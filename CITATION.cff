@@ -8,8 +8,8 @@ license: Apache-2.0
 doi: 10.5281/zenodo.24078244
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.24078771
-    description: "Zenodo record of version 1.0.0rc2"
+    value: 10.5281/zenodo.24104638
+    description: "Zenodo record of version 1.0.0rc3"
   - type: doi
     value: 10.5281/zenodo.24078244
     description: "Zenodo concept DOI (all versions)"
