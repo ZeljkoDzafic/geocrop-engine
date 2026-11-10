@@ -2,14 +2,14 @@ cff-version: 1.2.0
 message: "If you use GeoCrop Engine in your research, please cite it as below."
 title: "GeoCrop Engine: open Sentinel-1/Sentinel-2 crop-type classification and parcel-level declaration verification"
 type: software
-version: 1.0.0rc2
+version: 1.0.0rc3
 date-released: 2026-11-09
 license: Apache-2.0
 doi: 10.5281/zenodo.24078244
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.24078771
-    description: "Zenodo record of version 1.0.0rc2"
+    value: 10.5281/zenodo.24104638
+    description: "Zenodo record of version 1.0.0rc3"
   - type: doi
     value: 10.5281/zenodo.24078244
     description: "Zenodo concept DOI (all versions)"
