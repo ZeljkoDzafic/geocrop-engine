@@ -13,6 +13,7 @@
   area disagreement, model disagreement; `expected_pixels`, `valid_pixel_fraction`), `dominant_nonagricultural_class`,
   `--compare-probabilities` (second model) and `--review-sample N` (stratified sample for QGIS). All thresholds are unvalidated.
   Manifest schema is now `geocrop-crop-presence/2` (new fields only).
+- `geocrop segmentation-sweep` (module `segment_sweep`, [docs/segmentation.md](docs/segmentation.md#segment-density-sweep)): runs OBIA at several segment densities (default 100, 300, 500, 1000 per km²) and reports segment counts, area quantiles, share of small segments, runtime, fit to parcels (segments per parcel, boundary mismatch), object purity against reference polygons and the effect on `crop-presence` P3 against the connected-pixel baseline; CSV, markdown and manifest. Segments serve segmentation-assisted post-classification refinement, not an independent GEOBIA classification (a GEOBIA random forest is a possible future feature, not implemented).
 
 ## 1.0.0rc3 — 2026-11-09
 
