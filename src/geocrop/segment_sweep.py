@@ -150,11 +150,11 @@ def sweep(raster: str | Path, out: str | Path, densities=DEFAULT_DENSITIES, band
           workers: int | None = None, min_ha: float = 0.03, parcels: str | Path | None = None, min_segments: int = 2,
           reference: str | Path | None = None, label_field: str | None = None,
           probabilities: str | Path | None = None, id_field: str = "parcel_id", declared_field: str = "declared_crop",
-          presence_options: dict | None = None, keep_segments: bool = True) -> dict:
+          presence_options: dict | None = None, keep_segments: bool = True, aoi=None) -> dict:
     """Run ``obia`` per density and write ``segment_sweep.csv``, ``segment_sweep.md`` and ``segment_sweep_manifest.json``.
 
     `presence_options` are extra keyword arguments of ``crop_presence.analyse`` (e.g. ``crop_mapping``,
-    ``declared_area_field``, ``support_prob``); the probability raster and parcels (with the declared-crop column)
+    ``declared_area_field``, ``support_prob``); `aoi` is an optional `geocrop.aoi.AoiMask` (only AOI pixels are segmented); the probability raster and parcels (with the declared-crop column)
     enable the crop-presence comparison. Segments are kept as ``segments_d<density>.gpkg`` unless `keep_segments` is False."""
     from .segmentation import obia
     dens = [float(d) for d in densities]
@@ -184,7 +184,7 @@ def sweep(raster: str | Path, out: str | Path, densities=DEFAULT_DENSITIES, band
         path = out / f"segments_d{tag}.gpkg"
         t0 = time.perf_counter()
         r = obia(raster, path, bands, tile_size, d, compactness, min_area_pixels, merge_seams, merge_distance,
-                 workers=workers)
+                 workers=workers, aoi=aoi)
         runtime = time.perf_counter() - t0
         seg = gpd.read_file(path)
         row = {"requested_per_km2": d, **segment_stats(seg, min_ha), "runtime_s": round(runtime, 2),

@@ -609,6 +609,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--declared-area-field")
     x.add_argument("--crop-mapping", help="CSV source_code,class_name")
     x.add_argument("--support-prob", type=float, default=0.5)
+    _aoi_args(x, reference=False)
     x.add_argument("--discard-segments", action="store_true", help="delete the segment files after the sweep")
 
     x = cmd("segment-unet-train", "Train the boundary U-Net (requires torch)")
@@ -1658,7 +1659,7 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(sweep(a.raster, a.out, a.densities, a.bands, a.tile_size, a.compactness, a.min_area_pixels,
                      not a.no_merge_seams, a.merge_distance, a.workers, a.min_ha, a.parcels, a.min_segments,
                      a.reference, a.label_field, a.probabilities, a.id_field, a.declared_field, opts,
-                     keep_segments=not a.discard_segments))
+                     keep_segments=not a.discard_segments, aoi=_aoi_from_args(a)))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
         r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,

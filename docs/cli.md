@@ -787,6 +787,9 @@ Sweep OBIA segment density: segment statistics, parcel fit, purity and effect on
 | `--declared-area-field` |  |  |  |
 | `--crop-mapping` |  |  | CSV source_code,class_name |
 | `--support-prob` |  | `0.5` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--discard-segments` |  |  | delete the segment files after the sweep |
 
 ## `geocrop segment-unet-train`
