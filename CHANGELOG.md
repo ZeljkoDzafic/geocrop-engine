@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `geocrop segmentation-sweep` (module `segment_sweep`, [docs/segmentation.md](docs/segmentation.md#segment-density-sweep)): runs OBIA at several segment densities (default 100, 300, 500, 1000 per km²) and reports segment counts, area quantiles, share of small segments, runtime, fit to parcels (segments per parcel, boundary mismatch), object purity against reference polygons and the effect on `crop-presence` P3 against the connected-pixel baseline; CSV, markdown and manifest. Segments serve segmentation-assisted post-classification refinement, not an independent GEOBIA classification (a GEOBIA random forest is a possible future feature, not implemented).
+
 ## 1.0.0rc3 — 2026-11-09
 
 Pre-release. Highlights: `geocrop crop-presence` (presence of a declared crop in heterogeneous parcels with three comparable methods P1 pixel majority, P2 area-weighted soft vote, P3 segment-based evidence; preliminary status with unvalidated thresholds), review fixes (in-season feature sets by window names, combined parcel threshold fitted on agreeing parcels, training controls in transfer validation), updated website and `.mailmap`. The main experiments of the 2023 case study were re-executed from a clean commit contained in this release with identical results (see the reproducibility package). All accuracy figures produced by the tools are internal cross-validation results, a recommendation for human review and not independent validation.

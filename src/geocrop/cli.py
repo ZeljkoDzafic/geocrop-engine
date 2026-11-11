@@ -586,6 +586,31 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     _aoi_args(x, reference=False)
     x.add_argument("--workers", type=int, help="processes for tiles (default min(usable CPUs, 4); 1 = single process)")
 
+    x = cmd("segmentation-sweep", "Sweep OBIA segment density: segment statistics, parcel fit, purity and effect on crop-presence "
+                                  "(segmentation-assisted post-classification refinement, not GEOBIA classification)")
+    x.add_argument("--raster", required=True, help="raster in a projected CRS (metres) to segment")
+    x.add_argument("--out", required=True, help="output directory")
+    x.add_argument("--densities", type=float, nargs="+", default=[100, 300, 500, 1000], help="segments per km2")
+    x.add_argument("--bands", nargs="*")
+    x.add_argument("--compactness", type=float, default=0.1)
+    x.add_argument("--tile-size", type=int, default=1024)
+    x.add_argument("--min-area-pixels", type=int, default=9)
+    x.add_argument("--no-merge-seams", action="store_true")
+    x.add_argument("--merge-distance", type=float, default=0.08)
+    x.add_argument("--workers", type=int, help="processes for tiles (default min(usable CPUs, 4); 1 = single process)")
+    x.add_argument("--min-ha", type=float, default=0.03, help="segments below this area (ha) are counted as small")
+    x.add_argument("--parcels", help="parcel polygons: median area, segments per parcel, boundary mismatch")
+    x.add_argument("--min-segments", type=int, default=2, help="k for the share of parcels with >= k segments")
+    x.add_argument("--reference", help="reference polygons with --label-field: object purity")
+    x.add_argument("--label-field")
+    x.add_argument("--probabilities", help="probabilities.tif: run crop-presence per density (needs --parcels)")
+    x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--declared-field", default="declared_crop")
+    x.add_argument("--declared-area-field")
+    x.add_argument("--crop-mapping", help="CSV source_code,class_name")
+    x.add_argument("--support-prob", type=float, default=0.5)
+    x.add_argument("--discard-segments", action="store_true", help="delete the segment files after the sweep")
+
     x = cmd("segment-unet-train", "Train the boundary U-Net (requires torch)")
     x.add_argument("--images", required=True)
     x.add_argument("--masks", required=True)
@@ -1625,6 +1650,15 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
         _print(obia(a.raster, a.out, a.bands, a.tile_size, a.segments_per_km2, a.compactness,
                     merge_seams=not a.no_merge_seams, merge_distance=a.merge_distance, workers=a.workers,
                     aoi=_aoi_from_args(a)))
+    elif c == "segmentation-sweep":
+        from .adapters import read_mapping
+        from .segment_sweep import sweep
+        opts = {"support_prob": a.support_prob, "declared_area_field": a.declared_area_field,
+                "crop_mapping": read_mapping(a.crop_mapping) or None}
+        _print(sweep(a.raster, a.out, a.densities, a.bands, a.tile_size, a.compactness, a.min_area_pixels,
+                     not a.no_merge_seams, a.merge_distance, a.workers, a.min_ha, a.parcels, a.min_segments,
+                     a.reference, a.label_field, a.probabilities, a.id_field, a.declared_field, opts,
+                     keep_segments=not a.discard_segments))
     elif c == "segment-unet-train":
         from .segmentation import unet_train
         r = unet_train(a.images, a.masks, a.model, a.epochs, a.batch_size, groups=a.groups,

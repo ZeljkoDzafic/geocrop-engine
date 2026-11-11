@@ -88,6 +88,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
 | `export` | COG, GeoParquet, STAC items, HCAT mapping |
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
+| `segment_sweep` | segment-density sweep for segmentation-assisted post-classification refinement: segment statistics, parcel fit, object purity, effect on crop-presence |
 | `segmenters` | `Segmenter` protocol and registered OBIA, U-Net + watershed and Fields of The World (`ftw`) segmenters |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
 | `intake` | reference-data intake report (`geocrop intake`): readability, encodings, crop-mapping coverage, season, AOI overlap, class/CV support, leakage; reuses `audit` and `preflight` ([guide](intake.md)) |

@@ -25,6 +25,40 @@ geocrop boundaries-to-parcels --raster boundary.tif --out candidates.gpkg --thre
 * Training patches must come from areas spatially separate from the evaluation parcels. Pretrained global
   field-boundary models can be used instead: see [Fields of The World](field-boundaries.md) (`geocrop ftw-boundaries`).
 
+## Segment-density sweep
+`geocrop segmentation-sweep --raster stack.tif --out sweep/ [--densities 100 300 500 1000]` runs `segment-obia` at
+several densities and writes `segment_sweep.csv`, `segment_sweep.md` (one column per density) and
+`segment_sweep_manifest.json` (parameters, SHA-256 of every input, engine version; SLIC is deterministic, so there is
+no seed). Segment files are kept as `segments_d<density>.gpkg` (`--discard-segments` removes them).
+
+**What this is.** Segments are used for *segmentation-assisted post-classification refinement*: pixel classes or
+probabilities of an existing classifier are aggregated per object (for example P3 of
+[crop-presence](crop-presence.md)). It is not an independent GEOBIA classification: no object features are computed and
+no classifier is trained on objects. An independent GEOBIA random forest is a possible future feature and is not
+implemented here.
+
+Per density the table reports the number of segments, the realised density, area quantiles in ha (min, p10, median, p90,
+max), the share of segments below `--min-ha` (default 0.03 ha) and the runtime. Optional blocks:
+
+* `--parcels`: median parcel area and its ratio to the median segment, share of parcels holding at least
+  `--min-segments` segments (a segment belongs to the parcel containing its representative point), mean segments per
+  parcel and *boundary mismatch*: area share of segments that overlap two or more parcels by at least 5 % of their
+  area each (area-weighted, among segments touching any parcel).
+* `--reference POLYGONS --label-field FIELD`: object purity, the share of the majority reference class in the covered
+  part of each segment (area-weighted mean, median, share of segments below 0.8). Low purity indicates
+  under-segmentation. Reference polygons must not overlap each other.
+* `--probabilities probabilities.tif --parcels ... --declared-field ...`: `crop-presence` is run once on connected
+  same-class pixels (baseline) and once per density with that density's segments. The table lists status changes,
+  supported gained/lost, shares supported and the mean supported share of the agricultural part (P3), together with
+  the P1 match share and mean P2 soft vote (neither depends on segments, so they are the fixed reference); read finer
+  segments as beneficial only if they change P3 where the evidence supports it, not merely because more parcels become
+  supported. `--declared-area-field`, `--crop-mapping` and `--support-prob` are passed to `crop-presence`.
+
+**Caveats.** `segments_per_km2` is a target for SLIC initial centres per tile, not a count: segments below
+`min_area_pixels` are dropped, SLIC does not use every centre on homogeneous areas and seam merging joins pieces, so the
+realised density (reported) differs from the requested one. Runtime grows with density. All values are a recommendation
+for human review, not a validated conclusion; purity and mismatch depend on the quality of the reference polygons.
+
 ## Evaluation
 * `geocrop evaluate-segments --segments candidates.gpkg --reference parcels_ref.gpkg --out seg.json`:
   over-/under-segmentation and D (Clinton et al., 2010) per reference object, plus one-to-one matched-object

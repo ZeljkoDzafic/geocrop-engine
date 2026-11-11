@@ -760,6 +760,35 @@ SLIC superpixel segmentation (tiled, segments merged across tile seams)
 | `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
 
+## `geocrop segmentation-sweep`
+
+Sweep OBIA segment density: segment statistics, parcel fit, purity and effect on crop-presence (segmentation-assisted post-classification refinement, not GEOBIA classification)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--raster` | yes |  | raster in a projected CRS (metres) to segment |
+| `--out` | yes |  | output directory |
+| `--densities` |  | `[100, 300, 500, 1000]` | segments per km2 |
+| `--bands` |  |  |  |
+| `--compactness` |  | `0.1` |  |
+| `--tile-size` |  | `1024` |  |
+| `--min-area-pixels` |  | `9` |  |
+| `--no-merge-seams` |  |  |  |
+| `--merge-distance` |  | `0.08` |  |
+| `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
+| `--min-ha` |  | `0.03` | segments below this area (ha) are counted as small |
+| `--parcels` |  |  | parcel polygons: median area, segments per parcel, boundary mismatch |
+| `--min-segments` |  | `2` | k for the share of parcels with >= k segments |
+| `--reference` |  |  | reference polygons with --label-field: object purity |
+| `--label-field` |  |  |  |
+| `--probabilities` |  |  | probabilities.tif: run crop-presence per density (needs --parcels) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` |  |
+| `--declared-area-field` |  |  |  |
+| `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--support-prob` |  | `0.5` |  |
+| `--discard-segments` |  |  | delete the segment files after the sweep |
+
 ## `geocrop segment-unet-train`
 
 Train the boundary U-Net (requires torch)
