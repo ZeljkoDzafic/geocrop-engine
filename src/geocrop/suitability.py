@@ -251,7 +251,7 @@ def _md_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-NOTE = ("Technically unsuitable means unsuitable for reliable satellite analysis at 10 m, not an unsupported declaration. "
+NOTE = ("Insufficient spatial resolution means unsuitable for reliable satellite analysis at 10 m, not an unsupported declaration. "
         "The thresholds are not validated: this table is a recommendation for human review, to be read before any "
         "threshold is adopted.")
 
@@ -318,10 +318,11 @@ def compare_subsets(crop_presence_csv: str | Path | pd.DataFrame, suitability_cs
             ev, sup = _supported(sub, m, p2_threshold)
             n, k = int(ev.sum()), int((ev & sup).sum())
             row = {"subset": sname, "method": m, "n_declarations": len(sub), "area_ha": float(sub["parcel_area_ha"].sum()),
-                   "n_evaluated": n, "n_supported": k, "share_supported": k / n if n else None}
+                   "n_evaluated": n, "n_supported": k,
+                   "share_supported": k / len(sub) if len(sub) else None, "share_of_evaluated": k / n if n else None}
             if m == "p3_status":
                 for key in ("supported", "disputed_review", "not_supported"):
-                    row[f"share_{key}"] = float((st == key).sum() / n) if n else None
+                    row[f"share_{key}"] = float((st == key).sum() / len(sub)) if len(sub) else None
             rows.append(row)
         for a, b in itertools.combinations(("p1_agricultural", "p2_soft_vote", "p3_status"), 2):
             ea, sa = _supported(sub, a, p2_threshold)

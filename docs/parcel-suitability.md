@@ -88,3 +88,7 @@ parcels of at least 0.5 ha, and parcels that also pass the geometry criteria. Fo
 declarations, the share supported by P1, P2 and P3, the P3 shares of `supported`, `disputed_review` and `not_supported`, and the
 pairwise agreement of P1 (agricultural part), P2 and P3 are written (`subset_comparison.csv`, `subset_agreement.csv`). Excluded
 declarations stay in the register; they are left out of the basic evaluation only.
+
+`share_supported` and the P3 status shares use all declarations of the group as the denominator (a declaration without evidence for
+a method, for example no agricultural pixel for P2, counts as not supported by it), which is the convention of the crop-presence tables;
+`share_of_evaluated` uses only the declarations for which the method could be evaluated.
