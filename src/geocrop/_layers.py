@@ -42,6 +42,7 @@ LAYERS: dict[str, frozenset[str]] = {
         "crop_presence",   # presence of a declared crop in heterogeneous parcels: pixel majority, soft vote, segment evidence
         "cloudscore",    # attach external cloud-clearness rasters (Cloud Score+) as CLDPRB masks
         "calendars",     # data-driven crop calendars and phenological windows
+        "windows",       # temporal windows: JM, single/cumulative/optimised CV, earliest reliable window, leakage guard
         "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
         "cachedirs",     # download cache root and subfolders (environment variables only)
         "hcat",          # EuroCrops HCAT class harmonisation

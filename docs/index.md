@@ -11,6 +11,7 @@
    - [Presence of a declared crop in heterogeneous parcels](crop-presence.md)
 8. [Clouds, shadows and time series](timeseries.md)
    - [Class separability (JM) and window design](separability.md)
+   - [Temporal windows: single, cumulative, optimised; earliest reliable window; in-season leakage guard](temporal-windows.md)
    - [Sensitivity and review tools: training-only controls, partition stability, parcel aggregation, profiles, Cloud Score+](sensitivity.md)
 9. [Uncertainty, calibration and applicability](uncertainty.md)
    - [Domain shift: detection, coverage statements, safeguards](domain-shift.md)

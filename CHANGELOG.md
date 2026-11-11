@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `geocrop windows list|run|guard` (module `windows`, [docs/temporal-windows.md](docs/temporal-windows.md)): generic temporal-window analysis for any area, season and crops. Named or generated windows (length, step, overlap); JM of selected class pairs and variables per window; single, cumulative and nested-optimised windows compared on the same units and spatial folds; spatial-CV contribution of S1-only, S2-only and combined features (drop-group gain, group permutation importance); earliest reliable window under criteria frozen in the manifest before evaluation (class F1/recall, JM, bootstrap or fold-wise lower bound, stability over later windows); CSV/markdown tables, PNG plots, resolved configuration and manifest with seed and input hashes.
+- In-season leakage guard: `windows.check_provenance`, `check_observation_dates`, `check_feature_names` raise `LeakageError` for anything dated after the classification date, and `windows.causal_smooth` refits the Whittaker smoother on observations up to each cutoff. Tests prove that perturbing later observations leaves in-season features bit-identical while the whole-season smoother changes.
+
 ## 1.0.0rc3 — 2026-11-09
 
 Pre-release. Highlights: `geocrop crop-presence` (presence of a declared crop in heterogeneous parcels with three comparable methods P1 pixel majority, P2 area-weighted soft vote, P3 segment-based evidence; preliminary status with unvalidated thresholds), review fixes (in-season feature sets by window names, combined parcel threshold fitted on agreeing parcels, training controls in transfer validation), updated website and `.mailmap`. The main experiments of the 2023 case study were re-executed from a clean commit contained in this release with identical results (see the reproducibility package). All accuracy figures produced by the tools are internal cross-validation results, a recommendation for human review and not independent validation.

@@ -241,6 +241,18 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
     x.add_argument("--out", required=True)
 
+    x = cmd("windows", "Temporal windows: JM and spatial-CV comparison of single, cumulative and optimised windows, "
+                       "earliest reliable window under pre-registered criteria, in-season leakage guard")
+    x.add_argument("action", choices=["list", "run", "guard"],
+                   help="list: resolve windows (explicit or generated); run: full analysis; guard: check feature "
+                        "names against a cutoff")
+    x.add_argument("--config", help="YAML/JSON: season, windows / generate, groups, criteria, cv, model (see docs/temporal-windows.md)")
+    x.add_argument("--observations", help="run: long CSV/Parquet unit_id, class_name, x, y, date, variable, value")
+    x.add_argument("--out", help="run: output directory; list: write the windows YAML block here")
+    x.add_argument("--seed", type=int, help="run: override the configuration seed")
+    x.add_argument("--cutoff", help="guard: classification date (ISO)")
+    x.add_argument("--names", nargs="+", help="guard: feature column names to check")
+
     x = cmd("cv-stability", "Spatial-block CV repeated over alternative block partitions (sensitivity to the split)")
     x.add_argument("--samples", required=True, help="samples.npz written by the samples stage")
     x.add_argument("--block-sizes", type=float, nargs="+", default=[5000], help="block sizes in metres")
@@ -1087,6 +1099,44 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     return p
 
 
+def _windows(a):
+    """`geocrop windows list|run|guard` (kept out of `main` to keep the dispatch flat)."""
+    import yaml
+
+    from . import windows as W
+
+    cfg = {}
+    if a.config:
+        cfg = yaml.safe_load(Path(a.config).read_text(encoding="utf8")) or {}
+    if a.seed is not None:
+        cfg["seed"] = a.seed
+    if a.action == "list":
+        rc = W.resolve_config(cfg, need_groups=False)
+        ws = W.parse_windows(rc["windows"])
+        text = W.windows_yaml(ws, "windows resolved by geocrop windows list")
+        cum = W.cumulative_windows(ws, rc["season"]["start"])
+        if a.out:
+            Path(a.out).write_text(text, encoding="utf8")
+        _print({"windows": [w.as_dict() for w in ws], "cumulative": [w.as_dict() for w in cum],
+                "yaml": a.out or text})
+    elif a.action == "run":
+        if not a.observations or not a.out:
+            raise SystemExit("windows run needs --observations and --out")
+        r = W.evaluate(a.observations, cfg, a.out)
+        out = Path(a.out)
+        (out / "resolved_config.yaml").write_text(yaml.safe_dump(r["config"], sort_keys=False), encoding="utf8")
+        _print({**r["summary"], "out": str(out)})
+    else:
+        if not a.cutoff or not a.names or not cfg:
+            raise SystemExit("windows guard needs --cutoff, --names and --config with the windows")
+        try:
+            rc = W.resolve_config(cfg, need_groups=False)
+            W.check_feature_names(a.names, a.cutoff, {w.name: w.end for w in W.parse_windows(rc["windows"])})
+        except W.LeakageError as exc:
+            raise SystemExit(f"LEAKAGE: {exc}") from exc
+        _print({"cutoff": a.cutoff, "checked": len(a.names), "ok": True})
+
+
 def _calendar(a):
     """`geocrop calendar derive|worldcereal` (kept out of `main` to keep the dispatch flat)."""
     from . import calendars
@@ -1333,6 +1383,8 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                      a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
                                      min_supported_share=a.min_supported_share, low_score=a.low_score,
                                      min_confidence=a.min_confidence, area_tolerance=a.area_tolerance))
+    elif c == "windows":
+        _windows(a)
     elif c == "cv-stability":
         from . import stability
         from .samples import Samples
