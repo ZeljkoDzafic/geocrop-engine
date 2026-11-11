@@ -3,6 +3,16 @@
 ## Unreleased
 
 - `geocrop parcel-suitability` (module `suitability`, [docs/parcel-suitability.md](docs/parcel-suitability.md)): parcel geometry suitability for reliable 10 m analysis before a declaration is analysed. Area, representative width (inscribed circle and 2A/P), compactness, elongation, pixel centres inside, inner (10 m buffer) and reliable inner pixels (valid, optional mask); configurable rule with reason codes (`insufficient_spatial_resolution` means unsuitable for reliable satellite analysis, never an unsupported declaration); `sensitivity_grid` (CSV and markdown: excluded parcels and area over area x width x inner pixels, by declared crop and size class) and `compare_subsets` (P1/P2/P3 of `crop-presence` on all declarations and on suitable parcels only). The default thresholds are not validated.
+- `geocrop crop-presence`: audit of P3 and two additions that leave every existing P3 column and status unchanged. The audit
+  ([docs/crop-presence.md](docs/crop-presence.md)): with the default `--min-supported-share 0.5` the P3 `supported` set is a
+  subset of the P1 agricultural-majority set (up to exact 50 % ties), so P3 adds no support beyond P1. New `presence_status`
+  (present / partial_presence / absent / indeterminate; connected supported area, reliability, optional share of the declared
+  area; `--presence-min-mean-p`, `--presence-min-share`, `--min-valid-fraction`, `--min-expected-pixels`), `--sensitivity`
+  (`presence_sensitivity.csv`, grid of `min_connected_ha` x `support_prob` with cross-tab against P1 and P2), a mismatch
+  taxonomy (`mismatch_category` and `flag_*`: insufficient spatial resolution, no valid observations, other crop, partial,
+  area disagreement, model disagreement; `expected_pixels`, `valid_pixel_fraction`), `dominant_nonagricultural_class`,
+  `--compare-probabilities` (second model) and `--review-sample N` (stratified sample for QGIS). All thresholds are unvalidated.
+  Manifest schema is now `geocrop-crop-presence/2` (new fields only).
 
 ## 1.0.0rc3 — 2026-11-09
 
