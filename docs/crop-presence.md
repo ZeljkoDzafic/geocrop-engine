@@ -52,3 +52,5 @@ counted as zero; every pixel has the same area on the regular grid; no minimum a
 the segments counted as supported; `--min-connected-ha` is a threshold of the preliminary status rule, and
 `connected_support_ha` itself is computed without a minimum). A mean probability is not a validated
 estimate of the crop's area.
+
+Whether a parcel is geometrically suitable for 10 m analysis at all (area, width, inner pixels) is a separate, earlier question: see [parcel suitability](parcel-suitability.md), whose `compare_subsets` repeats the P1/P2/P3 comparison on suitable parcels only.
