@@ -582,6 +582,15 @@ Presence of the declared crop in heterogeneous parcels: pixel majority, area-wei
 | `--min-confidence` |  | `0.6` |  |
 | `--area-tolerance` |  | `0.5` |  |
 | `--min-pixels` |  | `4` |  |
+| `--presence-min-mean-p` |  | `0.6` | presence_status: minimum mean P(declared) of the connected supported area (not validated) |
+| `--presence-min-share` |  | `0.5` | presence_status: minimum connected supported area as a share of the declared area, when given |
+| `--min-valid-fraction` |  | `0.5` | minimum valid pixels / expected pixels (parcel area / pixel area); below: no_valid_observations |
+| `--min-expected-pixels` |  | `8.0` | parcels smaller than this many pixels: insufficient_spatial_resolution |
+| `--nonagri-max-share` |  | `0.1` | dominant_nonagricultural_class is reported for parcels with at most this agricultural share |
+| `--compare-probabilities` |  |  | second probabilities.tif (another model) analysed on the same parcels |
+| `--review-sample` |  |  | write N parcels per mismatch_category for visual control (review_sample.csv/.gpkg) |
+| `--seed` |  |  |  |
+| `--sensitivity` |  |  | also write presence_sensitivity.csv (min connected ha 0.03/0.05/0.1/0.2 x support-prob 0.4/0.5/0.6) |
 
 ## `geocrop parcel-model`
 

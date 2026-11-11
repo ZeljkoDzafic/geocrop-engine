@@ -462,6 +462,22 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--min-confidence", type=float, default=0.6)
     x.add_argument("--area-tolerance", type=float, default=0.5)
     x.add_argument("--min-pixels", type=int, default=4)
+    x.add_argument("--presence-min-mean-p", type=float, default=0.6,
+                   help="presence_status: minimum mean P(declared) of the connected supported area (not validated)")
+    x.add_argument("--presence-min-share", type=float, default=0.5,
+                   help="presence_status: minimum connected supported area as a share of the declared area, when given")
+    x.add_argument("--min-valid-fraction", type=float, default=0.5,
+                   help="minimum valid pixels / expected pixels (parcel area / pixel area); below: no_valid_observations")
+    x.add_argument("--min-expected-pixels", type=float, default=8.0,
+                   help="parcels smaller than this many pixels: insufficient_spatial_resolution")
+    x.add_argument("--nonagri-max-share", type=float, default=0.10,
+                   help="dominant_nonagricultural_class is reported for parcels with at most this agricultural share")
+    x.add_argument("--compare-probabilities", help="second probabilities.tif (another model) analysed on the same parcels")
+    x.add_argument("--review-sample", type=int, default=0, metavar="N",
+                   help="write N parcels per mismatch_category for visual control (review_sample.csv/.gpkg)")
+    x.add_argument("--seed", type=int, default=0)
+    x.add_argument("--sensitivity", action="store_true",
+                   help="also write presence_sensitivity.csv (min connected ha 0.03/0.05/0.1/0.2 x support-prob 0.4/0.5/0.6)")
 
     x = cmd("parcel-model", "Second-stage parcel classifier on aggregated descriptors")
     x.add_argument("--parcels", required=True, help="output of geocrop parcels with a reference label column")
@@ -1327,12 +1343,28 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
     elif c == "crop-presence":
         from . import crop_presence
         from .adapters import read_mapping
-        _print(crop_presence.analyse(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.declared_area_field,
-                                     read_mapping(a.crop_mapping) or None, a.segments,
-                                     a.segment_id_field, tuple(a.agricultural), a.buffer_px, a.support_prob,
-                                     a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
-                                     min_supported_share=a.min_supported_share, low_score=a.low_score,
-                                     min_confidence=a.min_confidence, area_tolerance=a.area_tolerance))
+        mapping = read_mapping(a.crop_mapping) or None
+        res = crop_presence.analyse(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.declared_area_field,
+                                    mapping, a.segments,
+                                    a.segment_id_field, tuple(a.agricultural), a.buffer_px, a.support_prob,
+                                    a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
+                                    min_supported_share=a.min_supported_share, low_score=a.low_score,
+                                    min_confidence=a.min_confidence, area_tolerance=a.area_tolerance,
+                                    presence_min_mean_p=a.presence_min_mean_p, presence_min_share=a.presence_min_share,
+                                    min_valid_fraction=a.min_valid_fraction, min_expected_pixels=a.min_expected_pixels,
+                                    nonagri_max_share=a.nonagri_max_share, compare_probabilities=a.compare_probabilities,
+                                    review_sample_n=a.review_sample, seed=a.seed)
+        if a.sensitivity:
+            res["sensitivity"] = crop_presence.sensitivity(
+                a.probabilities, a.parcels, Path(a.out) / "presence_sensitivity.csv", id_field=a.id_field,
+                declared_field=a.declared_field, declared_area_field=a.declared_area_field, crop_mapping=mapping,
+                segments=a.segments, segment_id_field=a.segment_id_field, agricultural=tuple(a.agricultural),
+                interior_buffer_px=a.buffer_px, min_segment_ha=a.min_segment_ha, min_valid_pixels=a.min_pixels,
+                min_supported_share=a.min_supported_share, low_score=a.low_score, min_confidence=a.min_confidence,
+                area_tolerance=a.area_tolerance, presence_min_mean_p=a.presence_min_mean_p,
+                presence_min_share=a.presence_min_share, min_valid_fraction=a.min_valid_fraction,
+                min_expected_pixels=a.min_expected_pixels)
+        _print(res)
     elif c == "cv-stability":
         from . import stability
         from .samples import Samples

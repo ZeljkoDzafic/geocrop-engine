@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- `geocrop crop-presence`: audit of P3 and two additions that leave every existing P3 column and status unchanged. The audit
+  ([docs/crop-presence.md](docs/crop-presence.md)): with the default `--min-supported-share 0.5` the P3 `supported` set is a
+  subset of the P1 agricultural-majority set (up to exact 50 % ties), so P3 adds no support beyond P1. New `presence_status`
+  (present / partial_presence / absent / indeterminate; connected supported area, reliability, optional share of the declared
+  area; `--presence-min-mean-p`, `--presence-min-share`, `--min-valid-fraction`, `--min-expected-pixels`), `--sensitivity`
+  (`presence_sensitivity.csv`, grid of `min_connected_ha` x `support_prob` with cross-tab against P1 and P2), a mismatch
+  taxonomy (`mismatch_category` and `flag_*`: insufficient spatial resolution, no valid observations, other crop, partial,
+  area disagreement, model disagreement; `expected_pixels`, `valid_pixel_fraction`), `dominant_nonagricultural_class`,
+  `--compare-probabilities` (second model) and `--review-sample N` (stratified sample for QGIS). All thresholds are unvalidated.
+  Manifest schema is now `geocrop-crop-presence/2` (new fields only).
+
 ## 1.0.0rc3 — 2026-11-09
 
 Pre-release. Highlights: `geocrop crop-presence` (presence of a declared crop in heterogeneous parcels with three comparable methods P1 pixel majority, P2 area-weighted soft vote, P3 segment-based evidence; preliminary status with unvalidated thresholds), review fixes (in-season feature sets by window names, combined parcel threshold fitted on agreeing parcels, training controls in transfer validation), updated website and `.mailmap`. The main experiments of the 2023 case study were re-executed from a clean commit contained in this release with identical results (see the reproducibility package). All accuracy figures produced by the tools are internal cross-validation results, a recommendation for human review and not independent validation.
