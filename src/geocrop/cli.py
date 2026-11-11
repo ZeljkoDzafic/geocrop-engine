@@ -1468,12 +1468,6 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                    a.resolution, a.min_area_ha, a.min_width_m, a.min_inner_pixels,
                                    a.min_reliable_inner_pixels, a.width_method, tuple(a.grid_areas), tuple(a.grid_widths),
                                    tuple(a.grid_inner_pixels), a.crop_presence, a.p2_threshold))
-        _print(crop_presence.analyse(a.probabilities, a.parcels, a.out, a.id_field, a.declared_field, a.declared_area_field,
-                                     read_mapping(a.crop_mapping) or None, a.segments,
-                                     a.segment_id_field, tuple(a.agricultural), a.buffer_px, a.support_prob,
-                                     a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
-                                     min_supported_share=a.min_supported_share, low_score=a.low_score,
-                                     min_confidence=a.min_confidence, area_tolerance=a.area_tolerance))
     elif c == "windows":
         _windows(a)
     elif c == "cv-stability":
