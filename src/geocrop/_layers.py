@@ -40,8 +40,11 @@ LAYERS: dict[str, frozenset[str]] = {
         "phenotiming",   # start/peak/end/length of seasonal curves and time alignment
         "phenofeatures",   # season metrics and time-aligned profile columns for samples; A/B/C feature sets
         "crop_presence",   # presence of a declared crop in heterogeneous parcels: pixel majority, soft vote, segment evidence
+        "suitability",     # parcel geometry suitability for 10 m analysis: width, inner pixels, sensitivity of the thresholds
+        "segment_sweep",   # segment-density sweep for segmentation-assisted refinement (OBIA, parcel fit, purity, crop-presence)
         "cloudscore",    # attach external cloud-clearness rasters (Cloud Score+) as CLDPRB masks
         "calendars",     # data-driven crop calendars and phenological windows
+        "windows",       # temporal windows: JM, single/cumulative/optimised CV, earliest reliable window, leakage guard
         "attribution",   # Copernicus Sentinel attribution tags (written, propagated, exported)
         "cachedirs",     # download cache root and subfolders (environment variables only)
         "hcat",          # EuroCrops HCAT class harmonisation

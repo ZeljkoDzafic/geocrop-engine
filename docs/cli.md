@@ -280,6 +280,45 @@ Jeffries-Matusita separability of class pairs per period and feature (parcel mea
 | `--groups` |  |  | feature groups to include (default: all period features) |
 | `--out` | yes |  |  |
 
+## `geocrop parcel-suitability`
+
+Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner and reliable pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  |  |
+| `--out` | yes |  |  |
+| `--raster` |  |  | raster of the study grid for pixel counts and valid pixels (else a virtual grid) |
+| `--mask` |  |  | optional validity raster on the same grid (0 = unreliable) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` | declared crop column (optional, for the by-crop tables) |
+| `--inner-buffer-m` |  | `10.0` |  |
+| `--resolution` |  | `10.0` | virtual pixel size in metres when no --raster is given |
+| `--min-area-ha` |  | `0.2` |  |
+| `--min-width-m` |  | `50.0` |  |
+| `--width-method` |  | `inscribed` | inscribed: 2 x largest inscribed circle radius; mean: 2 x area / perimeter |
+| `--min-inner-pixels` |  | `10` |  |
+| `--min-reliable-inner-pixels` |  |  | default: --min-inner-pixels |
+| `--grid-areas` |  | `[0.2]` | sensitivity grid: minimum areas (ha) |
+| `--grid-widths` |  | `[40, 50, 60]` | sensitivity grid: minimum widths (m) |
+| `--grid-inner-pixels` |  | `[4, 10, 16, 25]` | sensitivity grid: minimum inner pixels |
+| `--crop-presence` |  |  | crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels |
+| `--p2-threshold` |  | `0.5` | soft_vote_agricultural at or above which P2 is supported |
+
+## `geocrop windows`
+
+Temporal windows: JM and spatial-CV comparison of single, cumulative and optimised windows, earliest reliable window under pre-registered criteria, in-season leakage guard
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `action` | yes |  | list: resolve windows (explicit or generated); run: full analysis; guard: check feature names against a cutoff |
+| `--config` |  |  | YAML/JSON: season, windows / generate, groups, criteria, cv, model (see docs/temporal-windows.md) |
+| `--observations` |  |  | run: long CSV/Parquet unit_id, class_name, x, y, date, variable, value |
+| `--out` |  |  | run: output directory; list: write the windows YAML block here |
+| `--seed` |  |  | run: override the configuration seed |
+| `--cutoff` |  |  | guard: classification date (ISO) |
+| `--names` |  |  | guard: feature column names to check |
+
 ## `geocrop cv-stability`
 
 Spatial-block CV repeated over alternative block partitions (sensitivity to the split)
@@ -582,6 +621,15 @@ Presence of the declared crop in heterogeneous parcels: pixel majority, area-wei
 | `--min-confidence` |  | `0.6` |  |
 | `--area-tolerance` |  | `0.5` |  |
 | `--min-pixels` |  | `4` |  |
+| `--presence-min-mean-p` |  | `0.6` | presence_status: minimum mean P(declared) of the connected supported area (not validated) |
+| `--presence-min-share` |  | `0.5` | presence_status: minimum connected supported area as a share of the declared area, when given |
+| `--min-valid-fraction` |  | `0.5` | minimum valid pixels / expected pixels (parcel area / pixel area); below: no_valid_observations |
+| `--min-expected-pixels` |  | `8.0` | parcels smaller than this many pixels: mismatch category too_few_pixels |
+| `--nonagri-max-share` |  | `0.1` | dominant_nonagricultural_class is reported for parcels with at most this agricultural share |
+| `--compare-probabilities` |  |  | second probabilities.tif (another model) analysed on the same parcels |
+| `--review-sample` |  |  | write N parcels per mismatch_category for visual control (review_sample.csv/.gpkg) |
+| `--seed` |  |  |  |
+| `--sensitivity` |  |  | also write presence_sensitivity.csv (min connected ha 0.03/0.05/0.1/0.2 x support-prob 0.4/0.5/0.6) |
 
 ## `geocrop parcel-model`
 
@@ -759,6 +807,38 @@ SLIC superpixel segmentation (tiled, segments merged across tile seams)
 | `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
 | `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
 | `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
+
+## `geocrop segmentation-sweep`
+
+Sweep OBIA segment density: segment statistics, parcel fit, purity and effect on crop-presence (segmentation-assisted post-classification refinement, not GEOBIA classification)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--raster` | yes |  | raster in a projected CRS (metres) to segment |
+| `--out` | yes |  | output directory |
+| `--densities` |  | `[100, 300, 500, 1000]` | segments per km2 |
+| `--bands` |  |  |  |
+| `--compactness` |  | `0.1` |  |
+| `--tile-size` |  | `1024` |  |
+| `--min-area-pixels` |  | `9` |  |
+| `--no-merge-seams` |  |  |  |
+| `--merge-distance` |  | `0.08` |  |
+| `--workers` |  |  | processes for tiles (default min(usable CPUs, 4); 1 = single process) |
+| `--min-ha` |  | `0.03` | segments below this area (ha) are counted as small |
+| `--parcels` |  |  | parcel polygons: median area, segments per parcel, boundary mismatch |
+| `--min-segments` |  | `2` | k for the share of parcels with >= k segments |
+| `--reference` |  |  | reference polygons with --label-field: object purity |
+| `--label-field` |  |  |  |
+| `--probabilities` |  |  | probabilities.tif: run crop-presence per density (needs --parcels) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` |  |
+| `--declared-area-field` |  |  |  |
+| `--crop-mapping` |  |  | CSV source_code,class_name |
+| `--support-prob` |  | `0.5` |  |
+| `--aoi-mask` |  |  | AOI mask raster written by geocrop grid: only blocks that touch the AOI are read, computed and written |
+| `--no-aoi-mask` |  |  | ignore any AOI mask and process the whole grid |
+| `--aoi-halo-px` |  |  | pixels around the AOI that outputs also hold (smoothing radius is added automatically) |
+| `--discard-segments` |  |  | delete the segment files after the sweep |
 
 ## `geocrop segment-unet-train`
 

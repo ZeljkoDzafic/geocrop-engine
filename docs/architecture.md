@@ -78,16 +78,19 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `contracts`, `hashing` | `schema_version` stamping/validation/migration of JSON contracts; SHA-256 of files |
 | `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
 | `separability` | Jeffries-Matusita class separability from parcel means, per period and feature |
+| `windows` | user-defined or generated temporal windows; JM and spatial-CV comparison of single, cumulative and optimised windows for S1, S2 and combined features; earliest reliable window under pre-registered criteria; in-season leakage guard and causal smoothing |
 | `stability` | spread of spatial-block CV scores over alternative block partitions |
 | `aggregation` | parcel-level aggregation of pixel OOF predictions (majority, mean probability, threshold) |
 | `profiles` | temporal profiles of selected polygons against class bands |
 | `phenotiming` | start, peak, end and length of seasonal curves and time alignment of selected polygons to class medians |
 | `phenofeatures` | season metrics and relative-phase profile columns from ts_ columns, post-season and in-season (cutoff) feature sets |
 | `crop_presence` | presence of the declared crop in heterogeneous parcels: composition, agricultural part, pixel majority, area-weighted soft vote, segment evidence, preliminary unvalidated status |
+| `suitability` | parcel geometry suitability for 10 m analysis: area, width, inner and reliable pixels, threshold sensitivity, P1/P2/P3 on suitable parcels |
 | `cloudscore` | attach external cloud-clearness rasters (Cloud Score+) to scenes as `CLDPRB.tif` masks |
 | `cbm`, `fieldwork` | parcel signatures, markers, crop-calendar consistency, traffic light; field-campaign ranking |
 | `export` | COG, GeoParquet, STAC items, HCAT mapping |
 | `segmentation`, `unet`, `segmentation_metrics` | OBIA, U-Net boundaries, watershed objects; boundary and object metrics |
+| `segment_sweep` | segment-density sweep for segmentation-assisted post-classification refinement: segment statistics, parcel fit, object purity, effect on crop-presence |
 | `segmenters` | `Segmenter` protocol and registered OBIA, U-Net + watershed and Fields of The World (`ftw`) segmenters |
 | `adapters`, `splits` | neutral schema mapping and pseudonymisation; GIS-inspectable fold assignment |
 | `intake` | reference-data intake report (`geocrop intake`): readability, encodings, crop-mapping coverage, season, AOI overlap, class/CV support, leakage; reuses `audit` and `preflight` ([guide](intake.md)) |
