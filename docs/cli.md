@@ -297,11 +297,11 @@ Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner 
 | `--min-area-ha` |  | `0.2` |  |
 | `--min-width-m` |  | `50.0` |  |
 | `--width-method` |  | `inscribed` | inscribed: 2 x largest inscribed circle radius; mean: 2 x area / perimeter |
-| `--min-inner-pixels` |  | `4` |  |
+| `--min-inner-pixels` |  | `10` |  |
 | `--min-reliable-inner-pixels` |  |  | default: --min-inner-pixels |
 | `--grid-areas` |  | `[0.2]` | sensitivity grid: minimum areas (ha) |
 | `--grid-widths` |  | `[40, 50, 60]` | sensitivity grid: minimum widths (m) |
-| `--grid-inner-pixels` |  | `[1, 4, 9, 16]` | sensitivity grid: minimum inner pixels |
+| `--grid-inner-pixels` |  | `[4, 10, 16, 25]` | sensitivity grid: minimum inner pixels |
 | `--crop-presence` |  |  | crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels |
 | `--p2-threshold` |  | `0.5` | soft_vote_agricultural at or above which P2 is supported |
 

@@ -54,7 +54,7 @@ def test_shape_metrics():
 def test_known_geometries_rule():
     t = _table(min_area_ha=0.2, min_width_m=50)
     assert t.loc["square", "suitability"] == "suitable"
-    assert t.loc["strip", "suitability"] == "technically_unsuitable"
+    assert t.loc["strip", "suitability"] == "insufficient_spatial_resolution"
     assert t.loc["strip", "suitability_reasons"] == "width_below_min"          # area-OK but too narrow
     assert t.loc["strip", "area_ha"] == pytest.approx(0.9)
     assert "area_below_min" in t.loc["sliver", "suitability_reasons"]
@@ -74,7 +74,7 @@ def test_virtual_grid_pixel_counts():
 
 def test_width_method_mean_is_stricter_for_compact_shapes():
     assert _table(min_width_m=60, width_method="inscribed").loc["square", "suitability"] == "suitable"
-    assert _table(min_width_m=60, width_method="mean").loc["square", "suitability"] == "technically_unsuitable"   # 2A/P = 50
+    assert _table(min_width_m=60, width_method="mean").loc["square", "suitability"] == "insufficient_spatial_resolution"   # 2A/P = 50
     with pytest.raises(ValueError, match="width_method"):
         _table(width_method="other")
 
@@ -169,8 +169,8 @@ def test_compare_subsets():
     assert cmpr.loc[("all_declarations", "p2_soft_vote"), "n_supported"] == 3
     assert cmpr.loc[("all_declarations", "p3_status"), "share_supported"] == pytest.approx(3 / 6)
     # suitable: only the square (the strip is too narrow, the L arms are 40 m, small/sliver too small, orphan not assessed)
-    assert cmpr.loc[("suitable_only", "p3_status"), "n_evaluated"] == 1
-    assert cmpr.loc[("suitable_only", "p3_status"), "share_supported"] == 1.0
+    assert cmpr.loc[("geometry_suitable", "p3_status"), "n_evaluated"] == 1
+    assert cmpr.loc[("geometry_suitable", "p3_status"), "share_supported"] == 1.0
     ex = res["excluded"].iloc[0]
     assert ex.n_excluded == 5 and ex.excluded_area_ha == pytest.approx(0.9 + 0.12 + 0.16 + 1.28 + 0.5)
     by = res["excluded_by_crop"].set_index("declared_crop")
@@ -190,7 +190,7 @@ def test_analyse_end_to_end(tmp_path):
     out = tmp_path / "out"
     res = suitability.analyse(parcels, out, crop_presence=cp)
     assert res["thresholds_validated"] is False
-    assert res["suitability_counts"] == {"suitable": 1, "technically_unsuitable": 4}
+    assert res["suitability_counts"] == {"suitable": 1, "insufficient_spatial_resolution": 4}
     for name in ("parcel_suitability.csv", "suitability_sensitivity.csv", "suitability_sensitivity.md",
                  "subset_comparison.md", "subset_comparison.csv", "parcel_suitability_manifest.json"):
         assert (out / name).exists()
@@ -204,3 +204,24 @@ def test_cli(tmp_path, capsys):
     _parcels().to_file(parcels, driver="GPKG")
     main(["parcel-suitability", "--parcels", str(parcels), "--out", str(tmp_path / "o"), "--min-width-m", "25"])
     assert json.loads(capsys.readouterr().out)["suitability_counts"]["suitable"] == 3          # square, strip, L
+
+
+def test_subsets_include_area_groups_and_agreement():
+    cp = pd.DataFrame({"parcel_id": [1, 2, 3, 4], "parcel_area_ha": [0.1, 0.3, 0.6, 1.0],
+                       "p1_match_whole": [True, False, True, True], "p1_match_agricultural": [True, True, True, False],
+                       "soft_vote_agricultural": [0.9, 0.6, 0.7, 0.2],
+                       "preliminary_status": ["supported", "supported", "disputed_review", "not_supported"]})
+    su = pd.DataFrame({"parcel_id": [1, 2, 3, 4], "suitability": ["insufficient_spatial_resolution", "suitable", "suitable", "suitable"]})
+    res = suitability.compare_subsets(cp, su)
+    subsets = set(res["comparison"]["subset"])
+    assert subsets == {"all_declarations", "area_ge_0.2_ha", "area_ge_0.5_ha", "geometry_suitable"}
+    n = res["comparison"].set_index(["subset", "method"])["n_declarations"]
+    assert [n[(s, "p3_status")] for s in ("all_declarations", "area_ge_0.2_ha", "area_ge_0.5_ha", "geometry_suitable")] == [4, 3, 2, 3]
+    assert set(res["agreement"]["subset"]) == subsets
+
+
+def test_inner_area_share_of_strip():
+    from shapely.geometry import box
+    g = gpd.GeoDataFrame({"parcel_id": [1]}, geometry=[box(0, 0, 300, 30)], crs="EPSG:32633")
+    t = suitability.assess(g)
+    assert t.loc[0, "inner_area_share"] == pytest.approx(10 * 280 / (30 * 300), rel=1e-6)

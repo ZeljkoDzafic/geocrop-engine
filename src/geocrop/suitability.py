@@ -1,7 +1,7 @@
 """Parcel geometry suitability: is a parcel technically suitable for reliable Sentinel-2 (10 m) classification?
 
 The assessment runs BEFORE a declaration is analysed and looks at the parcel's geometry (and, when a raster is given, at
-its valid pixels) only. A parcel that fails the criteria is *technically unsuitable for reliable satellite analysis*; this
+its valid pixels) only. A parcel that fails the criteria is *insufficient spatial resolution for reliable satellite analysis*; this
 says nothing about the declaration, which is neither supported nor unsupported by it. Such parcels are better reported as
 a separate group than silently scored.
 
@@ -18,9 +18,10 @@ Per parcel (projected CRS in metres):
     n_inner_pixels       pixel centres inside the parcel shrunk by ``inner_buffer_m`` (default 10 m)
     n_reliable_inner     inner pixels that are also valid (finite, not nodata in any band) and, with a mask raster, not masked
     share_reliable_inner n_reliable_inner / n_inner_pixels
+    inner_area_ha        area of the parcel shrunk by ``inner_buffer_m``; ``inner_area_share`` = inner_area_ha / area_ha
 
 The rule is explicit and configurable: ``area_below_min``, ``width_below_min``, ``too_few_inner_pixels`` and
-``too_few_reliable_inner_pixels`` are reason codes of ``technically_unsuitable``. The default thresholds are **not
+``too_few_reliable_inner_pixels`` are reason codes of ``insufficient_spatial_resolution``. The default thresholds are **not
 validated**: ``sensitivity_grid`` shows how many parcels and how much area every combination would exclude, and the
 thresholds should be chosen (and frozen) only after looking at that. ``compare_subsets`` repeats the P1/P2/P3 comparison of
 ``crop-presence`` on all declarations and on the suitable parcels only. Everything here is a recommendation for human
@@ -28,6 +29,7 @@ review, not a conclusion about any declaration.
 """
 from __future__ import annotations
 
+import itertools
 import json
 import math
 from itertools import product
@@ -46,7 +48,7 @@ from .hashing import sha256
 from .raster import valid_mask
 from .samples import polygon_window
 
-STATES = ("suitable", "technically_unsuitable")
+STATES = ("suitable", "insufficient_spatial_resolution")
 REASONS = ("area_below_min", "width_below_min", "too_few_inner_pixels", "too_few_reliable_inner_pixels")
 WIDTH_METHODS = ("inscribed", "mean")
 SIZE_BINS_HA = (0.2, 0.5, 1.0, 2.0, 5.0)
@@ -164,6 +166,8 @@ def assess(parcels: str | Path | gpd.GeoDataFrame, raster: str | Path | None = N
                 row["declared_crop"] = None if pd.isna(v) else str(v)
             row.update(shape_metrics(geom))
             row.update(pixel_counts(geom, inner, ds, mask_ds, resolution))
+            row["inner_area_ha"] = float(inner.area / 1e4) if not inner.is_empty else 0.0
+            row["inner_area_share"] = row["inner_area_ha"] / (geom.area / 1e4) if geom.area > 0 else 0.0
             row["share_reliable_inner"] = row["n_reliable_inner"] / row["n_inner_pixels"] if row["n_inner_pixels"] else 0.0
             rows.append(row)
     finally:
@@ -187,9 +191,9 @@ def _failures(table: pd.DataFrame, min_area_ha: float, min_width_m: float, min_i
     return out
 
 
-def classify(table: pd.DataFrame, min_area_ha: float = 0.2, min_width_m: float = 50.0, min_inner_pixels: int = 4,
+def classify(table: pd.DataFrame, min_area_ha: float = 0.2, min_width_m: float = 50.0, min_inner_pixels: int = 10,
              min_reliable_inner_pixels: int | None = None, width_method: str = "inscribed") -> pd.DataFrame:
-    """Add ``suitability`` (suitable / technically_unsuitable) and ``suitability_reasons`` (codes joined by ';')."""
+    """Add ``suitability`` (suitable / insufficient_spatial_resolution) and ``suitability_reasons`` (codes joined by ';')."""
     fails = _failures(table, min_area_ha, min_width_m, min_inner_pixels, min_reliable_inner_pixels, width_method)
     out = table.copy()
     bad = np.zeros(len(out), dtype=bool)
@@ -198,7 +202,7 @@ def classify(table: pd.DataFrame, min_area_ha: float = 0.2, min_width_m: float =
         f = fails[code].to_numpy()
         bad |= f
         reasons = reasons.where(~f, reasons + np.where(reasons == "", "", ";") + code)
-    out["suitability"] = np.where(bad, "technically_unsuitable", "suitable")
+    out["suitability"] = np.where(bad, "insufficient_spatial_resolution", "suitable")
     out["suitability_reasons"] = reasons
     return out
 
@@ -210,7 +214,7 @@ def size_class(area_ha: pd.Series, bins: tuple[float, ...] = SIZE_BINS_HA) -> pd
 
 
 def sensitivity_grid(table: pd.DataFrame, areas: tuple[float, ...] = (0.2,), widths: tuple[float, ...] = (40, 50, 60),
-                     inner_pixels: tuple[int, ...] = (1, 4, 9, 16), width_method: str = "inscribed",
+                     inner_pixels: tuple[int, ...] = (4, 10, 16, 25), width_method: str = "inscribed",
                      by_crop: bool = True, by_size: bool = True, size_bins: tuple[float, ...] = SIZE_BINS_HA) -> pd.DataFrame:
     """Excluded parcels and area for every threshold combination (the minimum inner pixels apply to the inner and the
     reliable inner count). Long table with ``level`` all / crop / size_class; stricter thresholds never exclude fewer."""
@@ -286,7 +290,7 @@ def compare_subsets(crop_presence_csv: str | Path | pd.DataFrame, suitability_cs
                     p2_threshold: float = 0.5) -> dict[str, pd.DataFrame]:
     """P1/P2/P3 on all declarations and on the suitable parcels only, joined on ``parcel_id``.
 
-    Returns ``comparison`` (subset x method: declarations, supported, share), ``excluded`` (number and area of the
+    Subsets: all declarations, area >= 0.2 ha, area >= 0.5 ha and geometry-suitable parcels. Returns ``comparison`` (subset x method: declarations, area, supported, share; P3 status shares), ``agreement`` (pairwise P1-agricultural / P2 / P3), ``excluded`` (number and area of the
     declarations left out, overall) and ``excluded_by_crop``. P2 supported = ``soft_vote_agricultural >= p2_threshold``;
     P3 supported = ``preliminary_status == supported``. Declarations without a suitability row count as not assessed
     and are left out of the suitable subset.
@@ -304,14 +308,30 @@ def compare_subsets(crop_presence_csv: str | Path | pd.DataFrame, suitability_cs
     if "declared_crop" not in cp:
         cp["declared_crop"] = None
     cp["declared_crop"] = cp["declared_crop"].fillna("(none)")
-    subsets = {"all_declarations": cp, "suitable_only": cp[cp.suitability == "suitable"]}
-    rows = []
+    area = pd.to_numeric(cp["parcel_area_ha"], errors="coerce")
+    subsets = {"all_declarations": cp, "area_ge_0.2_ha": cp[area >= 0.2], "area_ge_0.5_ha": cp[area >= 0.5],
+               "geometry_suitable": cp[cp.suitability == "suitable"]}
+    rows, agree = [], []
     for sname, sub in subsets.items():
+        st = sub["preliminary_status"] if "preliminary_status" in sub else pd.Series(dtype=object)
         for m in METHODS:
             ev, sup = _supported(sub, m, p2_threshold)
             n, k = int(ev.sum()), int((ev & sup).sum())
-            rows.append({"subset": sname, "method": m, "n_declarations": len(sub), "n_evaluated": n, "n_supported": k,
-                         "share_supported": k / n if n else None})
+            row = {"subset": sname, "method": m, "n_declarations": len(sub), "area_ha": float(sub["parcel_area_ha"].sum()),
+                   "n_evaluated": n, "n_supported": k, "share_supported": k / n if n else None}
+            if m == "p3_status":
+                for key in ("supported", "disputed_review", "not_supported"):
+                    row[f"share_{key}"] = float((st == key).sum() / n) if n else None
+            rows.append(row)
+        for a, b in itertools.combinations(("p1_agricultural", "p2_soft_vote", "p3_status"), 2):
+            ea, sa = _supported(sub, a, p2_threshold)
+            eb, sb = _supported(sub, b, p2_threshold)
+            both = ea & eb
+            n = int(both.sum())
+            agree.append({"subset": sname, "method_a": a, "method_b": b, "n_both_evaluated": n,
+                          "both_supported": int((both & sa & sb).sum()), "only_a": int((both & sa & ~sb).sum()),
+                          "only_b": int((both & ~sa & sb).sum()), "neither": int((both & ~sa & ~sb).sum()),
+                          "agreement": float((both & (sa == sb)).sum() / n) if n else None})
     excl = cp[cp.suitability != "suitable"]
     total_area = float(cp["parcel_area_ha"].sum())
     excluded = pd.DataFrame([{"n_declarations": len(cp), "n_excluded": len(excl), "share_excluded": len(excl) / len(cp) if len(cp) else None,
@@ -322,7 +342,7 @@ def compare_subsets(crop_presence_csv: str | Path | pd.DataFrame, suitability_cs
         e = g[g.suitability != "suitable"]
         by.append({"declared_crop": crop, "n_declarations": len(g), "n_excluded": len(e), "share_excluded": len(e) / len(g),
                    "area_ha": float(g["parcel_area_ha"].sum()), "excluded_area_ha": float(e["parcel_area_ha"].sum())})
-    return {"comparison": pd.DataFrame(rows), "excluded": excluded, "excluded_by_crop": pd.DataFrame(by)}
+    return {"comparison": pd.DataFrame(rows), "agreement": pd.DataFrame(agree), "excluded": excluded, "excluded_by_crop": pd.DataFrame(by)}
 
 
 def write_comparison(result: dict[str, pd.DataFrame], out: str | Path) -> dict:
@@ -335,7 +355,8 @@ def write_comparison(result: dict[str, pd.DataFrame], out: str | Path) -> dict:
         paths[k] = str(p)
     md = ["# P1 / P2 / P3 on all declarations and on suitable parcels only", "", NOTE, "",
           "A smaller share on the suitable subset is not an error rate: nothing here is validated against field truth.", "",
-          "## Shares supported", "", _md_table(result["comparison"]), "", "## Declarations left out", "",
+          "## Shares supported", "", _md_table(result["comparison"]), "",
+          "## Agreement of P1 (agricultural part), P2 and P3", "", _md_table(result["agreement"]), "", "## Declarations left out", "",
           _md_table(result["excluded"]), "", "## Left out by declared crop", "", _md_table(result["excluded_by_crop"])]
     (out / "subset_comparison.md").write_text("\n".join(md) + "\n", encoding="utf8")
     paths["md"] = str(out / "subset_comparison.md")
@@ -345,9 +366,9 @@ def write_comparison(result: dict[str, pd.DataFrame], out: str | Path) -> dict:
 def analyse(parcels: str | Path | gpd.GeoDataFrame, output: str | Path, raster: str | Path | None = None,
             mask: str | Path | None = None, id_field: str = "parcel_id", declared_field: str | None = "declared_crop",
             inner_buffer_m: float = 10.0, resolution: float = 10.0, min_area_ha: float = 0.2, min_width_m: float = 50.0,
-            min_inner_pixels: int = 4, min_reliable_inner_pixels: int | None = None, width_method: str = "inscribed",
+            min_inner_pixels: int = 10, min_reliable_inner_pixels: int | None = None, width_method: str = "inscribed",
             grid_areas: tuple[float, ...] = (0.2,), grid_widths: tuple[float, ...] = (40, 50, 60),
-            grid_inner_pixels: tuple[int, ...] = (1, 4, 9, 16), crop_presence: str | Path | None = None,
+            grid_inner_pixels: tuple[int, ...] = (4, 10, 16, 25), crop_presence: str | Path | None = None,
             p2_threshold: float = 0.5) -> dict:
     """Write ``parcel_suitability.csv``, the sensitivity CSV/markdown, a manifest and, with ``crop_presence``, the subsets."""
     out = Path(output)

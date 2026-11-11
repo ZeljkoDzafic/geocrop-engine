@@ -4,7 +4,7 @@
 suitable for reliable Sentinel-2 (10 m) classification? A narrow strip or a sliver has few or no pixels that are not
 mixed with its surroundings, so any class decision on it is unreliable whatever the declaration says.
 
-**Semantics.** A parcel that fails the criteria is *technically unsuitable for reliable satellite analysis*. This is not a
+**Semantics.** A parcel that fails the criteria is *insufficient spatial resolution for reliable satellite analysis*. This is not a
 finding about the declaration: it is neither supported nor unsupported by it, and such parcels should be reported as a
 separate group (or checked by other means), never counted as unsupported declarations. The output is a recommendation
 for human review, not a conclusion.
@@ -21,6 +21,7 @@ Parcels must be in a projected CRS in metres (they are reprojected to the raster
 | `compactness` | Polsby-Popper `4 pi A / P^2` (1 for a circle, towards 0 for slivers) |
 | `elongation` | long over short side of the minimum rotated rectangle |
 | `n_pixels` | pixel centres inside the parcel |
+| `inner_area_ha`, `inner_area_share` | area of the parcel after the inner buffer and its share of the parcel area |
 | `n_inner_pixels` | pixel centres inside the parcel shrunk by `--inner-buffer-m` (default 10) |
 | `n_reliable_inner`, `share_reliable_inner` | inner pixels that are valid (finite and not nodata in every band, `raster.valid_mask`) and, with `--mask`, not 0 in the mask raster |
 
@@ -30,7 +31,7 @@ every pixel counts as reliable. The mask raster must be on exactly the same grid
 
 ## Rule and reason codes
 
-`suitability` is `suitable` or `technically_unsuitable`; `suitability_reasons` lists the codes joined by `;`:
+`suitability` is `suitable` or `insufficient_spatial_resolution`; `suitability_reasons` lists the codes joined by `;`:
 
 | Code | Condition (defaults) |
 |---|---|
@@ -45,7 +46,7 @@ analysis below, and freeze them before an independent validation.
 ## Sensitivity analysis
 
 `sensitivity_grid` evaluates every combination of `--grid-areas` (0.2 ha), `--grid-widths` (40, 50, 60 m) and
-`--grid-inner-pixels` (1, 4, 9, 16) and reports, per configuration, the number and share of excluded parcels and the
+`--grid-inner-pixels` (4, 10, 16, 25) and reports, per configuration, the number and share of excluded parcels and the
 excluded area (ha), for all parcels and by declared crop and by size class (`<0.2`, `0.2-0.5`, `0.5-1`, `1-2`, `2-5`,
 `>=5 ha`). A stricter threshold never excludes fewer parcels (tested). It is written as
 `suitability_sensitivity.csv` and `suitability_sensitivity.md`. Read it for the size of the effect on the data at hand
@@ -79,3 +80,11 @@ Output: `parcel_suitability.csv`, `suitability_sensitivity.csv/.md`, with `--cro
 Counts depend on the pixel grid (a shift of the grid changes the pixel centres inside a small parcel); the widths
 are geometric and ignore the point spread of the sensor and the registration error of the parcel boundary; validity
 reflects only nodata and the optional mask, not cloud or shadow unless the mask encodes them.
+
+## Subsets of the P1/P2/P3 comparison
+
+With `--crop-presence`, the comparison is made for four groups: all declarations (reference analysis), parcels of at least 0.2 ha,
+parcels of at least 0.5 ha, and parcels that also pass the geometry criteria. For each group the number and area of the
+declarations, the share supported by P1, P2 and P3, the P3 shares of `supported`, `disputed_review` and `not_supported`, and the
+pairwise agreement of P1 (agricultural part), P2 and P3 are written (`subset_comparison.csv`, `subset_agreement.csv`). Excluded
+declarations stay in the register; they are left out of the basic evaluation only.

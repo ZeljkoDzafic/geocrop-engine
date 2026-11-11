@@ -255,11 +255,11 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--min-width-m", type=float, default=50.0)
     x.add_argument("--width-method", choices=["inscribed", "mean"], default="inscribed",
                    help="inscribed: 2 x largest inscribed circle radius; mean: 2 x area / perimeter")
-    x.add_argument("--min-inner-pixels", type=int, default=4)
+    x.add_argument("--min-inner-pixels", type=int, default=10)
     x.add_argument("--min-reliable-inner-pixels", type=int, help="default: --min-inner-pixels")
     x.add_argument("--grid-areas", type=float, nargs="+", default=[0.2], help="sensitivity grid: minimum areas (ha)")
     x.add_argument("--grid-widths", type=float, nargs="+", default=[40, 50, 60], help="sensitivity grid: minimum widths (m)")
-    x.add_argument("--grid-inner-pixels", type=int, nargs="+", default=[1, 4, 9, 16], help="sensitivity grid: minimum inner pixels")
+    x.add_argument("--grid-inner-pixels", type=int, nargs="+", default=[4, 10, 16, 25], help="sensitivity grid: minimum inner pixels")
     x.add_argument("--crop-presence", help="crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels")
     x.add_argument("--p2-threshold", type=float, default=0.5, help="soft_vote_agricultural at or above which P2 is supported")
 

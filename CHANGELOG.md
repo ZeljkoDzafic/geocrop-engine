@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `geocrop parcel-suitability` (module `suitability`, [docs/parcel-suitability.md](docs/parcel-suitability.md)): parcel geometry suitability for reliable 10 m analysis before a declaration is analysed. Area, representative width (inscribed circle and 2A/P), compactness, elongation, pixel centres inside, inner (10 m buffer) and reliable inner pixels (valid, optional mask); configurable rule with reason codes (`technically_unsuitable` means unsuitable for reliable satellite analysis, never an unsupported declaration); `sensitivity_grid` (CSV and markdown: excluded parcels and area over area x width x inner pixels, by declared crop and size class) and `compare_subsets` (P1/P2/P3 of `crop-presence` on all declarations and on suitable parcels only). The default thresholds are not validated.
+- `geocrop parcel-suitability` (module `suitability`, [docs/parcel-suitability.md](docs/parcel-suitability.md)): parcel geometry suitability for reliable 10 m analysis before a declaration is analysed. Area, representative width (inscribed circle and 2A/P), compactness, elongation, pixel centres inside, inner (10 m buffer) and reliable inner pixels (valid, optional mask); configurable rule with reason codes (`insufficient_spatial_resolution` means unsuitable for reliable satellite analysis, never an unsupported declaration); `sensitivity_grid` (CSV and markdown: excluded parcels and area over area x width x inner pixels, by declared crop and size class) and `compare_subsets` (P1/P2/P3 of `crop-presence` on all declarations and on suitable parcels only). The default thresholds are not validated.
 
 ## 1.0.0rc3 — 2026-11-09
 
