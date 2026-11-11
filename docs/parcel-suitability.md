@@ -92,3 +92,5 @@ declarations stay in the register; they are left out of the basic evaluation onl
 `share_supported` and the P3 status shares use all declarations of the group as the denominator (a declaration without evidence for
 a method, for example no agricultural pixel for P2, counts as not supported by it), which is the convention of the crop-presence tables;
 `share_of_evaluated` uses only the declarations for which the method could be evaluated.
+
+The agreement of two methods is computed over all declarations of the group; a declaration without evidence for a method counts as not supported by it, as for the shares (`n_both_evaluated` gives the declarations for which both methods could be evaluated).

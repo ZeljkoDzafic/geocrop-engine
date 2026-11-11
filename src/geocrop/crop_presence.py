@@ -52,7 +52,7 @@ from .samples import polygon_window
 AGRICULTURAL_DEFAULT = ("maize", "soybean", "sunflower", "vegetables", "winter_crops")
 STATUSES = ("supported", "disputed_review", "not_supported")
 PRESENCE_STATUSES = ("present", "partial_presence", "absent", "indeterminate")
-MISMATCH_CATEGORIES = ("insufficient_spatial_resolution", "no_valid_observations", "other_crop_present", "declared_crop_partial",
+MISMATCH_CATEGORIES = ("too_few_pixels", "no_valid_observations", "other_crop_present", "declared_crop_partial",
                        "area_disagreement", "model_disagreement")
 # residual primary reasons that are not one of the six (documented in docs/crop-presence.md)
 MISMATCH_EXTRA = ("non_agricultural_dominant", "declared_crop_not_modelled", "none")
@@ -247,11 +247,11 @@ def mismatch_taxonomy(row: dict, presence_status: str, declared_area_ha: float |
     area = False
     if modelled and declared_area_ha and declared_area_ha > 0 and "crop_area_ha" in row and presence_status == "present":
         area = abs(row["crop_area_ha"] - declared_area_ha) / declared_area_ha > area_tolerance
-    flags = {"insufficient_spatial_resolution": res, "no_valid_observations": obs, "other_crop_present": other,
+    flags = {"too_few_pixels": res, "no_valid_observations": obs, "other_crop_present": other,
              "declared_crop_partial": partial, "area_disagreement": area,
              "model_disagreement": bool(model_disagreement)}
     if res:
-        primary = "insufficient_spatial_resolution"
+        primary = "too_few_pixels"
     elif obs:
         primary = "no_valid_observations"
     elif not modelled:

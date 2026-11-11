@@ -119,7 +119,7 @@ tolerance and models in agreement. All are indicators for review: they do not st
 
 | Reason | Flag true when |
 |---|---|
-| `insufficient_spatial_resolution` | `expected_pixels` (parcel area / pixel area, after the buffer) `< --min-expected-pixels` (8), or the parcel lies in the raster but fewer than `--min-pixels` pixel centres fall in it (thin) |
+| `too_few_pixels` | `expected_pixels` (parcel area / pixel area, after the buffer) `< --min-expected-pixels` (8), or the parcel lies in the raster but fewer than `--min-pixels` pixel centres fall in it (thin) |
 | `no_valid_observations` | (not too small) `n_valid_pixels < --min-pixels` or `valid_pixel_fraction = n_valid_pixels / expected_pixels < --min-valid-fraction` (0.5); includes parcels outside the raster |
 | `other_crop_present` | declared crop `absent` or `partial_presence` while another agricultural class has the pixel majority of the agricultural part |
 | `declared_crop_partial` | `presence_status == partial_presence` |

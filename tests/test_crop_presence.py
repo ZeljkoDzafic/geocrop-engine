@@ -286,7 +286,7 @@ def test_mismatch_taxonomy_primary_reason_and_flags(tmp_path):
     assert t.loc["NODATA", "mismatch_category"] == "no_valid_observations" and t.loc["NODATA", "presence_status"] == "indeterminate"
     assert t.loc["NODATA", "valid_pixel_fraction"] == pytest.approx(0.2) and t.loc["NODATA", "expected_pixels"] == pytest.approx(300)
     assert t.loc["OUTSIDE", "mismatch_category"] == "no_valid_observations" and t.loc["OUTSIDE", "n_valid_pixels"] == 0
-    assert t.loc["THIN", "mismatch_category"] == "insufficient_spatial_resolution" and t.loc["THIN", "n_parcel_pixels"] == 0
+    assert t.loc["THIN", "mismatch_category"] == "too_few_pixels" and t.loc["THIN", "n_parcel_pixels"] == 0
     assert t.loc["AREA", "presence_status"] == "present" and t.loc["AREA", "mismatch_category"] == "area_disagreement"
     # MAJORITY: declared 2 ha, mapped 2.4 ha in one connected area: present and within tolerance (20 % off)
     assert not t.loc["AREA", "flag_declared_crop_partial"] and not t.loc["MAJORITY", "flag_area_disagreement"]

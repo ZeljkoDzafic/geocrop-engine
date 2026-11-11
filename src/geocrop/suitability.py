@@ -328,11 +328,11 @@ def compare_subsets(crop_presence_csv: str | Path | pd.DataFrame, suitability_cs
             ea, sa = _supported(sub, a, p2_threshold)
             eb, sb = _supported(sub, b, p2_threshold)
             both = ea & eb
-            n = int(both.sum())
-            agree.append({"subset": sname, "method_a": a, "method_b": b, "n_both_evaluated": n,
-                          "both_supported": int((both & sa & sb).sum()), "only_a": int((both & sa & ~sb).sum()),
-                          "only_b": int((both & ~sa & sb).sum()), "neither": int((both & ~sa & ~sb).sum()),
-                          "agreement": float((both & (sa == sb)).sum() / n) if n else None})
+            n = len(sub)                      # all declarations of the group; missing evidence = not supported
+            agree.append({"subset": sname, "method_a": a, "method_b": b, "n_declarations": n,
+                          "n_both_evaluated": int(both.sum()), "both_supported": int((sa & sb).sum()),
+                          "only_a": int((sa & ~sb).sum()), "only_b": int((~sa & sb).sum()),
+                          "neither": int((~sa & ~sb).sum()), "agreement": float((sa == sb).sum() / n) if n else None})
     excl = cp[cp.suitability != "suitable"]
     total_area = float(cp["parcel_area_ha"].sum())
     excluded = pd.DataFrame([{"n_declarations": len(cp), "n_excluded": len(excl), "share_excluded": len(excl) / len(cp) if len(cp) else None,

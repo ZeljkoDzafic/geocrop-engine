@@ -225,3 +225,15 @@ def test_inner_area_share_of_strip():
     g = gpd.GeoDataFrame({"parcel_id": [1]}, geometry=[box(0, 0, 300, 30)], crs="EPSG:32633")
     t = suitability.assess(g)
     assert t.loc[0, "inner_area_share"] == pytest.approx(10 * 280 / (30 * 300), rel=1e-6)
+
+
+def test_agreement_uses_all_declarations_of_the_group():
+    cp = pd.DataFrame({"parcel_id": [1, 2, 3, 4], "parcel_area_ha": [1.0] * 4,
+                       "p1_match_whole": [True] * 4, "p1_match_agricultural": [True, True, False, False],
+                       "soft_vote_agricultural": [0.9, float("nan"), 0.1, float("nan")],
+                       "preliminary_status": ["supported", "disputed_review", "not_supported", "not_supported"]})
+    su = pd.DataFrame({"parcel_id": [1, 2, 3, 4], "suitability": ["suitable"] * 4})
+    a = suitability.compare_subsets(cp, su)["agreement"]
+    r = a[(a.subset == "all_declarations") & (a.method_a == "p1_agricultural") & (a.method_b == "p2_soft_vote")].iloc[0]
+    assert r.n_declarations == 4 and r.n_both_evaluated == 2
+    assert r.agreement == pytest.approx(3 / 4)       # parcel 2: P1 supported, P2 missing counts as not supported

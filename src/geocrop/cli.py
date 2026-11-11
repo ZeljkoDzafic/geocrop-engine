@@ -502,7 +502,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--min-valid-fraction", type=float, default=0.5,
                    help="minimum valid pixels / expected pixels (parcel area / pixel area); below: no_valid_observations")
     x.add_argument("--min-expected-pixels", type=float, default=8.0,
-                   help="parcels smaller than this many pixels: insufficient_spatial_resolution")
+                   help="parcels smaller than this many pixels: mismatch category too_few_pixels")
     x.add_argument("--nonagri-max-share", type=float, default=0.10,
                    help="dominant_nonagricultural_class is reported for parcels with at most this agricultural share")
     x.add_argument("--compare-probabilities", help="second probabilities.tif (another model) analysed on the same parcels")

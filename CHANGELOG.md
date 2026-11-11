@@ -9,7 +9,7 @@
   (present / partial_presence / absent / indeterminate; connected supported area, reliability, optional share of the declared
   area; `--presence-min-mean-p`, `--presence-min-share`, `--min-valid-fraction`, `--min-expected-pixels`), `--sensitivity`
   (`presence_sensitivity.csv`, grid of `min_connected_ha` x `support_prob` with cross-tab against P1 and P2), a mismatch
-  taxonomy (`mismatch_category` and `flag_*`: insufficient spatial resolution, no valid observations, other crop, partial,
+  taxonomy (`mismatch_category` and `flag_*`: too few pixels (not the geometric `insufficient_spatial_resolution` label of `parcel-suitability`), no valid observations, other crop, partial,
   area disagreement, model disagreement; `expected_pixels`, `valid_pixel_fraction`), `dominant_nonagricultural_class`,
   `--compare-probabilities` (second model) and `--review-sample N` (stratified sample for QGIS). All thresholds are unvalidated.
   Manifest schema is now `geocrop-crop-presence/2` (new fields only).
