@@ -305,6 +305,20 @@ Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner 
 | `--crop-presence` |  |  | crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels |
 | `--p2-threshold` |  | `0.5` | soft_vote_agricultural at or above which P2 is supported |
 
+## `geocrop windows`
+
+Temporal windows: JM and spatial-CV comparison of single, cumulative and optimised windows, earliest reliable window under pre-registered criteria, in-season leakage guard
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `action` | yes |  | list: resolve windows (explicit or generated); run: full analysis; guard: check feature names against a cutoff |
+| `--config` |  |  | YAML/JSON: season, windows / generate, groups, criteria, cv, model (see docs/temporal-windows.md) |
+| `--observations` |  |  | run: long CSV/Parquet unit_id, class_name, x, y, date, variable, value |
+| `--out` |  |  | run: output directory; list: write the windows YAML block here |
+| `--seed` |  |  | run: override the configuration seed |
+| `--cutoff` |  |  | guard: classification date (ISO) |
+| `--names` |  |  | guard: feature column names to check |
+
 ## `geocrop cv-stability`
 
 Spatial-block CV repeated over alternative block partitions (sensitivity to the split)

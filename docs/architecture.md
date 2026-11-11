@@ -78,6 +78,7 @@ Decisions: [ADR index](adr/README.md) — [layers](adr/0001-layered-architecture
 | `contracts`, `hashing` | `schema_version` stamping/validation/migration of JSON contracts; SHA-256 of files |
 | `uncertainty`, `applicability`, `spatial` | temperature scaling, Mondrian conformal sets, label-noise screening; Area of Applicability; variograms |
 | `separability` | Jeffries-Matusita class separability from parcel means, per period and feature |
+| `windows` | user-defined or generated temporal windows; JM and spatial-CV comparison of single, cumulative and optimised windows for S1, S2 and combined features; earliest reliable window under pre-registered criteria; in-season leakage guard and causal smoothing |
 | `stability` | spread of spatial-block CV scores over alternative block partitions |
 | `aggregation` | parcel-level aggregation of pixel OOF predictions (majority, mean probability, threshold) |
 | `profiles` | temporal profiles of selected polygons against class bands |
