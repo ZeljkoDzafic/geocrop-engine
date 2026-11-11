@@ -280,6 +280,31 @@ Jeffries-Matusita separability of class pairs per period and feature (parcel mea
 | `--groups` |  |  | feature groups to include (default: all period features) |
 | `--out` | yes |  |  |
 
+## `geocrop parcel-suitability`
+
+Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner and reliable pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)
+
+| Option | Required | Default | Notes |
+|---|---|---|---|
+| `--parcels` | yes |  |  |
+| `--out` | yes |  |  |
+| `--raster` |  |  | raster of the study grid for pixel counts and valid pixels (else a virtual grid) |
+| `--mask` |  |  | optional validity raster on the same grid (0 = unreliable) |
+| `--id-field` |  | `parcel_id` |  |
+| `--declared-field` |  | `declared_crop` | declared crop column (optional, for the by-crop tables) |
+| `--inner-buffer-m` |  | `10.0` |  |
+| `--resolution` |  | `10.0` | virtual pixel size in metres when no --raster is given |
+| `--min-area-ha` |  | `0.2` |  |
+| `--min-width-m` |  | `50.0` |  |
+| `--width-method` |  | `inscribed` | inscribed: 2 x largest inscribed circle radius; mean: 2 x area / perimeter |
+| `--min-inner-pixels` |  | `10` |  |
+| `--min-reliable-inner-pixels` |  |  | default: --min-inner-pixels |
+| `--grid-areas` |  | `[0.2]` | sensitivity grid: minimum areas (ha) |
+| `--grid-widths` |  | `[40, 50, 60]` | sensitivity grid: minimum widths (m) |
+| `--grid-inner-pixels` |  | `[4, 10, 16, 25]` | sensitivity grid: minimum inner pixels |
+| `--crop-presence` |  |  | crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels |
+| `--p2-threshold` |  | `0.5` | soft_vote_agricultural at or above which P2 is supported |
+
 ## `geocrop cv-stability`
 
 Spatial-block CV repeated over alternative block partitions (sensitivity to the split)

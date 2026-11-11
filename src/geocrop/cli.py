@@ -241,6 +241,28 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
     x.add_argument("--out", required=True)
 
+    x = cmd("parcel-suitability", "Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner and reliable "
+                                  "pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)")
+    x.add_argument("--parcels", required=True)
+    x.add_argument("--out", required=True)
+    x.add_argument("--raster", help="raster of the study grid for pixel counts and valid pixels (else a virtual grid)")
+    x.add_argument("--mask", help="optional validity raster on the same grid (0 = unreliable)")
+    x.add_argument("--id-field", default="parcel_id")
+    x.add_argument("--declared-field", default="declared_crop", help="declared crop column (optional, for the by-crop tables)")
+    x.add_argument("--inner-buffer-m", type=float, default=10.0)
+    x.add_argument("--resolution", type=float, default=10.0, help="virtual pixel size in metres when no --raster is given")
+    x.add_argument("--min-area-ha", type=float, default=0.2)
+    x.add_argument("--min-width-m", type=float, default=50.0)
+    x.add_argument("--width-method", choices=["inscribed", "mean"], default="inscribed",
+                   help="inscribed: 2 x largest inscribed circle radius; mean: 2 x area / perimeter")
+    x.add_argument("--min-inner-pixels", type=int, default=10)
+    x.add_argument("--min-reliable-inner-pixels", type=int, help="default: --min-inner-pixels")
+    x.add_argument("--grid-areas", type=float, nargs="+", default=[0.2], help="sensitivity grid: minimum areas (ha)")
+    x.add_argument("--grid-widths", type=float, nargs="+", default=[40, 50, 60], help="sensitivity grid: minimum widths (m)")
+    x.add_argument("--grid-inner-pixels", type=int, nargs="+", default=[4, 10, 16, 25], help="sensitivity grid: minimum inner pixels")
+    x.add_argument("--crop-presence", help="crop_presence.csv: repeat P1/P2/P3 on all declarations and on suitable parcels")
+    x.add_argument("--p2-threshold", type=float, default=0.5, help="soft_vote_agricultural at or above which P2 is supported")
+
     x = cmd("cv-stability", "Spatial-block CV repeated over alternative block partitions (sensitivity to the split)")
     x.add_argument("--samples", required=True, help="samples.npz written by the samples stage")
     x.add_argument("--block-sizes", type=float, nargs="+", default=[5000], help="block sizes in metres")
@@ -1333,6 +1355,12 @@ def main(argv=None):  # noqa: C901 - flat dispatch is the clearest form here
                                      a.min_segment_ha, a.min_pixels, min_connected_ha=a.min_connected_ha,
                                      min_supported_share=a.min_supported_share, low_score=a.low_score,
                                      min_confidence=a.min_confidence, area_tolerance=a.area_tolerance))
+    elif c == "parcel-suitability":
+        from . import suitability
+        _print(suitability.analyse(a.parcels, a.out, a.raster, a.mask, a.id_field, a.declared_field, a.inner_buffer_m,
+                                   a.resolution, a.min_area_ha, a.min_width_m, a.min_inner_pixels,
+                                   a.min_reliable_inner_pixels, a.width_method, tuple(a.grid_areas), tuple(a.grid_widths),
+                                   tuple(a.grid_inner_pixels), a.crop_presence, a.p2_threshold))
     elif c == "cv-stability":
         from . import stability
         from .samples import Samples
