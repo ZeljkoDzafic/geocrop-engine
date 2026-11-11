@@ -28,7 +28,7 @@ def synthetic(seed=0, per_class=18, noise=0.03):
     rows = []
     s2_days = np.arange(0, 180, 5)
     s1_days = np.arange(2, 180, 6)
-    for ci, (cls, (on, pk, off)) in enumerate(spec.items()):
+    for cls, (on, pk, off) in spec.items():
         for i in range(per_class):
             uid = f"{cls}{i:02d}"
             x, y = rng.uniform(0, 12000, 2)
@@ -189,8 +189,9 @@ def result():
 
 def test_early_window_separates_a_from_b_but_not_b_from_c(result):
     jm = result["jm_best"]
-    pick = lambda pair, window: jm[(jm.configuration == "S2") & (jm.kind == "single") & (jm.pair == pair)
-                                   & (jm.window == window)].jm.iloc[0]
+    def pick(pair, window):
+        return jm[(jm.configuration == "S2") & (jm.kind == "single") & (jm.pair == pair) & (jm.window == window)].jm.iloc[0]
+
     assert pick("A-B", "T02") > 1.5          # days 30-59: A has emerged, B has not
     assert pick("B-C", "T02") < 1.0          # B and C look alike before C senesces
     assert pick("B-C", "T05") > 1.5          # days 120-149: C has senesced

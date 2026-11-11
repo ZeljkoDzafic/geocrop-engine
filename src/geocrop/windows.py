@@ -539,7 +539,6 @@ def evaluate(observations, config: dict, out: str | Path | None = None) -> dict:
     y = units["class_name"].to_numpy(str)
     n_per_class = pd.Series(y).value_counts().to_dict()
     pairs = rc.get("pairs") or [_pair(a, b) for a, b in itertools.combinations(classes, 2)]
-    targets = sorted(crit["target_classes"] or classes)
     groups = rc["groups"]
     variables = sorted({v for vs in groups.values() for v in vs})
     var_group = {v: g for g, vs in groups.items() for v in vs}
@@ -566,10 +565,9 @@ def evaluate(observations, config: dict, out: str | Path | None = None) -> dict:
 
     cum = cumulative_windows(windows, season_start)
     by_kind = {"single": windows, "cumulative": cum, "optimised": cum}
-    ends = sorted({w.end for w in windows})
     starts = sorted({season_start, *(w.start for w in windows)})
     min_len = int(rc["optimise"]["min_length_days"])
-    jm_rows, perf_rows, class_rows, contrib_rows, opt_rows = [], [], [], [], []
+    jm_rows, perf_rows, class_rows, opt_rows = [], [], [], []
 
     def cols_of(config):
         gs = configs[config]
