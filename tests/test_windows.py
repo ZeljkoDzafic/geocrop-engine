@@ -263,9 +263,15 @@ def test_reproducible_and_exports_with_criteria_registered_first(tmp_path):
     pd.testing.assert_frame_equal(a["performance"], b["performance"], check_exact=True)
     out = tmp_path / "a"
     for name in ("jm_best.csv", "jm_best.md", "performance.csv", "performance_by_class.md", "contribution.csv",
-                 "earliest_reliable.csv", "leakage_guard.csv", "resolved_config.json", "criteria.json",
-                 "jm_by_window.png", "performance_by_window.png", "group_contribution.png"):
+                 "earliest_reliable.csv", "leakage_guard.csv", "resolved_config.json", "criteria.json"):
         assert (out / name).stat().st_size > 0, name
+    try:
+        import matplotlib  # noqa: F401  (plots are an optional extra)
+    except ImportError:
+        pass
+    else:
+        for name in ("jm_by_window.png", "performance_by_window.png", "group_contribution.png"):
+            assert (out / name).stat().st_size > 0, name
     m = json.loads((out / "manifest.json").read_text())
     assert m["status"] == "completed" and m["seed"] == 7 and m["inputs"][0]["sha256"]
     assert m["criteria_sha256"] == W.criteria_hash(json.loads((out / "criteria.json").read_text()))
