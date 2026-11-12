@@ -241,7 +241,7 @@ def build_parser(parser_class=argparse.ArgumentParser) -> argparse.ArgumentParse
     x.add_argument("--groups", nargs="+", help="feature groups to include (default: all period features)")
     x.add_argument("--out", required=True)
 
-    x = cmd("parcel-suitability", "Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner and reliable "
+    x = cmd("parcel-suitability", "Does a parcel pass the screening thresholds for 10 m analysis? Area, width, inner and reliable "
                                   "pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)")
     x.add_argument("--parcels", required=True)
     x.add_argument("--out", required=True)

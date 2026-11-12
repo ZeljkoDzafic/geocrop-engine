@@ -1,4 +1,4 @@
-"""Parcel geometry suitability: is a parcel technically suitable for reliable Sentinel-2 (10 m) classification?
+"""Parcel geometry suitability: does a parcel pass the screening thresholds for Sentinel-2 (10 m) classification?
 
 The assessment runs BEFORE a declaration is analysed and looks at the parcel's geometry (and, when a raster is given, at
 its valid pixels) only. A parcel that fails the criteria is *insufficient spatial resolution for reliable satellite analysis*; this
@@ -251,9 +251,10 @@ def _md_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-NOTE = ("Insufficient spatial resolution means unsuitable for reliable satellite analysis at 10 m, not an unsupported declaration. "
-        "The thresholds are not validated: this table is a recommendation for human review, to be read before any "
-        "threshold is adopted.")
+NOTE = ("Insufficient spatial resolution means that the parcel fails the screening thresholds for reliable analysis at 10 m; "
+        "it is not an unsupported declaration, and it is not shown to be impossible to analyse. The thresholds are not validated "
+        "and the share of excluded parcels depends strongly on them: this table is a recommendation for human review, to be read "
+        "before any threshold is adopted.")
 
 
 def write_sensitivity(grid: pd.DataFrame, out: str | Path) -> dict:
