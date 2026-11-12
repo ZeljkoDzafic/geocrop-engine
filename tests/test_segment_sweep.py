@@ -125,3 +125,22 @@ def test_invalid_densities(tmp_path):
             segment_sweep.sweep(raster, tmp_path / "o", densities=bad)
     with pytest.raises(ValueError):
         segment_sweep.sweep(raster, tmp_path / "o", densities=(10,), reference="x.gpkg")
+
+
+def test_parcel_coverage_detects_gaps():
+    crs = "EPSG:32633"
+    parcels = gpd.GeoDataFrame(geometry=[box(0, 0, 100, 100)], crs=crs)
+    full = gpd.GeoDataFrame(geometry=[box(0, 0, 50, 100), box(50, 0, 100, 100)], crs=crs)
+    gap = gpd.GeoDataFrame(geometry=[box(0, 0, 50, 100), box(60, 0, 100, 100)], crs=crs)
+    assert segment_sweep.parcel_coverage(full, parcels) == pytest.approx(1)
+    assert segment_sweep.parcel_coverage(gap, parcels) == pytest.approx(0.9)
+
+
+def test_segments_per_tile_estimate_and_memory_warning(tmp_path):
+    # 1000/km2 at 10 m in a 1024-pixel tile is the setting that exhausted 48 GB; 512-pixel tiles are a quarter of it
+    assert segment_sweep.segments_per_tile(1000, 1024, 10) > segment_sweep.MAX_SEGMENTS_PER_TILE
+    assert segment_sweep.segments_per_tile(1000, 512, 10) < segment_sweep.MAX_SEGMENTS_PER_TILE
+    raster, _ = _raster(tmp_path)
+    r = segment_sweep.sweep(raster, tmp_path / "o", densities=(20,), tile_size=64, workers=1)
+    assert r["warnings"] == []
+    assert json.loads((tmp_path / "o" / "segment_sweep_manifest.json").read_text())["warnings"] == []

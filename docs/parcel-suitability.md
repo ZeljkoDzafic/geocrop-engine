@@ -1,8 +1,10 @@
 # Parcel geometry suitability for 10 m analysis
 
-`geocrop parcel-suitability` answers one question **before** a declaration is analysed: is the parcel technically
-suitable for reliable Sentinel-2 (10 m) classification? A narrow strip or a sliver has few or no pixels that are not
-mixed with its surroundings, so any class decision on it is unreliable whatever the declaration says.
+`geocrop parcel-suitability` answers one question **before** a declaration is analysed: does the parcel pass
+the screening thresholds for Sentinel-2 (10 m) classification? A narrow strip or a sliver has few or no pixels that are not
+mixed with its surroundings, so a class decision on it is less reliable whatever the declaration says. The thresholds are
+starting values, not validated, and the share of excluded parcels depends strongly on them (sensitivity grid), so a parcel
+that fails them is not shown to be impossible to analyse.
 
 **Semantics.** A parcel that fails the criteria is *insufficient spatial resolution for reliable satellite analysis*. This is not a
 finding about the declaration: it is neither supported nor unsupported by it, and such parcels should be reported as a

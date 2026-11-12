@@ -35,9 +35,25 @@ from . import __version__
 from .hashing import sha256
 
 DEFAULT_DENSITIES = (100, 300, 500, 1000)
+# SLIC memory grows quickly with the number of segments per tile: about 105,000 per 1024-pixel tile (1000/km2 at 10 m)
+# exhausted 48 GB, about 26,000 (same density, 512-pixel tiles) ran in a few GB.
+MAX_SEGMENTS_PER_TILE = 60_000
+MIN_COVERAGE = 0.99
 NOTE = ("Segmentation-assisted post-classification refinement: segments aggregate pixel classes/probabilities of an "
         "existing classifier. It is not an independent GEOBIA classification. Results are a recommendation for human "
         "review, not a validated conclusion.")
+
+
+def segments_per_tile(density_per_km2: float, tile_size: int, pixel_size_m: float) -> float:
+    """Expected number of SLIC segments in one full tile at the requested density."""
+    return float(density_per_km2) * (tile_size * pixel_size_m / 1000.0) ** 2
+
+
+def parcel_coverage(seg: gpd.GeoDataFrame, parcels: gpd.GeoDataFrame) -> float:
+    """Share of the parcel area that lies inside some segment (1 = no gaps). Gaps appear when small segments are
+    dropped (``min_area_pixels``) or when tiles are skipped."""
+    pu = parcels.geometry.union_all()
+    return float(pu.intersection(seg.geometry.union_all()).area / pu.area) if pu.area > 0 else float("nan")
 
 
 def segment_stats(seg: gpd.GeoDataFrame, min_ha: float = 0.03) -> dict:
@@ -170,6 +186,13 @@ def sweep(raster: str | Path, out: str | Path, densities=DEFAULT_DENSITIES, band
         if src.crs is None or not src.crs.is_projected or abs(src.crs.linear_units_factor[1] - 1) > 1e-9:
             raise ValueError("The sweep requires a raster in a projected CRS in metres")
         crs = src.crs
+        pixel_size = abs(src.transform.a)
+    warnings: list[str] = []
+    for d in dens:
+        n = segments_per_tile(d, tile_size, pixel_size)
+        if n > MAX_SEGMENTS_PER_TILE:
+            warnings.append(f"density {d:g}/km2 gives about {n:,.0f} segments per {tile_size}-pixel tile (more than "
+                            f"{MAX_SEGMENTS_PER_TILE:,}): high memory use is likely; use a smaller tile_size")
     par = gpd.read_file(parcels).to_crs(crs) if parcels else None
     ref = gpd.read_file(reference).to_crs(crs) if reference else None
     opts = dict(presence_options or {})
@@ -191,6 +214,11 @@ def sweep(raster: str | Path, out: str | Path, densities=DEFAULT_DENSITIES, band
                "segments_before_merge": r["segments_before_merge"], "seam_merges": r["seam_merges"]}
         if par is not None:
             row.update(parcel_comparison(seg, par, min_segments))
+            row["parcel_area_covered_share"] = parcel_coverage(seg, par)
+            if row["parcel_area_covered_share"] < MIN_COVERAGE:
+                warnings.append(f"density {d:g}/km2: segments cover only {row['parcel_area_covered_share']:.1%} of the "
+                                f"parcel area (min_area_pixels={min_area_pixels} drops small segments); the results "
+                                "for this density are not comparable with a gap-free one")
         if ref is not None:
             row.update(purity(seg, ref, label_field))
         if base is not None:
@@ -214,11 +242,11 @@ def sweep(raster: str | Path, out: str | Path, densities=DEFAULT_DENSITIES, band
                            "merge_distance": merge_distance, "workers": workers, "min_ha": min_ha,
                            "min_segments_per_parcel": min_segments, "label_field": label_field, "id_field": id_field,
                            "declared_field": declared_field, "presence_options": {k: str(v) for k, v in opts.items()}},
-                "note": NOTE}
+                "warnings": warnings, "note": NOTE}
     (out / "segment_sweep_manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf8")
     return {"csv": str(out / "segment_sweep.csv"), "markdown": str(out / "segment_sweep.md"),
             "manifest": str(out / "segment_sweep_manifest.json"), "densities": dens,
-            "segments": [int(s) for s in table.segments]}
+            "segments": [int(s) for s in table.segments], "warnings": warnings}
 
 
 def to_markdown(table: pd.DataFrame) -> str:

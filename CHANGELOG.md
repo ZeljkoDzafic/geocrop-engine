@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.0rc5 — 2026-11-12
+
+Release candidate; contains everything in 1.0.0rc4. `geocrop segmentation-sweep` now warns when the segments leave gaps in the parcel area (small segments dropped by `min_area_pixels`) or when the requested density gives so many segments per tile that memory use is likely to be high; the warnings are returned and written to the manifest, and the results are unchanged. `geocrop parcel-suitability` wording (note of the outputs, command help, documentation) now says that a parcel failing the unvalidated screening thresholds is not shown to be impossible to analyse and is not an unsupported declaration. All thresholds are unvalidated; outputs are recommendations for human review and describe satellite consistency, not detection accuracy.
+
 ## 1.0.0rc4 — 2026-11-11
 
 Pre-release. Highlights: parcel geometry suitability (`geocrop parcel-suitability`), an audit of the P3 rule of `crop-presence` with a majority-independent presence criterion and a taxonomy of mismatch reasons, a segment-density sweep for segmentation-assisted refinement (`geocrop segmentation-sweep`) and a generic temporal-window analysis with an in-season leakage guard (`geocrop windows`). All thresholds are unvalidated; outputs are recommendations for human review and describe satellite consistency, not detection accuracy.

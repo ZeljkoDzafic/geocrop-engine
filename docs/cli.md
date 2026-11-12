@@ -282,7 +282,7 @@ Jeffries-Matusita separability of class pairs per period and feature (parcel mea
 
 ## `geocrop parcel-suitability`
 
-Is a parcel technically suitable for reliable 10 m analysis? Area, width, inner and reliable pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)
+Does a parcel pass the screening thresholds for 10 m analysis? Area, width, inner and reliable pixels, threshold sensitivity, optional P1/P2/P3 on suitable parcels (unvalidated thresholds)
 
 | Option | Required | Default | Notes |
 |---|---|---|---|
